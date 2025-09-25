@@ -1,7 +1,7 @@
 use crate::steam_api::{CloudFile, SteamCloudManager};
 use eframe::egui;
 use rfd::FileDialog;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
@@ -52,15 +52,26 @@ impl SteamCloudApp {
         
         #[cfg(target_os = "windows")]
         {
-            let font_dir = std::env::var("WINDIR")
-                .map(|w| format!("{}/Fonts", w))
-                .unwrap_or_else(|_| "C:/Windows/Fonts".to_string());
+            let mut font_dirs = Vec::new();
+            
+            if let Ok(windir) = std::env::var("WINDIR") {
+                font_dirs.push(PathBuf::from(format!("{}/Fonts", windir)));
+            }
+            
+            if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
+                font_dirs.push(PathBuf::from(format!("{}\\Microsoft\\Windows\\Fonts", localappdata)));
+            }
                 
-            if let Ok(entries) = std::fs::read_dir(&font_dir) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("ttf") {
-                        font_paths.push(path);
+            for font_dir in font_dirs {
+                if let Ok(entries) = std::fs::read_dir(&font_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if let Some(ext) = path.extension() {
+                            let ext_str = ext.to_str().unwrap_or("").to_lowercase();
+                            if ext_str == "ttf" || ext_str == "ttc" || ext_str == "otf" {
+                                font_paths.push(path);
+                            }
+                        }
                     }
                 }
             }
@@ -105,20 +116,32 @@ impl SteamCloudApp {
                 .unwrap_or("")
                 .to_lowercase();
             
-            if name.contains("noto") && name.contains("cjk") { 0 }
-            else if name.contains("pingfang") { 1 }
-            else if name.contains("msyh") || name.contains("yahei") { 2 }
-            else if name.contains("simsun") || name.contains("songti") { 3 }
-            else if name.contains("arial") && name.contains("unicode") { 4 }
-            else if name.contains("wqy") { 5 }
-            else if name.contains("dejavu") { 6 }
-            else if name.contains("liberation") { 7 }
-            else { 100 }
+            #[cfg(target_os = "windows")]
+            {
+                if name.contains("msyh") || name.contains("microsoft yahei") { 0 }
+                else if name.contains("simsun") { 1 }
+                else if name.contains("simhei") { 2 }
+                else if name.contains("arial") { 3 }
+                else if name.contains("segoe") { 4 }
+                else if name.contains("noto") && name.contains("cjk") { 5 }
+                else { 100 }
+            }
+            
+            #[cfg(not(target_os = "windows"))]
+            {
+                if name.contains("msyh") || name.contains("microsoft yahei") { 0 }
+                else if name.contains("simhei") || name.contains("heiti") { 1 }
+                else if name.contains("arial") { 2 }
+                else if name.contains("noto") && name.contains("cjk") { 3 }
+                else if name.contains("sarasa") { 4 }
+                else if name.contains("source") && name.contains("han") { 5 }
+                else if name.contains("wenquanyi") { 10 }
+                else { 100 }
+            }
         });
         
         font_paths
     }
-
     fn format_size(size: i32) -> String {
         let bytes = if size < 0 { 0.0 } else { size as f64 };
         if bytes < 1024.0 {
@@ -208,7 +231,7 @@ impl SteamCloudApp {
                 self.status_message = "正在连接到 Steam...".to_string();
                 
                 let result = {
-                    let mut manager = self.steam_manager.lock().expect("steam_manager 锁不可用");
+                    let mut manager = self.steam_manager.lock().unwrap();
                     manager.connect(app_id)
                 };
                 match result {
@@ -248,7 +271,7 @@ impl SteamCloudApp {
 
     fn auto_refresh_after_connect(&mut self) {
         // 连接后延迟一小段时间再自动刷新，确保 Steam API 完全就绪
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        std::thread::sleep(Duration::from_millis(500));
         self.refresh_files_internal();
     }
 
@@ -263,7 +286,7 @@ impl SteamCloudApp {
     fn refresh_files_internal(&mut self) {
         self.is_refreshing = true;
         let result = {
-            let mgr = self.steam_manager.lock().expect("steam_manager 锁不可用");
+            let mgr = self.steam_manager.lock().unwrap();
             mgr.get_files()
         };
         match result {
@@ -315,6 +338,15 @@ impl SteamCloudApp {
         
         match result {
             Ok(data) => {
+                 if let Some(parent) = path.parent() {
+                    if !parent.exists() {
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                            self.show_error(&format!("创建目录失败: {}", e));
+                            return;
+                        }
+                    }
+                }
+                
                 match std::fs::write(path, data) {
                     Ok(()) => {
                         self.status_message = format!("文件已下载: {}", path.display());
@@ -342,9 +374,16 @@ impl SteamCloudApp {
         {
             match std::fs::read(&path) {
                 Ok(data) => {
+                    // Windows下确保文件名的正确处理
                     let filename = path.file_name()
                         .and_then(|name| name.to_str())
-                        .unwrap_or("unknown_file");
+                        .map(|name| {
+                            // 移除Windows路径分隔符
+                            name.replace('\\', "/")
+                        })
+                        .unwrap_or("unknown_file".to_string());
+                    
+                    let filename = filename.as_str();
                     
                     let result = {
                         let manager = self.steam_manager.lock().unwrap();

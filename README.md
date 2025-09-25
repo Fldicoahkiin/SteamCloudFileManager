@@ -48,7 +48,9 @@ Steam 云自动在不同设备间同步游戏存档，但缺少统一的文件�
   - Linux（glibc 2.31+，如 Ubuntu 20.04、Debian 11、Fedora 34 或同等版本）
 
 **构建要求：**
-- Rust 1.70 或更高版本
+- Rust 1.70+ (推荐使用 1.82.0 stable 或更新版本)
+  - edition 2021 支持
+  - 如需使用 edition 2024，需要 Rust nightly 版本
 - Cargo 包管理器
 - C++ 构建工具（因平台而异）：
   - Windows: Visual Studio 2019+ 或 Visual Studio 构建工具
