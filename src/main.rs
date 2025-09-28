@@ -6,7 +6,7 @@ use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
     env_logger::init();
-    
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([800.0, 600.0])
@@ -14,7 +14,7 @@ fn main() -> Result<(), eframe::Error> {
             .with_icon(load_icon()),
         ..Default::default()
     };
-    
+
     eframe::run_native(
         "Steam 云文件管理器",
         options,
@@ -24,7 +24,7 @@ fn main() -> Result<(), eframe::Error> {
 
 fn load_icon() -> egui::IconData {
     let icon_bytes = include_bytes!("../assets/steam_logo.png");
-    
+
     match image::load_from_memory(icon_bytes) {
         Ok(image) => {
             let rgba = image.to_rgba8();
@@ -35,12 +35,10 @@ fn load_icon() -> egui::IconData {
                 height,
             }
         }
-        Err(_) => {
-            egui::IconData {
-                rgba: vec![255; 32 * 32 * 4],
-                width: 32,
-                height: 32,
-            }
-        }
+        Err(_) => egui::IconData {
+            rgba: vec![255; 32 * 32 * 4],
+            width: 32,
+            height: 32,
+        },
     }
 }

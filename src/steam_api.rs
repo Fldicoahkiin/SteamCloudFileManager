@@ -175,7 +175,7 @@ impl SteamCloudManager {
             let timestamp = Local
                 .timestamp_opt(steam_file_handle.timestamp(), 0)
                 .single()
-                .unwrap_or_else(|| Local::now());
+                .unwrap_or_else(Local::now);
 
             let file = CloudFile {
                 name: steam_file.name,
@@ -198,9 +198,7 @@ impl SteamCloudManager {
 
         // 根据已用空间动态估算总配额
         // Steam 云存储配额通常是 100MB、200MB、1GB 等固定值
-        let estimated_total = if used_bytes == 0 {
-            100_000_000u64 // 默认100MB（新游戏常见配额）
-        } else if used_bytes < 50_000_000 {
+        let estimated_total = if used_bytes < 50_000_000 {
             100_000_000u64 // < 50MB，可能是100MB配额
         } else if used_bytes < 100_000_000 {
             200_000_000u64 // 50-100MB，可能是200MB配额
