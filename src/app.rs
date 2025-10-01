@@ -13,17 +13,12 @@ enum SortColumn {
     Time,
 }
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Default)]
 enum SortOrder {
     Ascending,
     Descending,
+    #[default]
     None,
-}
-
-impl Default for SortOrder {
-    fn default() -> Self {
-        SortOrder::None
-    }
 }
 
 #[derive(Default)]
@@ -198,7 +193,7 @@ impl SteamCloudApp {
     fn draw_tree_items(&mut self, ui: &mut egui::Ui, parent_path: &str, indent: usize) {
         let mut folders = std::collections::HashMap::<String, Vec<usize>>::new();
         let mut direct_files = Vec::new();
-        
+
         for (idx, file) in self.files.iter().enumerate() {
             if self.show_only_local && file.exists {
                 continue;
@@ -206,14 +201,14 @@ impl SteamCloudApp {
             if self.show_only_cloud && !file.exists {
                 continue;
             }
-            
+
             if !self.search_query.is_empty() {
                 let query = self.search_query.to_lowercase();
                 if !file.name.to_lowercase().contains(&query) {
                     continue;
                 }
             }
-            
+
             let relative_path = if parent_path.is_empty() {
                 file.name.as_str()
             } else if file.name.starts_with(&format!("{}/", parent_path)) {
@@ -221,7 +216,7 @@ impl SteamCloudApp {
             } else {
                 continue;
             };
-            
+
             if let Some(slash_pos) = relative_path.find('/') {
                 let folder_name = relative_path[..slash_pos].to_string();
                 let folder_path = if parent_path.is_empty() {
@@ -229,36 +224,39 @@ impl SteamCloudApp {
                 } else {
                     format!("{}/{}", parent_path, folder_name)
                 };
-                folders.entry(folder_path).or_insert_with(Vec::new).push(idx);
+                folders.entry(folder_path).or_default().push(idx);
             } else {
                 direct_files.push(idx);
             }
         }
-        
+
         let mut sorted_folders: Vec<_> = folders.keys().cloned().collect();
         sorted_folders.sort();
-        
+
         let dragging = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
-        
+
         for folder_path in sorted_folders {
-            let folder_name = folder_path.split('/').last().unwrap_or(&folder_path);
+            let folder_name = folder_path.split('/').next_back().unwrap_or(&folder_path);
             let indent_str = "  ".repeat(indent);
-            
+
             let is_expanded = self.expanded_folders.contains(&folder_path);
             let arrow = if is_expanded { "▼" } else { "▶" };
-            
+
             let label = format!("{}{} [文件夹] {}", indent_str, arrow, folder_name);
             let resp = ui.selectable_label(false, &label);
-            
+
             if dragging && ui.rect_contains_pointer(resp.rect) {
                 ui.painter().rect(
                     resp.rect,
                     3.0,
                     egui::Color32::from_rgba_unmultiplied(100, 149, 237, 30),
-                    egui::Stroke::new(2.0, egui::Color32::from_rgba_unmultiplied(100, 149, 237, 160)),
+                    egui::Stroke::new(
+                        2.0,
+                        egui::Color32::from_rgba_unmultiplied(100, 149, 237, 160),
+                    ),
                 );
             }
-            
+
             if resp.clicked() {
                 if is_expanded {
                     self.expanded_folders.remove(&folder_path);
@@ -266,26 +264,26 @@ impl SteamCloudApp {
                     self.expanded_folders.insert(folder_path.clone());
                 }
             }
-            
+
             ui.label("-");
             ui.label("-");
             ui.label("-");
             ui.label("-");
             ui.end_row();
-            
+
             if is_expanded {
                 self.draw_tree_items(ui, &folder_path, indent + 1);
             }
         }
-        
+
         for &index in &direct_files {
             let file = &self.files[index];
-            let file_name = file.name.split('/').last().unwrap_or(&file.name);
+            let file_name = file.name.split('/').next_back().unwrap_or(&file.name);
             let indent_str = "  ".repeat(indent);
-            
+
             let is_selected = self.selected_files.contains(&index);
             let label = format!("{}{}", indent_str, file_name);
-            
+
             if ui.selectable_label(is_selected, &label).clicked() {
                 if self.multi_select_mode {
                     if is_selected {
@@ -300,7 +298,7 @@ impl SteamCloudApp {
                     }
                 }
             }
-            
+
             ui.label(Self::format_size(file.size));
             ui.label(file.timestamp.format("%Y-%m-%d %H:%M:%S").to_string());
             ui.label(if file.is_persisted { "✓" } else { "✕" });
@@ -308,7 +306,7 @@ impl SteamCloudApp {
             ui.end_row();
         }
     }
-    
+
     fn format_size(size: i32) -> String {
         let bytes = if size < 0 { 0.0 } else { size as f64 };
         if bytes < 1024.0 {
@@ -570,14 +568,19 @@ impl SteamCloudApp {
         #[cfg(target_os = "macos")]
         {
             if let Ok(home) = std::env::var("HOME") {
-                let steam_userdata = PathBuf::from(home.clone())
-                    .join("Library/Application Support/Steam/userdata");
-                
+                let steam_userdata =
+                    PathBuf::from(home.clone()).join("Library/Application Support/Steam/userdata");
+
                 if let Ok(entries) = std::fs::read_dir(&steam_userdata) {
                     for entry in entries.flatten() {
                         if let Some(dir_name) = entry.path().file_name() {
-                            if dir_name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
-                                let user_path = entry.path().join(format!("{}", app_id)).join("remote");
+                            if dir_name
+                                .to_string_lossy()
+                                .chars()
+                                .all(|c| c.is_ascii_digit())
+                            {
+                                let user_path =
+                                    entry.path().join(format!("{}", app_id)).join("remote");
                                 if user_path.exists() {
                                     self.local_save_path = Some(user_path);
                                     return;
@@ -591,14 +594,18 @@ impl SteamCloudApp {
         #[cfg(target_os = "linux")]
         {
             if let Ok(home) = std::env::var("HOME") {
-                let steam_userdata = PathBuf::from(home)
-                    .join(".steam/steam/userdata");
-                    
+                let steam_userdata = PathBuf::from(home).join(".steam/steam/userdata");
+
                 if let Ok(entries) = std::fs::read_dir(&steam_userdata) {
                     for entry in entries.flatten() {
                         if let Some(dir_name) = entry.path().file_name() {
-                            if dir_name.to_string_lossy().chars().all(|c| c.is_ascii_digit()) {
-                                let user_path = entry.path().join(format!("{}", app_id)).join("remote");
+                            if dir_name
+                                .to_string_lossy()
+                                .chars()
+                                .all(|c| c.is_ascii_digit())
+                            {
+                                let user_path =
+                                    entry.path().join(format!("{}", app_id)).join("remote");
                                 if user_path.exists() {
                                     self.local_save_path = Some(user_path);
                                     return;
@@ -869,7 +876,7 @@ impl SteamCloudApp {
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label("App ID:");
-            ui.text_edit_singleline(&mut self.app_id_input);
+            ui.add(egui::TextEdit::singleline(&mut self.app_id_input).desired_width(150.0));
 
             let connect_btn = ui.add_enabled(
                 !self.is_connecting,
@@ -916,123 +923,146 @@ impl SteamCloudApp {
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        ui.separator();
-
         if self.is_refreshing {
-            ui.label("正在刷新文件列表...");
+            ui.centered_and_justified(|ui| {
+                ui.label("正在刷新文件列表...");
+            });
             return;
         }
 
         if self.files.is_empty() {
-            ui.label("没有找到云文件");
+            ui.centered_and_justified(|ui| {
+                ui.label("没有找到云文件");
+            });
             return;
         }
 
         ui.horizontal(|ui| {
             if let Some(ref local_path) = self.local_save_path {
-                ui.label(format!("本地存档路径: {}", local_path.display()));
-                if ui.button("打开文件夹").clicked() {
-                    #[cfg(target_os = "macos")]
-                    {
-                        let _ = std::process::Command::new("open").arg(local_path).spawn();
-                    }
-                    #[cfg(target_os = "windows")]
-                    {
-                        let _ = std::process::Command::new("explorer").arg(local_path).spawn();
-                    }
-                    #[cfg(target_os = "linux")]
-                    {
-                        let _ = std::process::Command::new("xdg-open").arg(local_path).spawn();
-                    }
-                }
+                ui.label("本地存档路径:");
+                let path_str = local_path.display().to_string();
+                ui.add(
+                    egui::Label::new(egui::RichText::new(path_str).monospace().weak()).truncate(),
+                );
             } else {
                 ui.label("本地存档路径: 未找到");
             }
-            
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("清除搜索").clicked() {
-                    self.search_query.clear();
-                }
-                ui.add(egui::TextEdit::singleline(&mut self.search_query).desired_width(200.0).hint_text("搜索文件..."));
-                
-                if ui.selectable_label(self.show_only_local, "仅本地").clicked() {
-                    self.show_only_local = !self.show_only_local;
-                    if self.show_only_local {
-                        self.show_only_cloud = false;
-                    }
-                }
-                
-                if ui.selectable_label(self.show_only_cloud, "仅云端").clicked() {
-                    self.show_only_cloud = !self.show_only_cloud;
-                    if self.show_only_cloud {
-                        self.show_only_local = false;
-                    }
-                }
-                
-                if ui.selectable_label(self.multi_select_mode, "多选模式").clicked() {
-                    self.multi_select_mode = !self.multi_select_mode;
-                }
-            });
         });
 
-        let scroll_area = egui::ScrollArea::vertical();
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::TextEdit::singleline(&mut self.search_query)
+                    .desired_width(200.0)
+                    .hint_text("搜索文件..."),
+            );
+
+            if ui.button("清除搜索").clicked() {
+                self.search_query.clear();
+            }
+
+            ui.separator();
+
+            if ui
+                .selectable_label(self.show_only_local, "仅本地")
+                .clicked()
+            {
+                self.show_only_local = !self.show_only_local;
+                if self.show_only_local {
+                    self.show_only_cloud = false;
+                }
+            }
+
+            if ui
+                .selectable_label(self.show_only_cloud, "仅云端")
+                .clicked()
+            {
+                self.show_only_cloud = !self.show_only_cloud;
+                if self.show_only_cloud {
+                    self.show_only_local = false;
+                }
+            }
+
+            if ui
+                .selectable_label(self.multi_select_mode, "多选模式")
+                .clicked()
+            {
+                self.multi_select_mode = !self.multi_select_mode;
+            }
+        });
+
+        let available_height = ui.available_height();
+        let scroll_area = egui::ScrollArea::vertical().max_height(available_height);
         let scroll_output = scroll_area.show(ui, |ui| {
             egui::Grid::new("file_grid")
                 .num_columns(5)
                 .striped(true)
-                .min_col_width(60.0)
+                .spacing([8.0, 4.0])
+                .min_col_width(ui.available_width() / 5.0)
                 .show(ui, |ui| {
-                    if ui.button(if self.sort_column == Some(SortColumn::Name) {
-                        match self.sort_order {
-                            SortOrder::Ascending => "文件名 ▲",
-                            SortOrder::Descending => "文件名 ▼",
-                            SortOrder::None => "文件名",
-                        }
-                    } else {
-                        "文件名"
-                    }).clicked() {
+                    if ui
+                        .button(if self.sort_column == Some(SortColumn::Name) {
+                            match self.sort_order {
+                                SortOrder::Ascending => "文件名 ▲",
+                                SortOrder::Descending => "文件名 ▼",
+                                SortOrder::None => "文件名",
+                            }
+                        } else {
+                            "文件名"
+                        })
+                        .clicked()
+                    {
                         self.sort_files(SortColumn::Name);
                     }
-                    
-                    if ui.button(if self.sort_column == Some(SortColumn::Size) {
-                        match self.sort_order {
-                            SortOrder::Ascending => "大小 ▲",
-                            SortOrder::Descending => "大小 ▼",
-                            SortOrder::None => "大小",
-                        }
-                    } else {
-                        "大小"
-                    }).clicked() {
+
+                    if ui
+                        .button(if self.sort_column == Some(SortColumn::Size) {
+                            match self.sort_order {
+                                SortOrder::Ascending => "大小 ▲",
+                                SortOrder::Descending => "大小 ▼",
+                                SortOrder::None => "大小",
+                            }
+                        } else {
+                            "大小"
+                        })
+                        .clicked()
+                    {
                         self.sort_files(SortColumn::Size);
                     }
-                    
-                    if ui.button(if self.sort_column == Some(SortColumn::Time) {
-                        match self.sort_order {
-                            SortOrder::Ascending => "修改时间 ▲",
-                            SortOrder::Descending => "修改时间 ▼",
-                            SortOrder::None => "修改时间",
-                        }
-                    } else {
-                        "修改时间"
-                    }).clicked() {
+
+                    if ui
+                        .button(if self.sort_column == Some(SortColumn::Time) {
+                            match self.sort_order {
+                                SortOrder::Ascending => "修改时间 ▲",
+                                SortOrder::Descending => "修改时间 ▼",
+                                SortOrder::None => "修改时间",
+                            }
+                        } else {
+                            "修改时间"
+                        })
+                        .clicked()
+                    {
                         self.sort_files(SortColumn::Time);
                     }
-                    
-                    ui.label("保存");
+
+                    ui.label("本地已保存");
                     ui.label("云端已保存");
                     ui.end_row();
 
                     self.draw_tree_items(ui, "", 0);
                 });
         });
-        
-        if ui.ctx().input(|i| !i.raw.hovered_files.is_empty()) 
-            && ui.rect_contains_pointer(scroll_output.inner_rect) {
+
+        if ui.ctx().input(|i| !i.raw.hovered_files.is_empty())
+            && ui.rect_contains_pointer(scroll_output.inner_rect)
+        {
             ui.painter().rect(
                 scroll_output.inner_rect,
                 5.0,
                 egui::Color32::from_rgba_unmultiplied(100, 149, 237, 30),
-                egui::Stroke::new(2.0, egui::Color32::from_rgba_unmultiplied(100, 149, 237, 100)),
+                egui::Stroke::new(
+                    2.0,
+                    egui::Color32::from_rgba_unmultiplied(100, 149, 237, 100),
+                ),
             );
         }
     }
@@ -1045,14 +1075,14 @@ impl SteamCloudApp {
                 && self.remote_ready
                 && !self.is_refreshing
                 && !self.is_connecting;
-            
+
             if ui.button("全选").clicked() {
                 self.selected_files.clear();
                 for i in 0..self.files.len() {
                     self.selected_files.push(i);
                 }
             }
-            
+
             if ui.button("反选").clicked() {
                 let current_selected = self.selected_files.clone();
                 self.selected_files.clear();
@@ -1062,15 +1092,18 @@ impl SteamCloudApp {
                     }
                 }
             }
-            
+
             if ui.button("清除选择").clicked() {
                 self.selected_files.clear();
             }
-            
+
             ui.separator();
-            
+
             if ui
-                .add_enabled(can_ops && !self.selected_files.is_empty(), egui::Button::new("下载选中"))
+                .add_enabled(
+                    can_ops && !self.selected_files.is_empty(),
+                    egui::Button::new("下载选中"),
+                )
                 .clicked()
             {
                 self.download_selected_file();
@@ -1084,7 +1117,10 @@ impl SteamCloudApp {
             }
 
             if ui
-                .add_enabled(can_ops && !self.selected_files.is_empty(), egui::Button::new("删除选中"))
+                .add_enabled(
+                    can_ops && !self.selected_files.is_empty(),
+                    egui::Button::new("删除选中"),
+                )
                 .clicked()
             {
                 self.delete_selected_files();
@@ -1101,7 +1137,7 @@ impl SteamCloudApp {
                 let selected_count = self.selected_files.len();
                 let total_count = self.files.len();
                 ui.label(format!("已选: {}/{}", selected_count, total_count));
-                
+
                 if selected_count > 0 {
                     let mut total_size = 0i32;
                     for &idx in &self.selected_files {
@@ -1121,12 +1157,16 @@ impl SteamCloudApp {
         ui.horizontal(|ui| {
             ui.label("状态:");
             ui.label(&self.status_message);
-            
+
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if self.is_connected {
                     if let Ok(manager) = self.steam_manager.lock() {
                         if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
-                            let cloud_status = if enabled { "云存储: 开启" } else { "云存储: 关闭" };
+                            let cloud_status = if enabled {
+                                "云存储: 开启"
+                            } else {
+                                "云存储: 关闭"
+                            };
                             if ui.selectable_label(false, cloud_status).clicked() {
                                 let _ = manager.set_cloud_enabled_for_app(!enabled);
                             }
@@ -1244,18 +1284,22 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.heading("Steam 云文件管理器");
-
             self.draw_connection_panel(ui);
+        });
 
+        egui::TopBottomPanel::bottom("bottom_panel").show(ctx, |ui| {
+            self.draw_action_buttons(ui);
+            self.draw_status_panel(ui);
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| {
             if self.is_connected && self.remote_ready {
                 self.handle_file_drop(ctx, ui);
             }
 
             self.draw_file_list(ui);
-            self.draw_action_buttons(ui);
-            self.draw_status_panel(ui);
         });
 
         if self.show_error {

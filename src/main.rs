@@ -9,8 +9,8 @@ fn main() -> Result<(), eframe::Error> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            .with_inner_size([800.0, 600.0])
-            .with_min_inner_size([600.0, 400.0])
+            .with_inner_size([700.0, 600.0])
+            .with_min_inner_size([700.0, 400.0])
             .with_icon(load_icon()),
         ..Default::default()
     };
