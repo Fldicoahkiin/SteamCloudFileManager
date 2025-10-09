@@ -1,4 +1,7 @@
 # SteamCloudFileManager
+<p align="center">
+  <img src="assets/steam_cloud-iOS-Default-1024x1024@1x.png" width="160" alt="steam_cloud" />
+</p>
 
 [English](README.en.md) | **简体中文**
 
