@@ -176,8 +176,6 @@ Welcome to submit Issues and Pull Requests
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
-Copyright (c) 2025 SteamCloudFileManager Contributors
-
 ## Thanks
 
 - [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)

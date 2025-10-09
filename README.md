@@ -178,8 +178,6 @@ pub struct SteamCloudManager {
 
 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
 
-版权所有 (c) 2025 SteamCloudFileManager 贡献者
-
 ## 致谢
 
 - [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
