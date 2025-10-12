@@ -1,2 +1,32 @@
+# Rust
 /target
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# Steam
 steam_appid.txt
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Debug
+*.log
+debug/
+*.dSYM/
+
+# Release artifacts
+/dist
+/release
+/final-release
+
+# OS specific
+Thumbs.db
+desktop.ini
+
+CI_WORKFLOW.md
