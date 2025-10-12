@@ -46,7 +46,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
       - name: Build Release
         run: cargo build --release --target ${{ matrix.target }} --locked
@@ -106,7 +106,12 @@ jobs:
         id: previoustag
         run: |
           PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p')
-          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
+          if [ -z "$PREVIOUS_TAG" ]; then
+            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
+            echo "previous_tag=$FIRST_COMMIT" >> $GITHUB_OUTPUT
+          else
+            echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
+          fi
           
       - name: Prepare Release Notes
         run: |
