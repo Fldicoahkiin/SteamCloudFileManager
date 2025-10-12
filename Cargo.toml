@@ -9,7 +9,7 @@ license = "MIT"
 [dependencies]
 eframe = "0.28"
 egui = "0.28"
-steamworks = "0.11"
+steamworks = "0.12"
 tokio = { version = "1.0", features = ["full"] }
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
