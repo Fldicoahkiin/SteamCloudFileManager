@@ -3,97 +3,42 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
 
 permissions:
   contents: write
-  packages: write
 
 env:
   CARGO_TERM_COLOR: always
-  RUST_BACKTRACE: 1
 
 jobs:
-  create-release:
-    name: Create Release Draft
-    runs-on: ubuntu-latest
-    outputs:
-      release_id: ${{ steps.create_release.outputs.id }}
-      release_upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Get version from tag
-        id: get_version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Version: $VERSION"
-      
-      - name: Create Release Draft
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ steps.get_version.outputs.version }}
-          draft: true
-          prerelease: false
-          body: |
-            # Steam Cloud File Manager ${{ steps.get_version.outputs.version }}
-            
-            ## 更新内容
-            - 待补充
-            
-            ## 下载
-            选择适合您操作系统的版本：
-            - **Windows**: `steam-cloud-file-manager-windows-x86_64.exe`
-            - **macOS Intel**: `steam-cloud-file-manager-darwin-x86_64`
-            - **macOS Apple Silicon**: `steam-cloud-file-manager-darwin-aarch64`
-            - **Linux**: `steam-cloud-file-manager-linux-x86_64`
-
-  build-and-upload:
-    name: Build and Upload ${{ matrix.os_name }}-${{ matrix.arch }}
-    needs: create-release
+  build-release:
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
-            os_name: linux
-            arch: x86_64
+            name: Linux
             target: x86_64-unknown-linux-gnu
-            binary_name: steam-cloud-file-manager
-            asset_name: steam-cloud-file-manager-linux-x86_64
+            asset: steam-cloud-file-manager-linux-x64
           - os: windows-latest
-            os_name: windows
-            arch: x86_64
+            name: Windows
             target: x86_64-pc-windows-msvc
-            binary_name: steam-cloud-file-manager.exe
-            asset_name: steam-cloud-file-manager-windows-x86_64.exe
+            asset: steam-cloud-file-manager-windows-x64.exe
           - os: macos-latest
-            os_name: darwin
-            arch: x86_64
+            name: macOS-Intel
             target: x86_64-apple-darwin
-            binary_name: steam-cloud-file-manager
-            asset_name: steam-cloud-file-manager-darwin-x86_64
+            asset: steam-cloud-file-manager-macos-intel
           - os: macos-latest
-            os_name: darwin
-            arch: aarch64
+            name: macOS-ARM
             target: aarch64-apple-darwin
-            binary_name: steam-cloud-file-manager
-            asset_name: steam-cloud-file-manager-darwin-aarch64
+            asset: steam-cloud-file-manager-macos-arm
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
 
@@ -103,54 +48,78 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
-      - name: Download dependencies
-        run: cargo fetch --locked
-
       - name: Build Release
-        run: |
-          cargo build --release --target ${{ matrix.target }} --locked
-      
-      - name: Prepare Upload
+        run: cargo build --release --target ${{ matrix.target }} --locked
+
+      - name: Prepare artifact
         shell: bash
         run: |
-          mkdir -p upload
+          cd target/${{ matrix.target }}/release
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cp target/${{ matrix.target }}/release/SteamCloudFileManager.exe upload/${{ matrix.asset_name }}
+            cp SteamCloudFileManager.exe ${{ matrix.asset }}
           else
-            cp target/${{ matrix.target }}/release/SteamCloudFileManager upload/${{ matrix.asset_name }}
-            # 添加执行权限
-            chmod +x upload/${{ matrix.asset_name }}
+            cp SteamCloudFileManager ${{ matrix.asset }}
+            chmod +x ${{ matrix.asset }}
           fi
-          # 调试输出
-          echo "=== Files prepared for upload ==="
-          ls -la upload/
       
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          mkdir -p dmg_tmp
+          cp target/${{ matrix.target }}/release/${{ matrix.asset }} dmg_tmp/
+          
+          hdiutil create -volname "Steam Cloud File Manager" \
+            -srcfolder dmg_tmp \
+            -ov -format UDZO \
+            ${{ matrix.asset }}.dmg
+          
+          rm -rf dmg_tmp
+          
+      - name: Upload artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: actions/upload-artifact@v4
         with:
-          upload_url: ${{ needs.create-release.outputs.release_upload_url }}
-          asset_path: upload/${{ matrix.asset_name }}
-          asset_name: ${{ matrix.asset_name }}
-          asset_content_type: application/octet-stream
+          name: ${{ matrix.asset }}.dmg
+          path: ${{ matrix.asset }}.dmg
+          
+      - name: Upload artifact (non-macOS)
+        if: matrix.os != 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: target/${{ matrix.target }}/release/${{ matrix.asset }}
 
-  publish-release:
-    name: Publish Release
-    needs: [create-release, build-and-upload]
+  create-release:
+    name: Create Release
+    needs: build-release
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Publish Release
-        uses: actions/github-script@v7
+      - uses: actions/checkout@v4
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            await github.rest.repos.updateRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: ${{ needs.create-release.outputs.release_id }},
-              draft: false,
-              prerelease: false
-            });
-            console.log('Release published successfully!');
+          fetch-depth: 0
+      
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Get previous tag
+        id: previoustag
+        run: |
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p')
+          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
+          
+      - name: Prepare Release Notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
+          
+          sed "s/{VERSION}/$VERSION/g; s/{PREVIOUS_TAG}/$PREVIOUS_TAG/g" .github/release-template.md > release-notes.md
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          body_path: release-notes.md
+          generate_release_notes: true
+          draft: false
+          prerelease: false
