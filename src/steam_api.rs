@@ -1,10 +1,10 @@
+use crate::vdf_parser::VdfParser;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, TimeZone};
 use std::io::Read;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use steamworks::Client;
-use crate::vdf_parser::VdfParser;
 
 #[derive(Default)]
 pub struct SteamCloudManager {
@@ -19,6 +19,7 @@ pub struct CloudFile {
     pub timestamp: DateTime<Local>,
     pub is_persisted: bool,
     pub exists: bool,
+    #[allow(dead_code)]
     pub root: u32,
     pub root_description: String,
 }
@@ -161,39 +162,48 @@ impl SteamCloudManager {
                 return Ok(vdf_files);
             }
         }
-        
+
         // 如果VDF解析失败，回退到Steam API
         log::info!("VDF解析失败或无文件，尝试Steam API...");
-        
+
         let client = self.client.lock().unwrap();
         let client = client
             .as_ref()
             .ok_or_else(|| anyhow!("Steam客户端未连接"))?;
 
         let remote_storage = client.remote_storage();
-        
+
         // 检查云同步状态
         let cloud_enabled_account = remote_storage.is_cloud_enabled_for_account();
         let cloud_enabled_app = remote_storage.is_cloud_enabled_for_app();
-        
-        log::info!("云同步状态 - 账户: {}, 应用: {}", cloud_enabled_account, cloud_enabled_app);
-        
+
+        log::info!(
+            "云同步状态 - 账户: {}, 应用: {}",
+            cloud_enabled_account,
+            cloud_enabled_app
+        );
+
         if !cloud_enabled_account {
             log::warn!("此Steam账户未启用云同步功能");
         }
-        
+
         if !cloud_enabled_app {
             log::warn!("此应用未启用云同步功能");
         }
-        
+
         let steam_files = remote_storage.files();
         log::info!("Steam API返回 {} 个文件", steam_files.len());
-        
+
         let mut files = Vec::new();
 
         for (i, steam_file) in steam_files.iter().enumerate() {
-            log::debug!("文件 {}: {} ({} bytes)", i + 1, steam_file.name, steam_file.size);
-            
+            log::debug!(
+                "文件 {}: {} ({} bytes)",
+                i + 1,
+                steam_file.name,
+                steam_file.size
+            );
+
             let steam_file_handle = remote_storage.file(&steam_file.name);
             let timestamp = Local
                 .timestamp_opt(steam_file_handle.timestamp(), 0)
@@ -221,45 +231,47 @@ impl SteamCloudManager {
         if self.app_id == 0 {
             return Err(anyhow!("未设置App ID"));
         }
-        
+
         log::info!("尝试从VDF解析文件列表，App ID: {}", self.app_id);
-        
+
         // 创建VDF解析器
         let parser = VdfParser::new()?;
-        
+
         // 解析remotecache.vdf
         let vdf_entries = parser.parse_remotecache(self.app_id)?;
-        
+
         let mut files = Vec::new();
-        
+
         for entry in vdf_entries {
             log::debug!(
-                "VDF文件: {} (root={}, size={}, 实际路径={:?})", 
-                entry.filename, 
+                "VDF文件: {} (root={}, size={}, 实际路径={:?})",
+                entry.filename,
                 entry.root,
                 entry.size,
                 entry.actual_path
             );
-            
+
             let timestamp = Local
                 .timestamp_opt(entry.timestamp, 0)
                 .single()
                 .unwrap_or_else(Local::now);
-            
+
             let root_desc = Self::get_root_folder_name(entry.root);
-            
+
             let cloud_file = CloudFile {
                 name: entry.filename.clone(),
                 size: entry.size,
                 timestamp,
                 is_persisted: entry.sync_state == 1,
-                exists: entry.actual_path.as_ref()
+                exists: entry
+                    .actual_path
+                    .as_ref()
                     .map(|p| p.exists())
                     .unwrap_or(false),
                 root: entry.root,
                 root_description: root_desc.clone(),
             };
-            
+
             if let Some(path) = &entry.actual_path {
                 log::info!(
                     "文件 {} 位于 {} ({})",
@@ -268,10 +280,10 @@ impl SteamCloudManager {
                     path.display()
                 );
             }
-            
+
             files.push(cloud_file);
         }
-        
+
         log::info!("VDF解析完成: {} 个文件", files.len());
         Ok(files)
     }
@@ -284,20 +296,20 @@ impl SteamCloudManager {
 
         // 根据已用空间动态估算总配额
         // Steam 云存储配额通常是 100MB、200MB、1GB 等固定值
-                let estimated_total = if used_bytes < 50_000_000 {
+        let estimated_total = if used_bytes < 50_000_000 {
             100_000_000u64 // < 50MB，可能是100MB配额
-                } else if used_bytes < 100_000_000 {
+        } else if used_bytes < 100_000_000 {
             200_000_000u64 // 50-100MB，可能是200MB配额
-                } else if used_bytes < 500_000_000 {
+        } else if used_bytes < 500_000_000 {
             1_000_000_000u64 // 100-500MB，可能是1GB配额
-                } else {
+        } else {
             // 超过500MB，按已用空间1.5倍估算
-                    (used_bytes as f64 * 1.5) as u64
-                };
+            (used_bytes as f64 * 1.5) as u64
+        };
 
-                let available_bytes = estimated_total.saturating_sub(used_bytes);
+        let available_bytes = estimated_total.saturating_sub(used_bytes);
 
-                Ok((estimated_total, available_bytes))
+        Ok((estimated_total, available_bytes))
     }
 
     fn calculate_used_space(&self) -> Result<u64> {
@@ -391,48 +403,79 @@ impl SteamCloudManager {
             1 => "GameInstall",
             2 => {
                 #[cfg(target_os = "windows")]
-                { "WinMyDocuments" }
+                {
+                    "WinMyDocuments"
+                }
                 #[cfg(target_os = "macos")]
-                { "MacDocuments" }
+                {
+                    "MacDocuments"
+                }
                 #[cfg(target_os = "linux")]
-                { "LinuxHome/Documents" }
-            },
+                {
+                    "LinuxHome/Documents"
+                }
+            }
             3 => {
                 #[cfg(target_os = "windows")]
-                { "WinAppDataRoaming" }
+                {
+                    "WinAppDataRoaming"
+                }
                 #[cfg(target_os = "macos")]
-                { "MacApplicationSupport" }
+                {
+                    "MacApplicationSupport"
+                }
                 #[cfg(target_os = "linux")]
-                { "LinuxHome/.config" }
-            },
+                {
+                    "LinuxHome/.config"
+                }
+            }
             4 => {
                 #[cfg(target_os = "windows")]
-                { "WinAppDataLocal" }
+                {
+                    "WinAppDataLocal"
+                }
                 #[cfg(target_os = "macos")]
-                { "MacCaches" }
+                {
+                    "MacCaches"
+                }
                 #[cfg(target_os = "linux")]
-                { "LinuxHome/.local/share" }
-            },
+                {
+                    "LinuxHome/.local/share"
+                }
+            }
             5 => {
                 #[cfg(target_os = "macos")]
-                { "MacPreferences" }
+                {
+                    "MacPreferences"
+                }
                 #[cfg(not(target_os = "macos"))]
-                { "Preferences" }
-            },
+                {
+                    "Preferences"
+                }
+            }
             9 => {
                 #[cfg(target_os = "windows")]
-                { "WinSavedGames" }
+                {
+                    "WinSavedGames"
+                }
                 #[cfg(not(target_os = "windows"))]
-                { "SavedGames" }
-            },
+                {
+                    "SavedGames"
+                }
+            }
             12 => {
                 #[cfg(target_os = "windows")]
-                { "WinAppDataLocalLow" }
+                {
+                    "WinAppDataLocalLow"
+                }
                 #[cfg(not(target_os = "windows"))]
-                { "LocalLow" }
-            },
+                {
+                    "LocalLow"
+                }
+            }
             _ => "Unknown",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 

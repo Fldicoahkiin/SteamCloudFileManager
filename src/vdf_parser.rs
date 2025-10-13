@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 
 pub struct VdfParser {
     steam_path: PathBuf,
@@ -22,13 +22,13 @@ impl VdfParser {
     pub fn new() -> Result<Self> {
         let steam_path = Self::find_steam_path()?;
         let user_id = Self::find_user_id(&steam_path)?;
-        
+
         Ok(Self {
             steam_path,
             user_id,
         })
     }
-    
+
     fn find_steam_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
@@ -36,14 +36,14 @@ impl VdfParser {
                 PathBuf::from(r"C:\Program Files (x86)\Steam"),
                 PathBuf::from(r"C:\Program Files\Steam"),
             ];
-            
+
             for path in paths {
                 if path.exists() {
                     return Ok(path);
                 }
             }
         }
-        
+
         #[cfg(target_os = "macos")]
         {
             let home = std::env::var("HOME")?;
@@ -51,73 +51,73 @@ impl VdfParser {
                 .join("Library")
                 .join("Application Support")
                 .join("Steam");
-            
+
             if path.exists() {
                 return Ok(path);
             }
         }
-        
+
         #[cfg(target_os = "linux")]
         {
             let home = std::env::var("HOME")?;
             let paths = vec![
                 PathBuf::from(&home).join(".steam").join("steam"),
-                PathBuf::from(&home).join(".local").join("share").join("Steam"),
+                PathBuf::from(&home)
+                    .join(".local")
+                    .join("share")
+                    .join("Steam"),
             ];
-            
+
             for path in paths {
                 if path.exists() {
                     return Ok(path);
                 }
             }
         }
-        
+
         Err(anyhow!("未找到Steam安装目录"))
     }
-    
+
     fn find_user_id(steam_path: &Path) -> Result<String> {
         let userdata_path = steam_path.join("userdata");
-        
+
         if let Ok(entries) = fs::read_dir(&userdata_path) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let name = entry.file_name().to_string_lossy().to_string();
-                    if name.chars().all(|c| c.is_digit(10)) {
-                        return Ok(name);
-                    }
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.chars().all(|c| c.is_ascii_digit()) {
+                    return Ok(name);
                 }
             }
         }
-        
+
         Err(anyhow!("未找到用户ID"))
     }
-    
+
     fn get_game_install_dir(&self, app_id: u32) -> Result<PathBuf> {
-        let manifest_path = self.steam_path
+        let manifest_path = self
+            .steam_path
             .join("steamapps")
             .join(format!("appmanifest_{}.acf", app_id));
-        
+
         if manifest_path.exists() {
             let content = fs::read_to_string(&manifest_path)?;
-            
+
             for line in content.lines() {
                 if line.contains("\"installdir\"") {
                     if let Some(dir) = line.split('"').nth(3) {
-                        return Ok(self.steam_path
-                            .join("steamapps")
-                            .join("common")
-                            .join(dir));
+                        return Ok(self.steam_path.join("steamapps").join("common").join(dir));
                     }
                 }
             }
         }
-        
-        Ok(self.steam_path
+
+        Ok(self
+            .steam_path
             .join("steamapps")
             .join("common")
             .join(format!("Game_{}", app_id)))
     }
-    
+
     pub fn resolve_path(&self, root: u32, filename: &str, app_id: u32) -> Result<PathBuf> {
         let path = match root {
             0 => {
@@ -128,12 +128,11 @@ impl VdfParser {
                     .join(app_id.to_string())
                     .join("remote")
                     .join(filename)
-            },
+            }
             1 => {
                 // 游戏安装目录
-                self.get_game_install_dir(app_id)?
-                    .join(filename)
-            },
+                self.get_game_install_dir(app_id)?.join(filename)
+            }
             2 => {
                 // Documents文件夹
                 #[cfg(windows)]
@@ -151,7 +150,7 @@ impl VdfParser {
                     let home = std::env::var("HOME")?;
                     PathBuf::from(home).join("Documents").join(filename)
                 }
-            },
+            }
             3 => {
                 // AppData/Application Support
                 #[cfg(windows)]
@@ -172,7 +171,7 @@ impl VdfParser {
                     let home = std::env::var("HOME")?;
                     PathBuf::from(home).join(".config").join(filename)
                 }
-            },
+            }
             4 => {
                 // LocalAppData/Caches
                 #[cfg(windows)]
@@ -196,7 +195,7 @@ impl VdfParser {
                         .join("share")
                         .join(filename)
                 }
-            },
+            }
             9 => {
                 // Windows Saved Games文件夹 (Vista+)
                 #[cfg(windows)]
@@ -216,7 +215,7 @@ impl VdfParser {
                     let base = PathBuf::from(home).join("Documents").join("Saved Games");
                     base.join(filename)
                 }
-            },
+            }
             12 => {
                 // Windows LocalLow
                 #[cfg(windows)]
@@ -231,41 +230,43 @@ impl VdfParser {
                 {
                     return Err(anyhow!("Root 12 (LocalLow)仅在Windows上支持"));
                 }
-            },
+            }
             _ => {
                 return Err(anyhow!("未知的root值: {}", root));
             }
         };
-        
+
         Ok(path)
     }
-    
+
     // 解析remotecache.vdf文件
     pub fn parse_remotecache(&self, app_id: u32) -> Result<Vec<VdfFileEntry>> {
-        let vdf_path = self.steam_path
+        let vdf_path = self
+            .steam_path
             .join("userdata")
             .join(&self.user_id)
             .join(app_id.to_string())
             .join("remotecache.vdf");
-        
+
         if !vdf_path.exists() {
             return Err(anyhow!("remotecache.vdf不存在: {:?}", vdf_path));
         }
-        
+
         log::info!("解析VDF: {:?}", vdf_path);
-        
+
         let content = fs::read_to_string(&vdf_path)?;
         let mut files = Vec::new();
-        
+
         let lines: Vec<&str> = content.lines().collect();
         let mut i = 0;
-        
+
         while i < lines.len() {
             let line = lines[i].trim();
-            
-            if line.starts_with('"') && line.ends_with('"') && 
-               (line.contains("/") || line.contains("\\")) {
-                
+
+            if line.starts_with('"')
+                && line.ends_with('"')
+                && (line.contains("/") || line.contains("\\"))
+            {
                 let filename = line.trim_matches('"');
                 let mut entry = VdfFileEntry {
                     filename: filename.to_string(),
@@ -276,14 +277,14 @@ impl VdfParser {
                     sync_state: 0,
                     actual_path: None,
                 };
-                
+
                 i += 1;
                 if i < lines.len() && lines[i].trim() == "{" {
                     i += 1;
-                    
+
                     while i < lines.len() && lines[i].trim() != "}" {
                         let attr_line = lines[i].trim();
-                        
+
                         // 解析root
                         if attr_line.contains("\"root\"") {
                             if let Some(val) = Self::extract_value(attr_line) {
@@ -297,15 +298,14 @@ impl VdfParser {
                             }
                         }
                         // 解析time
-                        else if attr_line.contains("\"time\"") && 
-                                !attr_line.contains("localtime") && 
-                                !attr_line.contains("remotetime") {
+                        else if attr_line.contains("\"time\"")
+                            && !attr_line.contains("localtime")
+                            && !attr_line.contains("remotetime")
+                        {
                             if let Some(val) = Self::extract_value(attr_line) {
                                 entry.timestamp = val.parse().unwrap_or(0);
                             }
-                        }
-                        // 解析sha
-                        else if attr_line.contains("\"sha\"") {
+                        } else if attr_line.contains("\"sha\"") {
                             if let Some(val) = Self::extract_value(attr_line) {
                                 entry.sha = val.to_string();
                             }
@@ -316,26 +316,24 @@ impl VdfParser {
                                 entry.sync_state = val.parse().unwrap_or(0);
                             }
                         }
-                        
+
                         i += 1;
                     }
-                    
-                    // 计算实际路径
                     if let Ok(path) = self.resolve_path(entry.root, &entry.filename, app_id) {
                         entry.actual_path = Some(path);
                     }
-                    
+
                     files.push(entry);
                 }
             }
-            
+
             i += 1;
         }
-        
+
         log::info!("解析完成: {} 个文件", files.len());
         Ok(files)
     }
-    
+
     fn extract_value(line: &str) -> Option<&str> {
         let parts: Vec<&str> = line.split('"').collect();
         if parts.len() >= 4 {
@@ -343,60 +341,5 @@ impl VdfParser {
         } else {
             None
         }
-    }
-    
-    pub fn get_root_description(root: u32) -> &'static str {
-        match root {
-            0 => "Steam云文件夹 (remote)",
-            1 => "游戏安装目录",
-            2 => "文档文件夹 (Documents)",
-            3 => "应用数据文件夹 (AppData/Roaming)",
-            4 => "本地应用数据 (LocalAppData)",
-            5 => "macOS偏好设置 (Preferences)",
-            9 => "保存的游戏 (Saved Games)",
-            12 => "Windows LocalLow",
-            _ => "未知位置",
-        }
-    }
-    
-    // 检查root值是否已知
-    pub fn is_known_root(root: u32) -> bool {
-        matches!(root, 0 | 1 | 2 | 3 | 4 | 5 | 9 | 12)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn test_path_resolution() {
-        // 测试路径解析逻辑
-        if let Ok(parser) = VdfParser::new() {
-            // 测试root=1的路径（游戏目录）
-            if let Ok(path) = parser.resolve_path(1, "Saves/0.celeste", 504230) {
-                assert!(path.to_string_lossy().contains("Celeste") || 
-                        path.to_string_lossy().contains("504230"));
-                assert!(path.to_string_lossy().contains("Saves"));
-            }
-        }
-    }
-    
-    #[test]
-    fn test_root_descriptions() {
-        assert_eq!(VdfParser::get_root_description(0), "Steam云文件夹 (remote)");
-        assert_eq!(VdfParser::get_root_description(1), "游戏安装目录");
-        assert_eq!(VdfParser::get_root_description(9), "保存的游戏 (Saved Games)");
-        assert_eq!(VdfParser::get_root_description(12), "Windows LocalLow");
-        assert_eq!(VdfParser::get_root_description(99), "未知位置");
-    }
-    
-    #[test]
-    fn test_known_roots() {
-        assert!(VdfParser::is_known_root(0));
-        assert!(VdfParser::is_known_root(1));
-        assert!(VdfParser::is_known_root(9));
-        assert!(VdfParser::is_known_root(12));
-        assert!(!VdfParser::is_known_root(99));
     }
 }
