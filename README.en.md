@@ -6,7 +6,7 @@
 **English** | [简体中文](README.md)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Rust](https://img.shields.io/badge/rust-%E2%89%A51.70-orange)](https://www.rust-lang.org)
+[![Rust](https://img.shields.io/badge/rust-1.90+-orange)](https://www.rust-lang.org)
 [![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey)](https://github.com/Fldicoahkiin/SteamCloudFileManager)
 
 > Cross-platform Steam Cloud file management utility built with Rust and egui.
@@ -15,7 +15,6 @@ This tool provides a graphical interface for managing Steam Cloud save files acr
 
 ## Table of Contents
 
-- [Background](#background)
 - [Install](#install)
   - [Dependencies](#dependencies)
   - [Building from Source](#building-from-source)
@@ -27,17 +26,6 @@ This tool provides a graphical interface for managing Steam Cloud save files acr
 - [Contributing](#contributing)
 - [License](#license)
 - [Thanks](#thanks)
-
-## Background
-
-Steam Cloud automatically synchronizes game saves across devices, but lacks a unified interface for direct file management. This project addresses that gap by providing:
-
-- Direct access to Steam Remote Storage without launching games
-- Batch operations for multiple save files
-- Cross-platform compatibility with native system integration
-- Real-time quota monitoring and file metadata display
-
-The implementation uses the Steamworks SDK through [steamworks-rs](https://github.com/Thinkofname/steamworks-rs) bindings, ensuring compatibility with official Steam APIs.
 
 ## Install
 
@@ -51,12 +39,24 @@ The implementation uses the Steamworks SDK through [steamworks-rs](https://githu
   - Linux with glibc 2.31+ (Ubuntu 20.04, Debian 11, Fedora 34, or equivalent)
 
 **Build Requirements:**
-- Rust 1.70 or later
+- **Rust 1.88+** (recommended 1.90.0 or later)
+  - edition 2021
+  - egui 0.33 requires Rust 1.88+
 - Cargo package manager
 - C++ build tools (platform-specific):
   - Windows: Visual Studio 2019+ or Build Tools for Visual Studio
   - macOS: Xcode Command Line Tools
   - Linux: gcc/g++ or clang
+
+**Key Dependencies:**
+```toml
+eframe = "0.33"        # GUI framework
+egui = "0.33"          # Immediate mode UI
+egui_extras = "0.33"  # Table component
+steamworks = "0.12"    # Steam API bindings
+chrono = "0.4"         # Time handling
+rfd = "0.15"           # File dialogs
+```
 
 ### Building from Source
 
@@ -133,20 +133,20 @@ The application interfaces with Steam through these primary APIs:
 
 ### Steam Remote Storage APIs
 
-| Function | Status | Description |
-|----------|--------|-------------|
-| `GetFileCount()` | ✅ | Retrieve total file count |
-| `GetFileNameAndSize()` | ✅ | Get file metadata |
-| `FileExists()` | ✅ | Check file existence |
-| `FilePersisted()` | ✅ | Verify persistence status |
-| `GetFileTimestamp()` | ✅ | Retrieve modification time |
-| `FileRead()` | ✅ | Download file content |
-| `FileWrite()` | ✅ | Upload file content |
-| `FileDelete()` | ✅ | Remove file from cloud |
-| `FileForget()` | ✅ | Stop tracking file |
-| `IsCloudEnabledForAccount()` | ✅ | Check account cloud status |
-| `IsCloudEnabledForApp()` | ✅ | Check app cloud status |
-| `SetCloudEnabledForApp()` | ✅ | Toggle app cloud sync |
+| Function | Description |
+|----------|-------------|
+| `GetFileCount()` | Retrieve total file count |
+| `GetFileNameAndSize()` | Get file metadata |
+| `FileExists()` | Check file existence |
+| `FilePersisted()` | Verify persistence status |
+| `GetFileTimestamp()` | Retrieve modification time |
+| `FileRead()` | Download file content |
+| `FileWrite()` | Upload file content |
+| `FileDelete()` | Remove file from cloud |
+| `FileForget()` | Stop tracking file |
+| `IsCloudEnabledForAccount()` | Check account cloud status |
+| `IsCloudEnabledForApp()` | Check app cloud status |
+| `SetCloudEnabledForApp()` | Toggle app cloud sync |
 
 ### Internal APIs
 
@@ -162,6 +162,24 @@ pub struct SteamCloudManager {
 }
 ```
 
+### VDF File Parsing
+
+This tool uses a **dual-approach strategy** to ensure maximum compatibility:
+
+**Primary Method: VDF Parsing**
+- Directly reads `remotecache.vdf` file for complete file list
+- Supports all root path types (0-12), not just `remote/` folder
+- Displays actual file storage locations on local disk
+- Works with most modern games
+
+**Fallback Method: Steam API**
+- Automatically falls back when VDF file is missing or parsing fails
+- Uses `ISteamRemoteStorage` API
+- Only supports root=0 files
+- Ensures basic functionality
+
+For more technical details, see [STEAM_CLOUD_LIMITATIONS.md](STEAM_CLOUD_LIMITATIONS.md)
+
 ## Contributing
 
 Welcome to submit Issues and Pull Requests
@@ -175,6 +193,25 @@ Welcome to submit Issues and Pull Requests
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
+
+## References
+
+### Official Documentation
+- [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud) - Root Paths Configuration
+- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - C++ API Reference
+- [Steamworks SDK](https://partner.steamgames.com/doc/sdk) - Complete SDK Download
+
+### Community Verification
+- [Stack Exchange: What data is in Steam Cloud?](https://gaming.stackexchange.com/questions/146644) - Root Value Mapping Confirmation
+- Reddit r/Steam - VDF File Format Discussion
+
+### Open Source Implementations
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - C# Steamworks Wrapper
+- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - VDF File Parser Library
+- [Rust Steamworks](https://github.com/Thinkofname/steamworks-rs) - Rust Bindings Used by This Project
+
+### Technical Articles
+- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - Root Override Configuration
 
 ## Thanks
 
