@@ -40,8 +40,7 @@ pub struct SteamCloudApp {
     since_connected: Option<Instant>,
     sort_column: Option<SortColumn>,
     sort_order: SortOrder,
-    local_save_path: Option<PathBuf>,
-    expanded_folders: std::collections::HashSet<String>,
+    local_save_paths: Vec<(String, PathBuf)>,
     search_query: String,
     show_only_local: bool,
     show_only_cloud: bool,
@@ -207,7 +206,7 @@ impl SteamCloudApp {
             }
 
             let is_selected = self.selected_files.contains(&index);
-            
+
             ui.label(&file.root_description);
 
             if ui.selectable_label(is_selected, &file.name).clicked() {
@@ -302,8 +301,7 @@ impl SteamCloudApp {
             since_connected: None,
             sort_column: None,
             sort_order: SortOrder::None,
-            local_save_path: None,
-            expanded_folders: std::collections::HashSet::new(),
+            local_save_paths: Vec::new(),
             search_query: String::new(),
             show_only_local: false,
             show_only_cloud: false,
@@ -339,7 +337,6 @@ impl SteamCloudApp {
                     Ok(()) => {
                         self.is_connecting = false;
                         self.is_connected = true;
-                        self.detect_local_save_path(app_id);
                         self.status_message =
                             format!("已连接到Steam (App ID: {})，正在初始化云存储...", app_id);
                         self.since_connected = Some(Instant::now());
@@ -377,30 +374,32 @@ impl SteamCloudApp {
             self.show_error("未连接到Steam");
             return;
         }
-        
+
         log::info!("开始刷新云文件列表...");
         self.is_refreshing = true;
-        
+
         let result = {
             let mgr = self.steam_manager.lock().unwrap();
             mgr.get_files()
         };
-        
+
         match result {
             Ok(files) => {
                 let count = files.len();
                 log::info!("成功获取 {} 个云文件", count);
-                
+
                 if count == 0 {
                     log::warn!("云文件列表为空，可能原因：");
                     log::warn!("1. 游戏确实没有云存档");
                     log::warn!("2. Steam API 还在初始化中，请等待几秒后重试");
                     log::warn!("3. 游戏的云同步功能未启用");
                 }
-                
+
                 self.files = files;
                 self.selected_files.clear();
                 self.update_quota();
+                self.update_local_save_paths();
+
                 self.status_message = format!("已加载 {} 个文件", count);
                 self.remote_ready = true;
             }
@@ -409,7 +408,7 @@ impl SteamCloudApp {
                 self.show_error(&format!("刷新文件列表失败: {}", err));
             }
         }
-        
+
         self.is_refreshing = false;
     }
 
@@ -453,68 +452,39 @@ impl SteamCloudApp {
         }
     }
 
-    fn open_local_save_folder(&self) {
-        if let Some(path) = &self.local_save_path {
-            #[cfg(target_os = "windows")]
-            {
-                let _ = std::process::Command::new("explorer").arg(path).spawn();
-            }
-            #[cfg(target_os = "macos")]
-            {
-                let _ = std::process::Command::new("open").arg(path).spawn();
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let _ = std::process::Command::new("xdg-open").arg(path).spawn();
-            }
-        }
-    }
-
-    fn detect_local_save_path(&mut self, app_id: u32) {
+    fn open_local_save_folder(&self, path: &PathBuf) {
         #[cfg(target_os = "windows")]
         {
-            let possible_paths = vec![
-                std::env::var("PROGRAMFILES(X86)")
-                    .ok()
-                    .map(|p| PathBuf::from(p).join("Steam")),
-                std::env::var("PROGRAMFILES")
-                    .ok()
-                    .map(|p| PathBuf::from(p).join("Steam")),
-                Some(PathBuf::from("C:\\Program Files (x86)\\Steam")),
-                Some(PathBuf::from("C:\\Program Files\\Steam")),
-            ];
-
-            for steam_path in possible_paths.into_iter().flatten() {
-                if let Ok(entries) = std::fs::read_dir(steam_path.join("userdata")) {
-                    for entry in entries.flatten() {
-                        let user_path = entry.path().join(format!("{}", app_id)).join("remote");
-                        if user_path.exists() {
-                            self.local_save_path = Some(user_path);
-                            return;
-                        }
-                    }
-                }
-            }
+            let _ = std::process::Command::new("explorer").arg(path).spawn();
         }
         #[cfg(target_os = "macos")]
         {
-            if let Ok(home) = std::env::var("HOME") {
-                let steam_userdata =
-                    PathBuf::from(home.clone()).join("Library/Application Support/Steam/userdata");
+            let _ = std::process::Command::new("open").arg(path).spawn();
+        }
+        #[cfg(target_os = "linux")]
+        {
+            let _ = std::process::Command::new("xdg-open").arg(path).spawn();
+        }
+    }
 
-                if let Ok(entries) = std::fs::read_dir(&steam_userdata) {
-                    for entry in entries.flatten() {
-                        if let Some(dir_name) = entry.path().file_name() {
-                            if dir_name
-                                .to_string_lossy()
-                                .chars()
-                                .all(|c| c.is_ascii_digit())
-                            {
-                                let user_path =
-                                    entry.path().join(format!("{}", app_id)).join("remote");
-                                if user_path.exists() {
-                                    self.local_save_path = Some(user_path);
-                                    return;
+    fn update_local_save_paths(&mut self) {
+        use std::collections::HashMap;
+
+        // 从已加载的文件中提取所有唯一的父目录路径
+        let mut path_map: HashMap<String, PathBuf> = HashMap::new();
+
+        for file in &self.files {
+            // 从文件的root_description和实际存在性推断路径
+            if file.exists {
+                // 尝试通过VDF解析器获取实际路径
+                if let Ok(app_id) = self.app_id_input.parse::<u32>() {
+                    if let Ok(parser) = crate::vdf_parser::VdfParser::new() {
+                        if let Ok(path) = parser.resolve_path(file.root, &file.name, app_id) {
+                            if let Some(parent) = path.parent() {
+                                let parent_path = parent.to_path_buf();
+                                if parent_path.exists() {
+                                    let key = format!("{} ({})", file.root_description, file.root);
+                                    path_map.entry(key).or_insert(parent_path);
                                 }
                             }
                         }
@@ -522,30 +492,20 @@ impl SteamCloudApp {
                 }
             }
         }
-        #[cfg(target_os = "linux")]
-        {
-            if let Ok(home) = std::env::var("HOME") {
-                let steam_userdata = PathBuf::from(home).join(".steam/steam/userdata");
 
-                if let Ok(entries) = std::fs::read_dir(&steam_userdata) {
-                    for entry in entries.flatten() {
-                        if let Some(dir_name) = entry.path().file_name() {
-                            if dir_name
-                                .to_string_lossy()
-                                .chars()
-                                .all(|c| c.is_ascii_digit())
-                            {
-                                let user_path =
-                                    entry.path().join(format!("{}", app_id)).join("remote");
-                                if user_path.exists() {
-                                    self.local_save_path = Some(user_path);
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
+        // 转换为Vec并排序
+        let mut paths: Vec<(String, PathBuf)> = path_map.into_iter().collect();
+        paths.sort_by(|a, b| a.0.cmp(&b.0));
+
+        self.local_save_paths = paths;
+
+        if !self.local_save_paths.is_empty() {
+            log::info!("检测到 {} 个本地存档路径", self.local_save_paths.len());
+            for (desc, path) in &self.local_save_paths {
+                log::info!("  - {}: {}", desc, path.display());
             }
+        } else {
+            log::warn!("未找到本地存档路径");
         }
     }
 
@@ -604,14 +564,10 @@ impl SteamCloudApp {
         if let Some(path) = FileDialog::new().add_filter("所有文件", &["*"]).pick_file() {
             match std::fs::read(&path) {
                 Ok(data) => {
-                    // Windows下确保文件名的正确处理
                     let filename = path
                         .file_name()
                         .and_then(|name| name.to_str())
-                        .map(|name| {
-                            // 移除Windows路径分隔符
-                            name.replace('\\', "/")
-                        })
+                        .map(|name| name.replace('\\', "/"))
                         .unwrap_or("unknown_file".to_string());
 
                     let filename = filename.as_str();
@@ -844,11 +800,6 @@ impl SteamCloudApp {
                 if !ready {
                     ui.label("准备云存储接口...");
                 }
-
-                if self.local_save_path.is_some() && ui.button("打开本地存档目录").clicked()
-                {
-                    self.open_local_save_folder();
-                }
             }
         });
     }
@@ -868,17 +819,28 @@ impl SteamCloudApp {
             return;
         }
 
-        ui.horizontal(|ui| {
-            if let Some(ref local_path) = self.local_save_path {
+        if !self.local_save_paths.is_empty() {
+            ui.label("本地存档路径:");
+            ui.horizontal_wrapped(|ui| {
+                for (desc, path) in &self.local_save_paths {
+                    let button_text = format!("📁 {}", desc);
+                    if ui
+                        .button(button_text)
+                        .on_hover_text(path.display().to_string())
+                        .clicked()
+                    {
+                        self.open_local_save_folder(path);
+                    }
+                }
+            });
+            ui.separator();
+        } else if self.remote_ready {
+            ui.horizontal(|ui| {
                 ui.label("本地存档路径:");
-                let path_str = local_path.display().to_string();
-                ui.add(
-                    egui::Label::new(egui::RichText::new(path_str).monospace().weak()).truncate(),
-                );
-            } else {
-                ui.label("本地存档路径: 未找到");
-            }
-        });
+                ui.label("未找到（可能所有文件都仅在云端）");
+            });
+            ui.separator();
+        }
 
         ui.horizontal(|ui| {
             ui.add(
@@ -928,57 +890,56 @@ impl SteamCloudApp {
                 .num_columns(6)
                 .striped(true)
                 .spacing([8.0, 4.0])
-                .min_col_width(ui.available_width() / 6.0)
                 .show(ui, |ui| {
-                    ui.label("文件夹");
+                    ui.add_sized([150.0, 20.0], egui::Label::new("文件夹"));
 
-                    if ui
-                        .button(if self.sort_column == Some(SortColumn::Name) {
-                            match self.sort_order {
-                                SortOrder::Ascending => "文件名 ▲",
-                                SortOrder::Descending => "文件名 ▼",
-                                SortOrder::None => "文件名",
-                            }
-                        } else {
-                            "文件名"
-                        })
-                        .clicked()
-                    {
+                    let name_btn = if self.sort_column == Some(SortColumn::Name) {
+                        match self.sort_order {
+                            SortOrder::Ascending => "文件名 ▲",
+                            SortOrder::Descending => "文件名 ▼",
+                            SortOrder::None => "文件名",
+                        }
+                    } else {
+                        "文件名"
+                    };
+                    if ui.button(name_btn).clicked() {
                         self.sort_files(SortColumn::Name);
                     }
 
+                    let size_btn = if self.sort_column == Some(SortColumn::Size) {
+                        match self.sort_order {
+                            SortOrder::Ascending => "文件大小 ▲",
+                            SortOrder::Descending => "文件大小 ▼",
+                            SortOrder::None => "文件大小",
+                        }
+                    } else {
+                        "文件大小"
+                    };
                     if ui
-                        .button(if self.sort_column == Some(SortColumn::Size) {
-                            match self.sort_order {
-                                SortOrder::Ascending => "文件大小 ▲",
-                                SortOrder::Descending => "文件大小 ▼",
-                                SortOrder::None => "文件大小",
-                            }
-                        } else {
-                            "文件大小"
-                        })
+                        .add_sized([80.0, 20.0], egui::Button::new(size_btn))
                         .clicked()
                     {
                         self.sort_files(SortColumn::Size);
                     }
 
+                    let time_btn = if self.sort_column == Some(SortColumn::Time) {
+                        match self.sort_order {
+                            SortOrder::Ascending => "写入日期 ▲",
+                            SortOrder::Descending => "写入日期 ▼",
+                            SortOrder::None => "写入日期",
+                        }
+                    } else {
+                        "写入日期"
+                    };
                     if ui
-                        .button(if self.sort_column == Some(SortColumn::Time) {
-                            match self.sort_order {
-                                SortOrder::Ascending => "写入日期 ▲",
-                                SortOrder::Descending => "写入日期 ▼",
-                                SortOrder::None => "写入日期",
-                            }
-                        } else {
-                            "写入日期"
-                        })
+                        .add_sized([160.0, 20.0], egui::Button::new(time_btn))
                         .clicked()
                     {
                         self.sort_files(SortColumn::Time);
                     }
 
-                    ui.label("本地");
-                    ui.label("云端");
+                    ui.add_sized([40.0, 20.0], egui::Label::new("本地"));
+                    ui.add_sized([40.0, 20.0], egui::Label::new("云端"));
                     ui.end_row();
 
                     self.draw_file_items(ui);
@@ -1168,7 +1129,7 @@ impl eframe::App for SteamCloudApp {
             if let Ok(manager) = self.steam_manager.try_lock() {
                 manager.run_callbacks();
             }
-            
+
             // 连接后自动刷新一次（延迟2秒确保Steam API准备好）
             if !self.remote_ready && !self.is_refreshing {
                 if let Some(since) = self.since_connected {
@@ -1182,12 +1143,10 @@ impl eframe::App for SteamCloudApp {
 
         if let Some(rx) = &self.connect_rx {
             match rx.try_recv() {
-                Ok(Ok(app_id)) => {
+                Ok(Ok(_app_id)) => {
                     self.is_connecting = false;
                     self.is_connected = true;
-                    self.detect_local_save_path(app_id);
-                    self.status_message =
-                        format!("已连接到Steam (App ID: {})，请点击“刷新”加载云文件", app_id);
+                    self.status_message = "已连接到Steam，请点击【刷新】加载云文件".to_string();
                     self.connect_rx = None;
                 }
                 Ok(Err(err)) => {
