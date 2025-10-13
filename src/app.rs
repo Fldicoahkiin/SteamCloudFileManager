@@ -190,11 +190,8 @@ impl SteamCloudApp {
 
         font_paths
     }
-    fn draw_tree_items(&mut self, ui: &mut egui::Ui, parent_path: &str, indent: usize) {
-        let mut folders = std::collections::HashMap::<String, Vec<usize>>::new();
-        let mut direct_files = Vec::new();
-
-        for (idx, file) in self.files.iter().enumerate() {
+    fn draw_file_items(&mut self, ui: &mut egui::Ui) {
+        for (index, file) in self.files.iter().enumerate() {
             if self.show_only_local && file.exists {
                 continue;
             }
@@ -209,82 +206,11 @@ impl SteamCloudApp {
                 }
             }
 
-            let relative_path = if parent_path.is_empty() {
-                file.name.as_str()
-            } else if file.name.starts_with(&format!("{}/", parent_path)) {
-                &file.name[parent_path.len() + 1..]
-            } else {
-                continue;
-            };
-
-            if let Some(slash_pos) = relative_path.find('/') {
-                let folder_name = relative_path[..slash_pos].to_string();
-                let folder_path = if parent_path.is_empty() {
-                    folder_name.clone()
-                } else {
-                    format!("{}/{}", parent_path, folder_name)
-                };
-                folders.entry(folder_path).or_default().push(idx);
-            } else {
-                direct_files.push(idx);
-            }
-        }
-
-        let mut sorted_folders: Vec<_> = folders.keys().cloned().collect();
-        sorted_folders.sort();
-
-        let dragging = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
-
-        for folder_path in sorted_folders {
-            let folder_name = folder_path.split('/').next_back().unwrap_or(&folder_path);
-            let indent_str = "  ".repeat(indent);
-
-            let is_expanded = self.expanded_folders.contains(&folder_path);
-            let arrow = if is_expanded { "▼" } else { "▶" };
-
-            let label = format!("{}{} [文件夹] {}", indent_str, arrow, folder_name);
-            let resp = ui.selectable_label(false, &label);
-
-            if dragging && ui.rect_contains_pointer(resp.rect) {
-                ui.painter().rect(
-                    resp.rect,
-                    3.0,
-                    egui::Color32::from_rgba_unmultiplied(100, 149, 237, 30),
-                    egui::Stroke::new(
-                        2.0,
-                        egui::Color32::from_rgba_unmultiplied(100, 149, 237, 160),
-                    ),
-                );
-            }
-
-            if resp.clicked() {
-                if is_expanded {
-                    self.expanded_folders.remove(&folder_path);
-                } else {
-                    self.expanded_folders.insert(folder_path.clone());
-                }
-            }
-
-            ui.label("-");
-            ui.label("-");
-            ui.label("-");
-            ui.label("-");
-            ui.end_row();
-
-            if is_expanded {
-                self.draw_tree_items(ui, &folder_path, indent + 1);
-            }
-        }
-
-        for &index in &direct_files {
-            let file = &self.files[index];
-            let file_name = file.name.split('/').next_back().unwrap_or(&file.name);
-            let indent_str = "  ".repeat(indent);
-
             let is_selected = self.selected_files.contains(&index);
-            let label = format!("{}{}", indent_str, file_name);
+            
+            ui.label(&file.root_description);
 
-            if ui.selectable_label(is_selected, &label).clicked() {
+            if ui.selectable_label(is_selected, &file.name).clicked() {
                 if self.multi_select_mode {
                     if is_selected {
                         self.selected_files.retain(|&x| x != index);
@@ -301,8 +227,8 @@ impl SteamCloudApp {
 
             ui.label(Self::format_size(file.size));
             ui.label(file.timestamp.format("%Y-%m-%d %H:%M:%S").to_string());
-            ui.label(if file.is_persisted { "✓" } else { "✕" });
             ui.label(if file.exists { "✓" } else { "✕" });
+            ui.label(if file.is_persisted { "✓" } else { "✕" });
             ui.end_row();
         }
     }
@@ -415,13 +341,13 @@ impl SteamCloudApp {
                         self.is_connected = true;
                         self.detect_local_save_path(app_id);
                         self.status_message =
-                            format!("已连接到Steam (App ID: {})，正在加载云文件...", app_id);
+                            format!("已连接到Steam (App ID: {})，正在初始化云存储...", app_id);
                         self.since_connected = Some(Instant::now());
-                        // 连接成功后自动刷新一次
-                        self.auto_refresh_after_connect();
+                        log::info!("Steam连接成功，App ID: {}", app_id);
                     }
                     Err(e) => {
                         self.is_connecting = false;
+                        log::error!("连接Steam失败: {}", e);
                         self.show_error(&format!("连接Steam失败: {}", e));
                     }
                 }
@@ -446,29 +372,32 @@ impl SteamCloudApp {
         self.status_message = "已断开连接".to_string();
     }
 
-    fn auto_refresh_after_connect(&mut self) {
-        // 连接后延迟一小段时间再自动刷新，确保 Steam API 完全就绪
-        std::thread::sleep(Duration::from_millis(500));
-        self.refresh_files_internal();
-    }
-
     fn refresh_files(&mut self) {
         if !self.is_connected {
             self.show_error("未连接到Steam");
             return;
         }
-        self.refresh_files_internal();
-    }
-
-    fn refresh_files_internal(&mut self) {
+        
+        log::info!("开始刷新云文件列表...");
         self.is_refreshing = true;
+        
         let result = {
             let mgr = self.steam_manager.lock().unwrap();
             mgr.get_files()
         };
+        
         match result {
             Ok(files) => {
                 let count = files.len();
+                log::info!("成功获取 {} 个云文件", count);
+                
+                if count == 0 {
+                    log::warn!("云文件列表为空，可能原因：");
+                    log::warn!("1. 游戏确实没有云存档");
+                    log::warn!("2. Steam API 还在初始化中，请等待几秒后重试");
+                    log::warn!("3. 游戏的云同步功能未启用");
+                }
+                
                 self.files = files;
                 self.selected_files.clear();
                 self.update_quota();
@@ -476,9 +405,11 @@ impl SteamCloudApp {
                 self.remote_ready = true;
             }
             Err(err) => {
+                log::error!("刷新文件列表失败: {}", err);
                 self.show_error(&format!("刷新文件列表失败: {}", err));
             }
         }
+        
         self.is_refreshing = false;
     }
 
@@ -994,11 +925,13 @@ impl SteamCloudApp {
         let scroll_area = egui::ScrollArea::vertical().max_height(available_height);
         let scroll_output = scroll_area.show(ui, |ui| {
             egui::Grid::new("file_grid")
-                .num_columns(5)
+                .num_columns(6)
                 .striped(true)
                 .spacing([8.0, 4.0])
-                .min_col_width(ui.available_width() / 5.0)
+                .min_col_width(ui.available_width() / 6.0)
                 .show(ui, |ui| {
+                    ui.label("文件夹");
+
                     if ui
                         .button(if self.sort_column == Some(SortColumn::Name) {
                             match self.sort_order {
@@ -1017,12 +950,12 @@ impl SteamCloudApp {
                     if ui
                         .button(if self.sort_column == Some(SortColumn::Size) {
                             match self.sort_order {
-                                SortOrder::Ascending => "大小 ▲",
-                                SortOrder::Descending => "大小 ▼",
-                                SortOrder::None => "大小",
+                                SortOrder::Ascending => "文件大小 ▲",
+                                SortOrder::Descending => "文件大小 ▼",
+                                SortOrder::None => "文件大小",
                             }
                         } else {
-                            "大小"
+                            "文件大小"
                         })
                         .clicked()
                     {
@@ -1032,23 +965,23 @@ impl SteamCloudApp {
                     if ui
                         .button(if self.sort_column == Some(SortColumn::Time) {
                             match self.sort_order {
-                                SortOrder::Ascending => "修改时间 ▲",
-                                SortOrder::Descending => "修改时间 ▼",
-                                SortOrder::None => "修改时间",
+                                SortOrder::Ascending => "写入日期 ▲",
+                                SortOrder::Descending => "写入日期 ▼",
+                                SortOrder::None => "写入日期",
                             }
                         } else {
-                            "修改时间"
+                            "写入日期"
                         })
                         .clicked()
                     {
                         self.sort_files(SortColumn::Time);
                     }
 
-                    ui.label("本地已保存");
-                    ui.label("云端已保存");
+                    ui.label("本地");
+                    ui.label("云端");
                     ui.end_row();
 
-                    self.draw_tree_items(ui, "", 0);
+                    self.draw_file_items(ui);
                 });
         });
 
@@ -1230,9 +1163,20 @@ impl SteamCloudApp {
 
 impl eframe::App for SteamCloudApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 定期调用Steam callbacks
         if self.is_connected {
             if let Ok(manager) = self.steam_manager.try_lock() {
                 manager.run_callbacks();
+            }
+            
+            // 连接后自动刷新一次（延迟2秒确保Steam API准备好）
+            if !self.remote_ready && !self.is_refreshing {
+                if let Some(since) = self.since_connected {
+                    if since.elapsed() >= Duration::from_secs(2) {
+                        log::info!("Steam API已准备就绪，自动刷新云文件列表");
+                        self.refresh_files();
+                    }
+                }
             }
         }
 

@@ -1,5 +1,6 @@
 mod app;
 mod steam_api;
+mod vdf_parser;
 
 use app::SteamCloudApp;
 use eframe::egui;
