@@ -1,5 +1,9 @@
 use anyhow::{anyhow, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
+use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
 pub struct VdfParser {
@@ -16,6 +20,59 @@ pub struct VdfFileEntry {
     pub sha: String,
     pub sync_state: i32,
     pub actual_path: Option<PathBuf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloudGameInfo {
+    pub app_id: u32,
+    pub file_count: usize,
+    pub total_size: i64,
+    pub last_played: Option<i64>,
+    pub playtime: Option<u32>,
+    pub game_name: Option<String>,
+    pub is_installed: bool,
+    pub install_dir: Option<String>,
+    pub categories: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameConfig {
+    pub app_id: u32,
+    pub last_played: Option<i64>,
+    pub playtime: Option<u32>,
+    pub launch_options: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GameCategory {
+    pub app_id: u32,
+    pub tags: Vec<String>,
+    pub is_favorite: bool,
+    pub is_hidden: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppManifest {
+    pub app_id: u32,
+    pub name: String,
+    pub install_dir: String,
+    pub size_on_disk: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppInfo {
+    pub app_id: u32,
+    pub name: Option<String>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct UserInfo {
+    pub user_id: String,
+    #[allow(dead_code)]
+    pub persona_name: Option<String>,
+    pub is_current: bool,
 }
 
 impl VdfParser {
@@ -341,5 +398,458 @@ impl VdfParser {
         } else {
             None
         }
+    }
+
+    pub fn scan_all_cloud_games(&self) -> Result<Vec<CloudGameInfo>> {
+        let mut games = Vec::new();
+        let userdata_path = self.steam_path.join("userdata").join(&self.user_id);
+
+        log::info!("开始扫描游戏库...");
+        let all_manifests = self.scan_app_manifests().unwrap_or_default();
+        log::info!("发现 {} 个已安装游戏", all_manifests.len());
+
+        let all_categories = self.parse_shared_config().unwrap_or_default();
+        log::info!("解析 {} 个游戏分类", all_categories.len());
+
+        let all_appinfo = self.parse_appinfo_vdf().unwrap_or_default();
+        log::info!("从 appinfo.vdf 读取 {} 个游戏信息", all_appinfo.len());
+
+        if let Ok(entries) = fs::read_dir(&userdata_path) {
+            for entry in entries.flatten() {
+                let entry_name = entry.file_name().to_string_lossy().to_string();
+                if let Ok(app_id) = entry_name.parse::<u32>() {
+                    let vdf_path = entry.path().join("remotecache.vdf");
+                    if vdf_path.exists() {
+                        log::debug!("发现云存档游戏: App ID {}", app_id);
+                        
+                        let files = self.parse_remotecache(app_id).unwrap_or_default();
+                        let total_size: i64 = files.iter().map(|f| f.size as i64).sum();
+                        let config = self.get_game_config(app_id).ok();
+                        let manifest = all_manifests.get(&app_id);
+                        let category = all_categories.get(&app_id);
+                        let appinfo = all_appinfo.get(&app_id);
+                        
+                        let game_name = manifest
+                            .as_ref()
+                            .map(|m| m.name.clone())
+                            .or_else(|| appinfo.and_then(|a| a.name.clone()));
+                        
+                        if game_name.is_none() {
+                            log::debug!("App ID {} 无游戏名称 (manifest: {}, appinfo: {})", 
+                                app_id, 
+                                manifest.is_some(), 
+                                appinfo.is_some()
+                            );
+                        }
+                        
+                        games.push(CloudGameInfo {
+                            app_id,
+                            file_count: files.len(),
+                            total_size,
+                            last_played: config.as_ref().and_then(|c| c.last_played),
+                            playtime: config.as_ref().and_then(|c| c.playtime),
+                            game_name,
+                            is_installed: manifest.is_some(),
+                            install_dir: manifest.as_ref().map(|m| m.install_dir.clone()),
+                            categories: category
+                                .as_ref()
+                                .map(|c| c.tags.clone())
+                                .unwrap_or_default(),
+                        });
+                    }
+                }
+            }
+        }
+
+        games.sort_by(|a, b| b.last_played.unwrap_or(0).cmp(&a.last_played.unwrap_or(0)));
+
+        log::info!("扫描完成，共 {} 个有云存档的游戏", games.len());
+        Ok(games)
+    }
+    pub fn get_game_config(&self, app_id: u32) -> Result<GameConfig> {
+        let localconfig_path = self
+            .steam_path
+            .join("userdata")
+            .join(&self.user_id)
+            .join("config")
+            .join("localconfig.vdf");
+
+        if !localconfig_path.exists() {
+            return Err(anyhow!("localconfig.vdf不存在"));
+        }
+
+        let content = fs::read_to_string(&localconfig_path)?;
+        let app_id_str = app_id.to_string();
+
+        let mut last_played = None;
+        let mut playtime = None;
+        let mut launch_options = None;
+        let mut in_app_section = false;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.contains(&format!("\"{}\"", app_id_str)) {
+                in_app_section = true;
+                continue;
+            }
+
+            if in_app_section {
+                if trimmed == "}" {
+                    break;
+                }
+
+                if trimmed.contains("\"LastPlayed\"") {
+                    if let Some(val) = Self::extract_value(trimmed) {
+                        last_played = val.parse().ok();
+                    }
+                } else if trimmed.contains("\"Playtime\"") {
+                    if let Some(val) = Self::extract_value(trimmed) {
+                        playtime = val.parse().ok();
+                    }
+                } else if trimmed.contains("\"LaunchOptions\"") {
+                    if let Some(val) = Self::extract_value(trimmed) {
+                        launch_options = Some(val.to_string());
+                    }
+                }
+            }
+        }
+
+        Ok(GameConfig {
+            app_id,
+            last_played,
+            playtime,
+            launch_options,
+        })
+    }
+
+    pub fn get_all_user_ids(&self) -> Result<Vec<String>> {
+        let userdata_path = self.steam_path.join("userdata");
+        let mut user_ids = Vec::new();
+
+        if let Ok(entries) = fs::read_dir(&userdata_path) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.chars().all(|c| c.is_ascii_digit()) {
+                    user_ids.push(name);
+                }
+            }
+        }
+
+        Ok(user_ids)
+    }
+
+    pub fn with_user_id(steam_path: PathBuf, user_id: String) -> Self {
+        Self {
+            steam_path,
+            user_id,
+        }
+    }
+
+    pub fn get_steam_path(&self) -> &PathBuf {
+        &self.steam_path
+    }
+
+    pub fn get_user_id(&self) -> &str {
+        &self.user_id
+    }
+
+    pub fn scan_app_manifests(&self) -> Result<HashMap<u32, AppManifest>> {
+        let mut manifests = HashMap::new();
+        let steamapps_path = self.steam_path.join("steamapps");
+
+        if let Ok(entries) = fs::read_dir(&steamapps_path) {
+            for entry in entries.flatten() {
+                let filename = entry.file_name().to_string_lossy().to_string();
+                if filename.starts_with("appmanifest_") && filename.ends_with(".acf") {
+                    if let Ok(manifest) = self.parse_app_manifest(&entry.path()) {
+                        manifests.insert(manifest.app_id, manifest);
+                    }
+                }
+            }
+        }
+
+        log::info!("扫描到 {} 个已安装游戏", manifests.len());
+        Ok(manifests)
+    }
+
+    fn parse_app_manifest(&self, path: &Path) -> Result<AppManifest> {
+        let content = fs::read_to_string(path)?;
+        let mut app_id = None;
+        let mut name = None;
+        let mut install_dir = None;
+        let mut size_on_disk = None;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.contains("\"appid\"") {
+                if let Some(val) = Self::extract_value(trimmed) {
+                    app_id = val.parse().ok();
+                }
+            } else if trimmed.contains("\"name\"") {
+                if let Some(val) = Self::extract_value(trimmed) {
+                    name = Some(val.to_string());
+                }
+            } else if trimmed.contains("\"installdir\"") {
+                if let Some(val) = Self::extract_value(trimmed) {
+                    install_dir = Some(val.to_string());
+                }
+            } else if trimmed.contains("\"SizeOnDisk\"") {
+                if let Some(val) = Self::extract_value(trimmed) {
+                    size_on_disk = val.parse().ok();
+                }
+            }
+        }
+
+        if let (Some(app_id), Some(name), Some(install_dir)) = (app_id, name, install_dir) {
+            Ok(AppManifest {
+                app_id,
+                name,
+                install_dir,
+                size_on_disk,
+            })
+        } else {
+            Err(anyhow!("解析 manifest 失败"))
+        }
+    }
+
+    pub fn parse_shared_config(&self) -> Result<HashMap<u32, GameCategory>> {
+        let mut categories = HashMap::new();
+        let sharedconfig_path = self
+            .steam_path
+            .join("userdata")
+            .join(&self.user_id)
+            .join("7")
+            .join("remote")
+            .join("sharedconfig.vdf");
+
+        if !sharedconfig_path.exists() {
+            return Ok(categories);
+        }
+
+        let content = fs::read_to_string(&sharedconfig_path)?;
+        let mut current_app_id: Option<u32> = None;
+        let mut current_tags = Vec::new();
+        let mut is_favorite = false;
+        let mut is_hidden = false;
+        let mut in_tags_section = false;
+
+        for line in content.lines() {
+            let trimmed = line.trim();
+
+            if trimmed.starts_with('"') && trimmed.ends_with('"') {
+                if let Ok(app_id) = trimmed.trim_matches('"').parse::<u32>() {
+                    if let Some(prev_app_id) = current_app_id {
+                        categories.insert(
+                            prev_app_id,
+                            GameCategory {
+                                app_id: prev_app_id,
+                                tags: current_tags.clone(),
+                                is_favorite,
+                                is_hidden,
+                            },
+                        );
+                    }
+                    current_app_id = Some(app_id);
+                    current_tags.clear();
+                    is_favorite = false;
+                    is_hidden = false;
+                    in_tags_section = false;
+                }
+            }
+
+            if trimmed.contains("\"tags\"") {
+                in_tags_section = true;
+            }
+
+            if in_tags_section && trimmed.starts_with('"') && trimmed.contains('"') {
+                if let Some(tag) = Self::extract_value(trimmed) {
+                    if !tag.is_empty() && tag != "tags" {
+                        current_tags.push(tag.to_string());
+                    }
+                }
+            }
+
+            if trimmed.contains("\"favorite\"") {
+                is_favorite = true;
+            }
+
+            if trimmed.contains("\"hidden\"") {
+                is_hidden = true;
+            }
+
+            if in_tags_section && trimmed == "}" {
+                in_tags_section = false;
+            }
+        }
+
+        if let Some(prev_app_id) = current_app_id {
+            categories.insert(
+                prev_app_id,
+                GameCategory {
+                    app_id: prev_app_id,
+                    tags: current_tags,
+                    is_favorite,
+                    is_hidden,
+                },
+            );
+        }
+
+        log::info!("解析到 {} 个游戏的分类信息", categories.len());
+        Ok(categories)
+    }
+
+    #[allow(dead_code)]
+    pub fn get_installed_games(&self) -> Result<Vec<AppManifest>> {
+        let manifests = self.scan_app_manifests()?;
+        Ok(manifests.into_values().collect())
+    }
+
+    #[allow(dead_code)]
+    pub fn is_game_installed(&self, app_id: u32) -> bool {
+        let manifest_path = self
+            .steam_path
+            .join("steamapps")
+            .join(format!("appmanifest_{}.acf", app_id));
+        manifest_path.exists()
+    }
+
+    pub fn parse_appinfo_vdf(&self) -> Result<HashMap<u32, AppInfo>> {
+        let appinfo_path = self.steam_path.join("appcache").join("appinfo.vdf");
+
+        if !appinfo_path.exists() {
+            log::debug!("appinfo.vdf 不存在，跳过解析");
+            return Ok(HashMap::new());
+        }
+
+        let data = match fs::read(&appinfo_path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::warn!("无法读取 appinfo.vdf: {}", e);
+                return Ok(HashMap::new());
+            }
+        };
+
+        let mut cursor = Cursor::new(data);
+        let mut apps = HashMap::new();
+
+        let magic = match cursor.read_u32::<LittleEndian>() {
+            Ok(m) => m,
+            Err(_) => {
+                log::warn!("appinfo.vdf 格式无效");
+                return Ok(HashMap::new());
+            }
+        };
+
+        if magic != 0x07564427 && magic != 0x07564428 {
+            log::warn!("appinfo.vdf 格式不支持: 0x{:X}", magic);
+            return Ok(HashMap::new());
+        }
+
+        let _ = cursor.read_u32::<LittleEndian>();
+
+        let mut count = 0;
+        while let Ok(app_id) = cursor.read_u32::<LittleEndian>() {
+            if app_id == 0 || count > 10000 {
+                break;
+            }
+
+            // Skip size, infostate, last_updated, access_token
+            for _ in 0..3 {
+                let _ = cursor.read_u32::<LittleEndian>();
+            }
+            let _ = cursor.read_u64::<LittleEndian>();
+
+            // Read SHA hash (20 bytes)
+            let mut sha = vec![0u8; 20];
+            if cursor.read_exact(&mut sha).is_err() {
+                break;
+            }
+
+            // Skip change_number (4 bytes)
+            let _ = cursor.read_u32::<LittleEndian>();
+
+            // Try to find the game name in the VDF structure
+            if let Ok(name) = Self::parse_appinfo_name(&mut cursor, app_id) {
+                if !name.is_empty() && name.len() < 200 {
+                    apps.insert(
+                        app_id,
+                        AppInfo {
+                            app_id,
+                            name: Some(name),
+                            developer: None,
+                            publisher: None,
+                        },
+                    );
+                }
+            }
+
+            // Skip to next entry (read remaining data)
+            let mut buf = vec![0u8; 4096];
+            let mut skipped = 0;
+            while skipped < 500000 {
+                if cursor.read(&mut buf).is_err() {
+                    break;
+                }
+                skipped += buf.len();
+                // Look for next app_id marker or end
+                if buf.starts_with(&[0, 0, 0, 0]) {
+                    break;
+                }
+            }
+
+            count += 1;
+        }
+
+        log::info!("从 appinfo.vdf 解析到 {} 个游戏", apps.len());
+        Ok(apps)
+    }
+
+    fn parse_appinfo_name(cursor: &mut Cursor<Vec<u8>>, app_id: u32) -> Result<String> {
+        // VDF binary format: try to find "name" field
+        let mut buf = vec![0u8; 1024];
+        if cursor.read(&mut buf).is_err() {
+            return Err(anyhow!("无法读取"));
+        }
+
+        // Look for "common" section and "name" field
+        let buf_str = String::from_utf8_lossy(&buf);
+        
+        // Try to find name pattern
+        if let Some(name_pos) = buf_str.find("name\0") {
+            let start = name_pos + 5; // Skip "name\0"
+            if start < buf.len() {
+                // Find the string after "name"
+                let remaining = &buf[start..];
+                if let Some(null_pos) = remaining.iter().position(|&b| b == 0) {
+                    if let Ok(name) = String::from_utf8(remaining[..null_pos].to_vec()) {
+                        if !name.is_empty() && name.is_ascii() {
+                            log::debug!("App {} 名称: {}", app_id, name);
+                            return Ok(name);
+                        }
+                    }
+                }
+            }
+        }
+
+        Err(anyhow!("未找到游戏名称"))
+    }
+
+    #[allow(dead_code)]
+    fn read_simple_string(cursor: &mut Cursor<Vec<u8>>, max_len: usize) -> Result<String> {
+        let mut bytes = Vec::new();
+        for _ in 0..max_len {
+            match cursor.read_u8() {
+                Ok(0) => break,
+                Ok(b) if b < 128 && (b.is_ascii_graphic() || b == b' ') => bytes.push(b),
+                Ok(_) => continue,
+                Err(_) => break,
+            }
+        }
+        if bytes.is_empty() {
+            return Err(anyhow!("空字符串"));
+        }
+        String::from_utf8(bytes).map_err(|e| anyhow!("UTF-8 解码失败: {}", e))
     }
 }

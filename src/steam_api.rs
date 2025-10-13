@@ -39,8 +39,10 @@ impl SteamCloudManager {
     }
 
     pub fn connect(&mut self, app_id: u32) -> Result<()> {
-        // 如果已经连接，先断开之前的连接
-        self.disconnect();
+        if self.is_connected() {
+            self.disconnect();
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
 
         Self::cleanup_app_id_file();
 
@@ -114,9 +116,15 @@ impl SteamCloudManager {
 
     pub fn disconnect(&mut self) {
         if let Ok(mut guard) = self.client.lock() {
-            *guard = None;
+            if guard.is_some() {
+                log::info!("断开 Steam 连接 (App ID: {})", self.app_id);
+                *guard = None;
+                drop(guard);
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
         }
         self.app_id = 0;
+        Self::cleanup_app_id_file();
     }
 
     pub fn is_connected(&self) -> bool {

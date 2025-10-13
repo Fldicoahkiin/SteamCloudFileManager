@@ -168,6 +168,22 @@ pub struct SteamCloudManager {
 - 仅支持 root=0 的文件
 - 确保基本功能可用
 
+### ⚠️ 当前限制
+
+**显示的游戏数量**
+- 本工具显示：本地有 `remotecache.vdf` 的游戏（通常是最近运行过的游戏）
+- Steam 官网显示：所有曾在任何设备上有云存档的游戏
+
+**为什么会有差异？**
+- `remotecache.vdf` 只在游戏运行后由 Steam 客户端创建
+- 已卸载或未在本地运行过的游戏不会有本地 VDF 文件
+- Steam 官网通过服务器 API 直接访问所有云存档
+
+**解决方案（计划中）：**
+- 集成 Steam Web API 获取完整游戏列表
+- 需要用户提供 Steam Web API Key（免费）
+- 可选功能，不影响当前本地 VDF 解析
+
 更多技术细节请参考 [STEAM_CLOUD_LIMITATIONS.md](STEAM_CLOUD_LIMITATIONS.md)
 
 ## 贡献
