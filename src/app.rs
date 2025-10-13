@@ -189,47 +189,73 @@ impl SteamCloudApp {
 
         font_paths
     }
-    fn draw_file_items(&mut self, ui: &mut egui::Ui) {
-        for (index, file) in self.files.iter().enumerate() {
-            if self.show_only_local && file.exists {
-                continue;
-            }
-            if self.show_only_cloud && !file.exists {
-                continue;
-            }
-
-            if !self.search_query.is_empty() {
-                let query = self.search_query.to_lowercase();
-                if !file.name.to_lowercase().contains(&query) {
-                    continue;
+    fn draw_file_items_table(&mut self, body: egui_extras::TableBody) {
+        let row_height = 20.0;
+        let files: Vec<(usize, &CloudFile)> = self
+            .files
+            .iter()
+            .enumerate()
+            .filter(|(_, file)| {
+                if self.show_only_local && file.exists {
+                    return false;
                 }
-            }
-
-            let is_selected = self.selected_files.contains(&index);
-
-            ui.label(&file.root_description);
-
-            if ui.selectable_label(is_selected, &file.name).clicked() {
-                if self.multi_select_mode {
-                    if is_selected {
-                        self.selected_files.retain(|&x| x != index);
-                    } else {
-                        self.selected_files.push(index);
-                    }
-                } else {
-                    self.selected_files.clear();
-                    if !is_selected {
-                        self.selected_files.push(index);
+                if self.show_only_cloud && !file.exists {
+                    return false;
+                }
+                if !self.search_query.is_empty() {
+                    let query = self.search_query.to_lowercase();
+                    if !file.name.to_lowercase().contains(&query) {
+                        return false;
                     }
                 }
-            }
+                true
+            })
+            .collect();
 
-            ui.label(Self::format_size(file.size));
-            ui.label(file.timestamp.format("%Y-%m-%d %H:%M:%S").to_string());
-            ui.label(if file.exists { "✓" } else { "✕" });
-            ui.label(if file.is_persisted { "✓" } else { "✕" });
-            ui.end_row();
-        }
+        body.rows(row_height, files.len(), |mut row| {
+            let row_index = row.index();
+            if let Some((index, file)) = files.get(row_index) {
+                let index = *index;
+                let is_selected = self.selected_files.contains(&index);
+
+                row.col(|ui| {
+                    ui.label(&file.root_description);
+                });
+
+                row.col(|ui| {
+                    if ui.selectable_label(is_selected, &file.name).clicked() {
+                        if self.multi_select_mode {
+                            if is_selected {
+                                self.selected_files.retain(|&x| x != index);
+                            } else {
+                                self.selected_files.push(index);
+                            }
+                        } else {
+                            self.selected_files.clear();
+                            if !is_selected {
+                                self.selected_files.push(index);
+                            }
+                        }
+                    }
+                });
+
+                row.col(|ui| {
+                    ui.label(Self::format_size(file.size));
+                });
+
+                row.col(|ui| {
+                    ui.label(file.timestamp.format("%Y-%m-%d %H:%M:%S").to_string());
+                });
+
+                row.col(|ui| {
+                    ui.label(if file.exists { "✓" } else { "✕" });
+                });
+
+                row.col(|ui| {
+                    ui.label(if file.is_persisted { "✓" } else { "✕" });
+                });
+            }
+        });
     }
 
     fn format_size(size: i32) -> String {
@@ -265,9 +291,10 @@ impl SteamCloudApp {
 
         for path in font_paths {
             if let Ok(data) = std::fs::read(&path) {
-                fonts
-                    .font_data
-                    .insert("system_cjk".to_owned(), egui::FontData::from_owned(data));
+                fonts.font_data.insert(
+                    "system_cjk".to_owned(),
+                    egui::FontData::from_owned(data).into(),
+                );
                 fonts
                     .families
                     .entry(egui::FontFamily::Proportional)
@@ -883,16 +910,24 @@ impl SteamCloudApp {
             }
         });
 
-        let available_height = ui.available_height();
-        let scroll_area = egui::ScrollArea::vertical().max_height(available_height);
-        let scroll_output = scroll_area.show(ui, |ui| {
-            egui::Grid::new("file_grid")
-                .num_columns(6)
-                .striped(true)
-                .spacing([8.0, 4.0])
-                .show(ui, |ui| {
-                    ui.add_sized([150.0, 20.0], egui::Label::new("文件夹"));
+        use egui_extras::{Column, TableBuilder};
 
+        let available_height = ui.available_height();
+        TableBuilder::new(ui)
+            .striped(true)
+            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+            .column(Column::exact(150.0)) // 文件夹 - 固定宽度
+            .column(Column::remainder().at_least(150.0)) // 文件名 - 可拉伸
+            .column(Column::exact(80.0)) // 文件大小 - 固定宽度
+            .column(Column::exact(160.0)) // 写入日期 - 固定宽度
+            .column(Column::exact(40.0)) // 本地 - 固定宽度
+            .column(Column::exact(40.0)) // 云端 - 固定宽度
+            .max_scroll_height(available_height)
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.label("文件夹");
+                });
+                header.col(|ui| {
                     let name_btn = if self.sort_column == Some(SortColumn::Name) {
                         match self.sort_order {
                             SortOrder::Ascending => "文件名 ▲",
@@ -905,7 +940,8 @@ impl SteamCloudApp {
                     if ui.button(name_btn).clicked() {
                         self.sort_files(SortColumn::Name);
                     }
-
+                });
+                header.col(|ui| {
                     let size_btn = if self.sort_column == Some(SortColumn::Size) {
                         match self.sort_order {
                             SortOrder::Ascending => "文件大小 ▲",
@@ -915,13 +951,11 @@ impl SteamCloudApp {
                     } else {
                         "文件大小"
                     };
-                    if ui
-                        .add_sized([80.0, 20.0], egui::Button::new(size_btn))
-                        .clicked()
-                    {
+                    if ui.button(size_btn).clicked() {
                         self.sort_files(SortColumn::Size);
                     }
-
+                });
+                header.col(|ui| {
                     let time_btn = if self.sort_column == Some(SortColumn::Time) {
                         match self.sort_order {
                             SortOrder::Ascending => "写入日期 ▲",
@@ -931,34 +965,20 @@ impl SteamCloudApp {
                     } else {
                         "写入日期"
                     };
-                    if ui
-                        .add_sized([160.0, 20.0], egui::Button::new(time_btn))
-                        .clicked()
-                    {
+                    if ui.button(time_btn).clicked() {
                         self.sort_files(SortColumn::Time);
                     }
-
-                    ui.add_sized([40.0, 20.0], egui::Label::new("本地"));
-                    ui.add_sized([40.0, 20.0], egui::Label::new("云端"));
-                    ui.end_row();
-
-                    self.draw_file_items(ui);
                 });
-        });
-
-        if ui.ctx().input(|i| !i.raw.hovered_files.is_empty())
-            && ui.rect_contains_pointer(scroll_output.inner_rect)
-        {
-            ui.painter().rect(
-                scroll_output.inner_rect,
-                5.0,
-                egui::Color32::from_rgba_unmultiplied(100, 149, 237, 30),
-                egui::Stroke::new(
-                    2.0,
-                    egui::Color32::from_rgba_unmultiplied(100, 149, 237, 100),
-                ),
-            );
-        }
+                header.col(|ui| {
+                    ui.label("本地");
+                });
+                header.col(|ui| {
+                    ui.label("云端");
+                });
+            })
+            .body(|body| {
+                self.draw_file_items_table(body);
+            });
     }
 
     fn draw_action_buttons(&mut self, ui: &mut egui::Ui) {
