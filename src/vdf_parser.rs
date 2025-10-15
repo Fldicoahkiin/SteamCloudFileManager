@@ -6,6 +6,7 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
+
 pub struct VdfParser {
     steam_path: PathBuf,
     user_id: String,
@@ -79,7 +80,6 @@ impl VdfParser {
     pub fn new() -> Result<Self> {
         let steam_path = Self::find_steam_path()?;
         let user_id = Self::find_user_id(&steam_path)?;
-
         Ok(Self {
             steam_path,
             user_id,
@@ -89,14 +89,25 @@ impl VdfParser {
     fn find_steam_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
-            let paths = vec![
-                PathBuf::from(r"C:\Program Files (x86)\Steam"),
-                PathBuf::from(r"C:\Program Files\Steam"),
-            ];
-
-            for path in paths {
-                if path.exists() {
-                    return Ok(path);
+            let mut candidates: Vec<PathBuf> = Vec::new();
+            if let Ok(p) = std::env::var("STEAM_PATH") {
+                candidates.push(PathBuf::from(p));
+            }
+            if let Ok(p) = std::env::var("PROGRAMFILES(X86)") {
+                candidates.push(PathBuf::from(p).join("Steam"));
+            }
+            if let Ok(p) = std::env::var("PROGRAMFILES") {
+                candidates.push(PathBuf::from(p).join("Steam"));
+            }
+            if let Ok(p) = std::env::var("LOCALAPPDATA") {
+                candidates.push(PathBuf::from(p).join("Steam"));
+            }
+            if let Ok(p) = std::env::var("APPDATA") {
+                candidates.push(PathBuf::from(p).join("Steam"));
+            }
+            for c in candidates {
+                if c.join("userdata").exists() || c.join("steam.exe").exists() {
+                    return Ok(c);
                 }
             }
         }
@@ -136,8 +147,10 @@ impl VdfParser {
     }
 
     fn find_user_id(steam_path: &Path) -> Result<String> {
+        if let Some(uid) = Self::find_user_id_from_loginusers(steam_path) {
+            return Ok(uid);
+        }
         let userdata_path = steam_path.join("userdata");
-
         if let Ok(entries) = fs::read_dir(&userdata_path) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
@@ -146,23 +159,57 @@ impl VdfParser {
                 }
             }
         }
-
         Err(anyhow!("未找到用户ID"))
     }
 
+    fn find_user_id_from_loginusers(steam_path: &Path) -> Option<String> {
+        let p = steam_path.join("config").join("loginusers.vdf");
+        let s = fs::read_to_string(&p).ok()?;
+        let mut current_id64: Option<u64> = None;
+        let mut most_recent_id64: Option<u64> = None;
+        let mut in_user_block = false;
+        for line in s.lines() {
+            let t = line.trim();
+            if t.starts_with('"')
+                && t.ends_with('"')
+                && t.chars().skip(1).take_while(|c| c.is_ascii_digit()).count() + 2 == t.len()
+            {
+                if let Ok(id64) = t.trim_matches('"').parse::<u64>() {
+                    current_id64 = Some(id64);
+                }
+                in_user_block = true;
+                continue;
+            }
+            if in_user_block && t.contains("\"MostRecent\"") {
+                if let Some(val) = Self::extract_value(t) {
+                    if val == "1" {
+                        most_recent_id64 = current_id64;
+                    }
+                }
+            }
+            if in_user_block && t == "}" {
+                in_user_block = false;
+            }
+        }
+        let id64 = most_recent_id64.or(current_id64)?;
+        let base: u64 = 76561197960265728;
+        if id64 > base {
+            Some((id64 - base).to_string())
+        } else {
+            None
+        }
+    }
+
     fn get_game_install_dir(&self, app_id: u32) -> Result<PathBuf> {
-        let manifest_path = self
-            .steam_path
-            .join("steamapps")
-            .join(format!("appmanifest_{}.acf", app_id));
-
-        if manifest_path.exists() {
-            let content = fs::read_to_string(&manifest_path)?;
-
-            for line in content.lines() {
-                if line.contains("\"installdir\"") {
-                    if let Some(dir) = line.split('"').nth(3) {
-                        return Ok(self.steam_path.join("steamapps").join("common").join(dir));
+        for steamapps in self.discover_library_steamapps() {
+            let manifest_path = steamapps.join(format!("appmanifest_{}.acf", app_id));
+            if manifest_path.exists() {
+                let content = fs::read_to_string(&manifest_path)?;
+                for line in content.lines() {
+                    if line.contains("\"installdir\"") {
+                        if let Some(dir) = line.split('"').nth(3) {
+                            return Ok(steamapps.join("common").join(dir));
+                        }
                     }
                 }
             }
@@ -421,27 +468,29 @@ impl VdfParser {
                     let vdf_path = entry.path().join("remotecache.vdf");
                     if vdf_path.exists() {
                         log::debug!("发现云存档游戏: App ID {}", app_id);
-                        
+
                         let files = self.parse_remotecache(app_id).unwrap_or_default();
                         let total_size: i64 = files.iter().map(|f| f.size as i64).sum();
                         let config = self.get_game_config(app_id).ok();
                         let manifest = all_manifests.get(&app_id);
                         let category = all_categories.get(&app_id);
                         let appinfo = all_appinfo.get(&app_id);
-                        
+
                         let game_name = manifest
                             .as_ref()
                             .map(|m| m.name.clone())
-                            .or_else(|| appinfo.and_then(|a| a.name.clone()));
-                        
+                            .or_else(|| appinfo.and_then(|a| a.name.clone()))
+                            .or_else(|| Self::fetch_app_name_from_store(app_id));
+
                         if game_name.is_none() {
-                            log::debug!("App ID {} 无游戏名称 (manifest: {}, appinfo: {})", 
-                                app_id, 
-                                manifest.is_some(), 
+                            log::debug!(
+                                "App ID {} 无游戏名称 (manifest: {}, appinfo: {})",
+                                app_id,
+                                manifest.is_some(),
                                 appinfo.is_some()
                             );
                         }
-                        
+
                         games.push(CloudGameInfo {
                             app_id,
                             file_count: files.len(),
@@ -545,7 +594,6 @@ impl VdfParser {
             user_id,
         }
     }
-
     pub fn get_steam_path(&self) -> &PathBuf {
         &self.steam_path
     }
@@ -556,21 +604,41 @@ impl VdfParser {
 
     pub fn scan_app_manifests(&self) -> Result<HashMap<u32, AppManifest>> {
         let mut manifests = HashMap::new();
-        let steamapps_path = self.steam_path.join("steamapps");
-
-        if let Ok(entries) = fs::read_dir(&steamapps_path) {
-            for entry in entries.flatten() {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.starts_with("appmanifest_") && filename.ends_with(".acf") {
-                    if let Ok(manifest) = self.parse_app_manifest(&entry.path()) {
-                        manifests.insert(manifest.app_id, manifest);
+        for steamapps_path in self.discover_library_steamapps() {
+            if let Ok(entries) = fs::read_dir(&steamapps_path) {
+                for entry in entries.flatten() {
+                    let filename = entry.file_name().to_string_lossy().to_string();
+                    if filename.starts_with("appmanifest_") && filename.ends_with(".acf") {
+                        if let Ok(manifest) = self.parse_app_manifest(&entry.path()) {
+                            manifests.entry(manifest.app_id).or_insert(manifest);
+                        }
                     }
                 }
             }
         }
-
         log::info!("扫描到 {} 个已安装游戏", manifests.len());
         Ok(manifests)
+    }
+
+    fn discover_library_steamapps(&self) -> Vec<PathBuf> {
+        let mut libs = Vec::new();
+        let main = self.steam_path.join("steamapps");
+        libs.push(main.clone());
+        let lf = main.join("libraryfolders.vdf");
+        if let Ok(content) = fs::read_to_string(&lf) {
+            for line in content.lines() {
+                let t = line.trim();
+                if t.contains("\"path\"") {
+                    if let Some(val) = Self::extract_value(t) {
+                        let p = PathBuf::from(val).join("steamapps");
+                        if p.exists() {
+                            libs.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        libs
     }
 
     fn parse_app_manifest(&self, path: &Path) -> Result<AppManifest> {
@@ -742,7 +810,7 @@ impl VdfParser {
             }
         };
 
-        if magic != 0x07564427 && magic != 0x07564428 {
+        if magic != 0x07564427 && magic != 0x07564428 && magic != 0x07564429 {
             log::warn!("appinfo.vdf 格式不支持: 0x{:X}", magic);
             return Ok(HashMap::new());
         }
@@ -806,6 +874,19 @@ impl VdfParser {
         Ok(apps)
     }
 
+    fn fetch_app_name_from_store(app_id: u32) -> Option<String> {
+        let url = format!(
+            "https://store.steampowered.com/api/appdetails?appids={}&l=schinese",
+            app_id
+        );
+        let resp = ureq::get(&url).call().ok()?;
+        let text = resp.into_string().ok()?;
+        let v: serde_json::Value = serde_json::from_str(&text).ok()?;
+        let key = app_id.to_string();
+        let data = v.get(&key)?.get("data")?;
+        data.get("name")?.as_str().map(|s: &str| s.to_string())
+    }
+
     fn parse_appinfo_name(cursor: &mut Cursor<Vec<u8>>, app_id: u32) -> Result<String> {
         // VDF binary format: try to find "name" field
         let mut buf = vec![0u8; 1024];
@@ -815,7 +896,7 @@ impl VdfParser {
 
         // Look for "common" section and "name" field
         let buf_str = String::from_utf8_lossy(&buf);
-        
+
         // Try to find name pattern
         if let Some(name_pos) = buf_str.find("name\0") {
             let start = name_pos + 5; // Skip "name\0"

@@ -23,6 +23,7 @@ serde = "1.0"
 serde_json = "1.0"
 keyvalues-parser = "0.2"
 byteorder = "1.5"
+ureq = "2.9"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [
