@@ -256,11 +256,19 @@ impl SteamCloudApp {
                 });
 
                 row.col(|ui| {
-                    ui.label(if file.exists { "✓" } else { "✕" });
+                    if file.exists {
+                        ui.colored_label(egui::Color32::from_rgb(0, 200, 0), "✓");
+                    } else {
+                        ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "✗");
+                    }
                 });
 
                 row.col(|ui| {
-                    ui.label(if file.is_persisted { "✓" } else { "✕" });
+                    if file.is_persisted {
+                        ui.colored_label(egui::Color32::from_rgb(0, 150, 255), "✓");
+                    } else {
+                        ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "✗");
+                    }
                 });
             }
         });
@@ -294,6 +302,85 @@ impl SteamCloudApp {
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
         let mut fonts = egui::FontDefinitions::default();
+
+        #[cfg(target_os = "windows")]
+        {
+            if let Ok(windir) = std::env::var("WINDIR") {
+                let symbols_path = std::path::PathBuf::from(&windir).join("Fonts").join("seguisym.ttf");
+                if let Ok(data) = std::fs::read(&symbols_path) {
+                    fonts.font_data.insert(
+                        "symbols".to_owned(),
+                        egui::FontData::from_owned(data).into(),
+                    );
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Proportional)
+                        .or_default()
+                        .push("symbols".to_owned());
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Monospace)
+                        .or_default()
+                        .push("symbols".to_owned());
+                }
+            }
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            let candidates = [
+                "/System/Library/Fonts/Apple Symbols.ttf",
+                "/System/Library/Fonts/Supplemental/Symbols.ttf",
+            ];
+            for p in candidates {
+                if let Ok(data) = std::fs::read(p) {
+                    fonts.font_data.insert(
+                        "symbols".to_owned(),
+                        egui::FontData::from_owned(data).into(),
+                    );
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Proportional)
+                        .or_default()
+                        .push("symbols".to_owned());
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Monospace)
+                        .or_default()
+                        .push("symbols".to_owned());
+                    break;
+                }
+            }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            let candidates = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
+                "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf",
+                "/usr/share/fonts/noto/NotoSansSymbols2-Regular.ttf",
+            ];
+            for p in candidates {
+                if let Ok(data) = std::fs::read(p) {
+                    fonts.font_data.insert(
+                        "symbols".to_owned(),
+                        egui::FontData::from_owned(data).into(),
+                    );
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Proportional)
+                        .or_default()
+                        .push("symbols".to_owned());
+                    fonts
+                        .families
+                        .entry(egui::FontFamily::Monospace)
+                        .or_default()
+                        .push("symbols".to_owned());
+                    break;
+                }
+            }
+        }
 
         let font_paths = Self::find_system_fonts();
 
@@ -730,6 +817,9 @@ impl SteamCloudApp {
     }
 
     fn scan_cloud_games(&mut self) {
+        if self.vdf_parser.is_none() {
+            self.vdf_parser = VdfParser::new().ok();
+        }
         if let Some(parser) = &self.vdf_parser {
             self.is_scanning_games = true;
             match parser.scan_all_cloud_games() {
@@ -773,12 +863,12 @@ impl SteamCloudApp {
                                             if game.is_installed {
                                                 ui.colored_label(
                                                     egui::Color32::from_rgb(0, 200, 0),
-                                                    "● 已安装",
+                                                    "已安装",
                                                 );
                                             } else {
                                                 ui.colored_label(
                                                     egui::Color32::from_rgb(150, 150, 150),
-                                                    "○ 未安装",
+                                                    "未安装",
                                                 );
                                             }
                                         } else {
@@ -786,12 +876,12 @@ impl SteamCloudApp {
                                             if game.is_installed {
                                                 ui.colored_label(
                                                     egui::Color32::from_rgb(0, 200, 0),
-                                                    "● 已安装",
+                                                    "已安装",
                                                 );
                                             } else {
                                                 ui.colored_label(
                                                     egui::Color32::from_rgb(150, 150, 150),
-                                                    "○ 未安装",
+                                                    "未安装",
                                                 );
                                             }
                                         }
