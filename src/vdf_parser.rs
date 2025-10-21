@@ -6,7 +6,6 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::{Path, PathBuf};
 
-
 pub struct VdfParser {
     steam_path: PathBuf,
     user_id: String,
@@ -16,7 +15,7 @@ pub struct VdfParser {
 pub struct VdfFileEntry {
     pub filename: String,
     pub root: u32,
-    pub size: i32,
+    pub size: u64,
     pub timestamp: i64,
     pub sha: String,
     pub sync_state: i32,
@@ -27,7 +26,7 @@ pub struct VdfFileEntry {
 pub struct CloudGameInfo {
     pub app_id: u32,
     pub file_count: usize,
-    pub total_size: i64,
+    pub total_size: u64,
     pub last_played: Option<i64>,
     pub playtime: Option<u32>,
     pub game_name: Option<String>,
@@ -300,6 +299,78 @@ impl VdfParser {
                         .join(filename)
                 }
             }
+            5 => {
+                // Pictures
+                #[cfg(windows)]
+                {
+                    let userprofile = std::env::var("USERPROFILE")?;
+                    PathBuf::from(userprofile).join("Pictures").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Pictures").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Pictures").join(filename)
+                }
+            }
+            6 => {
+                // Music
+                #[cfg(windows)]
+                {
+                    let userprofile = std::env::var("USERPROFILE")?;
+                    PathBuf::from(userprofile).join("Music").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Music").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Music").join(filename)
+                }
+            }
+            7 => {
+                // Videos / Movies
+                #[cfg(windows)]
+                {
+                    let userprofile = std::env::var("USERPROFILE")?;
+                    PathBuf::from(userprofile).join("Videos").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Movies").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Videos").join(filename)
+                }
+            }
+            8 => {
+                // Desktop
+                #[cfg(windows)]
+                {
+                    let userprofile = std::env::var("USERPROFILE")?;
+                    PathBuf::from(userprofile).join("Desktop").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Desktop").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Desktop").join(filename)
+                }
+            }
             9 => {
                 // Windows Saved Games文件夹 (Vista+)
                 #[cfg(windows)]
@@ -320,6 +391,39 @@ impl VdfParser {
                     base.join(filename)
                 }
             }
+            10 => {
+                // Downloads
+                #[cfg(windows)]
+                {
+                    let userprofile = std::env::var("USERPROFILE")?;
+                    PathBuf::from(userprofile).join("Downloads").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Downloads").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home).join("Downloads").join(filename)
+                }
+            }
+            11 => {
+                // Public/Shared
+                #[cfg(windows)]
+                {
+                    PathBuf::from("C:\\Users\\Public").join(filename)
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    PathBuf::from("/Users/Shared").join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    PathBuf::from("/tmp").join(filename)
+                }
+            }
             12 => {
                 // Windows LocalLow
                 #[cfg(windows)]
@@ -330,13 +434,34 @@ impl VdfParser {
                         .join("LocalLow")
                         .join(filename)
                 }
-                #[cfg(not(windows))]
+                #[cfg(target_os = "macos")]
                 {
-                    return Err(anyhow!("Root 12 (LocalLow)仅在Windows上支持"));
+                    // 降级到 Caches
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home)
+                        .join("Library")
+                        .join("Caches")
+                        .join(filename)
+                }
+                #[cfg(target_os = "linux")]
+                {
+                    // 降级到 ~/.local/share
+                    let home = std::env::var("HOME")?;
+                    PathBuf::from(home)
+                        .join(".local")
+                        .join("share")
+                        .join(filename)
                 }
             }
             _ => {
-                return Err(anyhow!("未知的root值: {}", root));
+                // 未知root：按照文档降级为 root 0 (remote)
+                log::warn!("未知的root值: {}，降级到 remote", root);
+                self.steam_path
+                    .join("userdata")
+                    .join(&self.user_id)
+                    .join(app_id.to_string())
+                    .join("remote")
+                    .join(filename)
             }
         };
 
@@ -361,77 +486,76 @@ impl VdfParser {
         let content = fs::read_to_string(&vdf_path)?;
         let mut files = Vec::new();
 
-        let lines: Vec<&str> = content.lines().collect();
-        let mut i = 0;
+        let mut pending_key: Option<String> = None;
+        let mut in_entry = false;
+        let mut current: Option<VdfFileEntry> = None;
 
-        while i < lines.len() {
-            let line = lines[i].trim();
+        for raw in content.lines() {
+            let line = raw.trim();
 
-            if line.starts_with('"')
-                && line.ends_with('"')
-                && (line.contains("/") || line.contains("\\"))
-            {
-                let filename = line.trim_matches('"');
-                let mut entry = VdfFileEntry {
-                    filename: filename.to_string(),
-                    root: 0,
-                    size: 0,
-                    timestamp: 0,
-                    sha: String::new(),
-                    sync_state: 0,
-                    actual_path: None,
-                };
-
-                i += 1;
-                if i < lines.len() && lines[i].trim() == "{" {
-                    i += 1;
-
-                    while i < lines.len() && lines[i].trim() != "}" {
-                        let attr_line = lines[i].trim();
-
-                        // 解析root
-                        if attr_line.contains("\"root\"") {
-                            if let Some(val) = Self::extract_value(attr_line) {
-                                entry.root = val.parse().unwrap_or(0);
-                            }
-                        }
-                        // 解析size
-                        else if attr_line.contains("\"size\"") {
-                            if let Some(val) = Self::extract_value(attr_line) {
-                                entry.size = val.parse().unwrap_or(0);
-                            }
-                        }
-                        // 解析time
-                        else if attr_line.contains("\"time\"")
-                            && !attr_line.contains("localtime")
-                            && !attr_line.contains("remotetime")
-                        {
-                            if let Some(val) = Self::extract_value(attr_line) {
-                                entry.timestamp = val.parse().unwrap_or(0);
-                            }
-                        } else if attr_line.contains("\"sha\"") {
-                            if let Some(val) = Self::extract_value(attr_line) {
-                                entry.sha = val.to_string();
-                            }
-                        }
-                        // 解析syncstate
-                        else if attr_line.contains("\"syncstate\"") {
-                            if let Some(val) = Self::extract_value(attr_line) {
-                                entry.sync_state = val.parse().unwrap_or(0);
-                            }
-                        }
-
-                        i += 1;
+            if !in_entry {
+                if line.starts_with('"') && line.ends_with('"') {
+                    let key = line.trim_matches('"');
+                    if key.chars().all(|c| c.is_ascii_digit()) {
+                        pending_key = None;
+                    } else {
+                        pending_key = Some(key.to_string());
                     }
-                    if let Ok(path) = self.resolve_path(entry.root, &entry.filename, app_id) {
-                        entry.actual_path = Some(path);
+                } else if line == "{" {
+                    if let Some(name) = pending_key.take() {
+                        in_entry = true;
+                        current = Some(VdfFileEntry {
+                            filename: name,
+                            root: 0,
+                            size: 0,
+                            timestamp: 0,
+                            sha: String::new(),
+                            sync_state: 0,
+                            actual_path: None,
+                        });
                     }
-
-                    files.push(entry);
                 }
+                continue;
             }
 
-            i += 1;
+            if line == "}" {
+                if let Some(mut e) = current.take() {
+                    if let Ok(path) = self.resolve_path(e.root, &e.filename, app_id) {
+                        e.actual_path = Some(path);
+                    }
+                    files.push(e);
+                }
+                in_entry = false;
+                continue;
+            }
+
+            if let Some(e) = current.as_mut() {
+                if let Some((key, val)) = Self::extract_key_value(line) {
+                    match key {
+                        "root" => {
+                            e.root = val.parse().unwrap_or(0);
+                        }
+                        "size" => {
+                            e.size = val.parse::<u64>().unwrap_or(0);
+                        }
+                        "localtime" => {
+                            e.timestamp = val.parse::<i64>().unwrap_or(0);
+                        }
+                        "remotetime" | "time" => {
+                            if e.timestamp == 0 {
+                                e.timestamp = val.parse::<i64>().unwrap_or(0);
+                            }
+                        }
+                        "sha" => {
+                            e.sha = val.to_string();
+                        }
+                        "syncstate" => {
+                            e.sync_state = val.parse().unwrap_or(0);
+                        }
+                        _ => {}
+                    }
+                }
+            }
         }
 
         log::info!("解析完成: {} 个文件", files.len());
@@ -445,6 +569,15 @@ impl VdfParser {
         } else {
             None
         }
+    }
+
+    fn extract_key_value(line: &str) -> Option<(&str, &str)> {
+        let mut it = line.split('"');
+        it.next()?; // leading content
+        let key = it.next()?;
+        it.next()?; // separator
+        let val = it.next()?;
+        Some((key, val))
     }
 
     pub fn scan_all_cloud_games(&self) -> Result<Vec<CloudGameInfo>> {
@@ -470,7 +603,7 @@ impl VdfParser {
                         log::debug!("发现云存档游戏: App ID {}", app_id);
 
                         let files = self.parse_remotecache(app_id).unwrap_or_default();
-                        let total_size: i64 = files.iter().map(|f| f.size as i64).sum();
+                        let total_size: u64 = files.iter().map(|f| f.size).sum();
                         let config = self.get_game_config(app_id).ok();
                         let manifest = all_manifests.get(&app_id);
                         let category = all_categories.get(&app_id);
