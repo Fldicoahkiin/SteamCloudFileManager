@@ -49,6 +49,7 @@ pub struct SteamCloudApp {
     cloud_games: Vec<CloudGameInfo>,
     show_game_selector: bool,
     is_scanning_games: bool,
+    scan_games_rx: Option<Receiver<Result<Vec<CloudGameInfo>, String>>>,
     vdf_parser: Option<VdfParser>,
     all_users: Vec<UserInfo>,
     show_user_selector: bool,
@@ -248,7 +249,7 @@ impl SteamCloudApp {
                 });
 
                 row.col(|ui| {
-                    ui.label(Self::format_size(file.size));
+                    ui.label(Self::format_size_u64(file.size));
                 });
 
                 row.col(|ui| {
@@ -274,19 +275,6 @@ impl SteamCloudApp {
         });
     }
 
-    fn format_size(size: i32) -> String {
-        let bytes = if size < 0 { 0.0 } else { size as f64 };
-        if bytes < 1024.0 {
-            format!("{} B", size.max(0))
-        } else if bytes < 1024.0 * 1024.0 {
-            format!("{:.2} KB", bytes / 1024.0)
-        } else if bytes < 1024.0 * 1024.0 * 1024.0 {
-            format!("{:.2} MB", bytes / (1024.0 * 1024.0))
-        } else {
-            format!("{:.2} GB", bytes / (1024.0 * 1024.0 * 1024.0))
-        }
-    }
-
     fn format_size_u64(size: u64) -> String {
         let bytes = size as f64;
         if bytes < 1024.0 {
@@ -306,7 +294,9 @@ impl SteamCloudApp {
         #[cfg(target_os = "windows")]
         {
             if let Ok(windir) = std::env::var("WINDIR") {
-                let symbols_path = std::path::PathBuf::from(&windir).join("Fonts").join("seguisym.ttf");
+                let symbols_path = std::path::PathBuf::from(&windir)
+                    .join("Fonts")
+                    .join("seguisym.ttf");
                 if let Ok(data) = std::fs::read(&symbols_path) {
                     fonts.font_data.insert(
                         "symbols".to_owned(),
@@ -405,7 +395,7 @@ impl SteamCloudApp {
         }
         cc.egui_ctx.set_fonts(fonts);
 
-        Self {
+        let mut app = Self {
             steam_manager: Arc::new(Mutex::new(SteamCloudManager::new())),
             app_id_input: String::new(),
             files: Vec::new(),
@@ -431,11 +421,27 @@ impl SteamCloudApp {
             cloud_games: Vec::new(),
             show_game_selector: false,
             is_scanning_games: false,
+            scan_games_rx: None,
             vdf_parser: VdfParser::new().ok(),
             all_users: Vec::new(),
             show_user_selector: false,
             show_about: false,
+        };
+
+        if let Some(parser) = &app.vdf_parser {
+            app.is_scanning_games = true;
+            let (tx, rx) = std::sync::mpsc::channel();
+            app.scan_games_rx = Some(rx);
+            let steam_path = parser.get_steam_path().clone();
+            let user_id = parser.get_user_id().to_string();
+            std::thread::spawn(move || {
+                let parser = VdfParser::with_user_id(steam_path, user_id);
+                let res = parser.scan_all_cloud_games().map_err(|e| e.to_string());
+                let _ = tx.send(res);
+            });
         }
+
+        app
     }
 
     fn connect_to_steam(&mut self) {
@@ -596,19 +602,31 @@ impl SteamCloudApp {
         // 从已加载的文件中提取所有唯一的父目录路径
         let mut path_map: HashMap<String, PathBuf> = HashMap::new();
 
+        // 需要有效的 App ID 才能解析实际路径
+        let app_id = match self.app_id_input.parse::<u32>() {
+            Ok(id) => id,
+            Err(_) => {
+                self.local_save_paths.clear();
+                return;
+            }
+        };
+
+        // 复用已存在的 VdfParser；若未初始化，则尝试初始化一次
+        if self.vdf_parser.is_none() {
+            self.vdf_parser = VdfParser::new().ok();
+        }
+        let parser_opt = self.vdf_parser.as_ref();
+
         for file in &self.files {
             // 从文件的root_description和实际存在性推断路径
             if file.exists {
-                // 尝试通过VDF解析器获取实际路径
-                if let Ok(app_id) = self.app_id_input.parse::<u32>() {
-                    if let Ok(parser) = crate::vdf_parser::VdfParser::new() {
-                        if let Ok(path) = parser.resolve_path(file.root, &file.name, app_id) {
-                            if let Some(parent) = path.parent() {
-                                let parent_path = parent.to_path_buf();
-                                if parent_path.exists() {
-                                    let key = format!("{} ({})", file.root_description, file.root);
-                                    path_map.entry(key).or_insert(parent_path);
-                                }
+                if let Some(parser) = parser_opt {
+                    if let Ok(path) = parser.resolve_path(file.root, &file.name, app_id) {
+                        if let Some(parent) = path.parent() {
+                            let parent_path = parent.to_path_buf();
+                            if parent_path.exists() {
+                                let key = format!("{} ({})", file.root_description, file.root);
+                                path_map.entry(key).or_insert(parent_path);
                             }
                         }
                     }
@@ -822,18 +840,16 @@ impl SteamCloudApp {
         }
         if let Some(parser) = &self.vdf_parser {
             self.is_scanning_games = true;
-            match parser.scan_all_cloud_games() {
-                Ok(games) => {
-                    self.cloud_games = games;
-                    self.show_game_selector = true;
-                    self.status_message =
-                        format!("发现 {} 个有云存档的游戏", self.cloud_games.len());
-                }
-                Err(e) => {
-                    self.show_error(&format!("扫描游戏失败: {}", e));
-                }
-            }
-            self.is_scanning_games = false;
+            self.status_message = "正在扫描游戏库...".to_string();
+            let (tx, rx) = std::sync::mpsc::channel();
+            self.scan_games_rx = Some(rx);
+            let steam_path = parser.get_steam_path().clone();
+            let user_id = parser.get_user_id().to_string();
+            std::thread::spawn(move || {
+                let parser = VdfParser::with_user_id(steam_path, user_id);
+                let res = parser.scan_all_cloud_games().map_err(|e| e.to_string());
+                let _ = tx.send(res);
+            });
         } else {
             self.show_error("VDF 解析器未初始化");
         }
@@ -848,116 +864,110 @@ impl SteamCloudApp {
             .resizable(true)
             .default_size([600.0, 500.0])
             .show(ctx, |ui| {
-                ui.heading(format!("{} 个有云存档的游戏", games.len()));
-
-                ui.add_space(10.0);
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for game in &games {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.horizontal(|ui| {
-                                        if let Some(name) = &game.game_name {
-                                            ui.strong(name);
-                                            if game.is_installed {
-                                                ui.colored_label(
-                                                    egui::Color32::from_rgb(0, 200, 0),
-                                                    "已安装",
-                                                );
+                if self.is_scanning_games && games.is_empty() {
+                    ui.label("正在扫描游戏库...");
+                } else if games.is_empty() {
+                    ui.label("未发现云存档的游戏");
+                } else {
+                    ui.heading(format!("{} 个有云存档的游戏", games.len()));
+                    ui.add_space(10.0);
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for game in &games {
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            if let Some(name) = &game.game_name {
+                                                ui.strong(name);
+                                                if game.is_installed {
+                                                    ui.colored_label(
+                                                        egui::Color32::from_rgb(0, 200, 0),
+                                                        "已安装",
+                                                    );
+                                                } else {
+                                                    ui.colored_label(
+                                                        egui::Color32::from_rgb(150, 150, 150),
+                                                        "未安装",
+                                                    );
+                                                }
                                             } else {
-                                                ui.colored_label(
-                                                    egui::Color32::from_rgb(150, 150, 150),
-                                                    "未安装",
-                                                );
+                                                ui.strong(format!("App ID: {}", game.app_id));
+                                                if game.is_installed {
+                                                    ui.colored_label(
+                                                        egui::Color32::from_rgb(0, 200, 0),
+                                                        "已安装",
+                                                    );
+                                                } else {
+                                                    ui.colored_label(
+                                                        egui::Color32::from_rgb(150, 150, 150),
+                                                        "未安装",
+                                                    );
+                                                }
                                             }
-                                        } else {
-                                            ui.strong(format!("App ID: {}", game.app_id));
-                                            if game.is_installed {
-                                                ui.colored_label(
-                                                    egui::Color32::from_rgb(0, 200, 0),
-                                                    "已安装",
-                                                );
-                                            } else {
-                                                ui.colored_label(
-                                                    egui::Color32::from_rgb(150, 150, 150),
-                                                    "未安装",
-                                                );
+                                        });
+
+                                        if game.game_name.is_some() {
+                                            ui.label(format!("App ID: {}", game.app_id));
+                                        }
+
+                                        ui.label(format!(
+                                            "{} 个文件 | {}",
+                                            game.file_count,
+                                            Self::format_size_u64(game.total_size)
+                                        ));
+
+                                        if let Some(dir) = &game.install_dir {
+                                            ui.label(format!("安装目录: {}", dir));
+                                        }
+
+                                        if !game.categories.is_empty() {
+                                            ui.label(format!(
+                                                "标签: {}",
+                                                game.categories.join(", ")
+                                            ));
+                                        }
+
+                                        if let Some(playtime) = game.playtime {
+                                            let hours = playtime / 60;
+                                            ui.label(format!("游戏时间: {:.2} 小时", hours as f64));
+                                        }
+
+                                        if let Some(last_played) = game.last_played {
+                                            if last_played > 0 {
+                                                use chrono::{DateTime, Local};
+                                                use std::time::{Duration, UNIX_EPOCH};
+                                                let dt = UNIX_EPOCH
+                                                    + Duration::from_secs(last_played as u64);
+                                                let local: DateTime<Local> = dt.into();
+                                                ui.label(format!(
+                                                    "最后运行: {}",
+                                                    local.format("%Y-%m-%d %H:%M")
+                                                ));
                                             }
                                         }
                                     });
 
-                                    if game.game_name.is_some() {
-                                        ui.label(format!("App ID: {}", game.app_id));
-                                    }
-
-                                    ui.label(format!(
-                                        "{} 个文件 | {}",
-                                        game.file_count,
-                                        Self::format_size_i64(game.total_size)
-                                    ));
-
-                                    if let Some(dir) = &game.install_dir {
-                                        ui.label(format!("安装目录: {}", dir));
-                                    }
-
-                                    if !game.categories.is_empty() {
-                                        ui.label(format!("标签: {}", game.categories.join(", ")));
-                                    }
-
-                                    if let Some(playtime) = game.playtime {
-                                        let hours = playtime / 60;
-                                        ui.label(format!("游戏时间: {:.2} 小时", hours as f64));
-                                    }
-
-                                    if let Some(last_played) = game.last_played {
-                                        if last_played > 0 {
-                                            use chrono::{DateTime, Local};
-                                            use std::time::{Duration, UNIX_EPOCH};
-                                            let dt = UNIX_EPOCH
-                                                + Duration::from_secs(last_played as u64);
-                                            let local: DateTime<Local> = dt.into();
-                                            ui.label(format!(
-                                                "最后运行: {}",
-                                                local.format("%Y-%m-%d %H:%M")
-                                            ));
-                                        }
-                                    }
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if ui.button("选择").clicked() {
+                                                selected_app_id = Some(game.app_id);
+                                            }
+                                        },
+                                    );
                                 });
-
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if ui.button("选择").clicked() {
-                                            selected_app_id = Some(game.app_id);
-                                        }
-                                    },
-                                );
                             });
-                        });
 
-                        ui.add_space(5.0);
-                    }
-                });
+                            ui.add_space(5.0);
+                        }
+                    });
+                }
             });
 
         if let Some(app_id) = selected_app_id {
             self.app_id_input = app_id.to_string();
             self.show_game_selector = false;
             self.connect_to_steam();
-        }
-    }
-
-    fn format_size_i64(size: i64) -> String {
-        let bytes = if size < 0 { 0.0 } else { size as f64 };
-        if bytes < 1024.0 {
-            format!("{} B", size.max(0))
-        } else if bytes < 1024.0 * 1024.0 {
-            format!("{:.2} KB", bytes / 1024.0)
-        } else if bytes < 1024.0 * 1024.0 * 1024.0 {
-            format!("{:.2} MB", bytes / (1024.0 * 1024.0))
-        } else {
-            format!("{:.2} GB", bytes / (1024.0 * 1024.0 * 1024.0))
         }
     }
 
@@ -1050,6 +1060,7 @@ impl SteamCloudApp {
             self.vdf_parser = Some(VdfParser::with_user_id(steam_path, user_id));
             self.cloud_games.clear();
             self.status_message = "已切换用户".to_string();
+            self.scan_cloud_games();
         }
     }
 
@@ -1139,9 +1150,6 @@ impl SteamCloudApp {
                 ui.separator();
                 ui.add_space(10.0);
 
-                ui.label("Platform Support:");
-                ui.label("  Windows | macOS | Linux");
-
                 ui.add_space(10.0);
                 ui.label("Built with Rust and egui");
             });
@@ -1160,7 +1168,13 @@ impl SteamCloudApp {
                 self.show_user_selector = true;
             }
             if ui.button("游戏库").clicked() {
-                self.scan_cloud_games();
+                if !self.cloud_games.is_empty() {
+                    self.show_game_selector = true;
+                } else if !self.is_scanning_games {
+                    self.scan_cloud_games();
+                } else {
+                    self.show_game_selector = true;
+                }
             }
 
             ui.separator();
@@ -1434,13 +1448,13 @@ impl SteamCloudApp {
                 ui.label(format!("已选: {}/{}", selected_count, total_count));
 
                 if selected_count > 0 {
-                    let mut total_size = 0i32;
+                    let mut total_size: u64 = 0;
                     for &idx in &self.selected_files {
                         if let Some(file) = self.files.get(idx) {
-                            total_size += file.size;
+                            total_size = total_size.saturating_add(file.size);
                         }
                     }
-                    ui.label(format!("总大小: {}", Self::format_size(total_size)));
+                    ui.label(format!("总大小: {}", Self::format_size_u64(total_size)));
                 }
             });
         });
@@ -1588,6 +1602,28 @@ impl eframe::App for SteamCloudApp {
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.is_refreshing = false;
                     self.loader_rx = None;
+                }
+            }
+        }
+
+        if let Some(rx) = &self.scan_games_rx {
+            match rx.try_recv() {
+                Ok(Ok(games)) => {
+                    self.cloud_games = games;
+                    self.status_message =
+                        format!("发现 {} 个有云存档的游戏", self.cloud_games.len());
+                    self.is_scanning_games = false;
+                    self.scan_games_rx = None;
+                }
+                Ok(Err(err)) => {
+                    self.show_error(&format!("扫描游戏失败: {}", err));
+                    self.is_scanning_games = false;
+                    self.scan_games_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.is_scanning_games = false;
+                    self.scan_games_rx = None;
                 }
             }
         }

@@ -15,7 +15,7 @@ pub struct SteamCloudManager {
 #[derive(Debug, Clone)]
 pub struct CloudFile {
     pub name: String,
-    pub size: i32,
+    pub size: u64,
     pub timestamp: DateTime<Local>,
     pub is_persisted: bool,
     pub exists: bool,
@@ -220,7 +220,7 @@ impl SteamCloudManager {
 
             let file = CloudFile {
                 name: steam_file.name.clone(),
-                size: steam_file.size as i32,
+                size: steam_file.size,
                 timestamp,
                 is_persisted: steam_file_handle.is_persisted(),
                 exists: steam_file_handle.exists(),
