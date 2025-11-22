@@ -118,7 +118,11 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
           
-          sed "s/{VERSION}/$VERSION/g; s/{PREVIOUS_TAG}/$PREVIOUS_TAG/g" .github/release-template.md > release-notes.md
+          echo -e "## What's Changed\n" > release-notes.md
+          git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> release-notes.md
+          echo -e "\n" >> release-notes.md
+          
+          sed "s/{VERSION}/$VERSION/g; s/{PREVIOUS_TAG}/$PREVIOUS_TAG/g" .github/release-template.md >> release-notes.md
           
       - name: Create Release
         uses: softprops/action-gh-release@v2
