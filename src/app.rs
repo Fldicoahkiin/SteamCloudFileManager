@@ -461,7 +461,7 @@ impl SteamCloudApp {
             all_users: Vec::new(),
             show_user_selector: false,
             show_about: false,
-            show_debug_warning: !crate::steam_api::check_cdp_enabled(),
+            show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
         };
 
         if let Some(parser) = &app.vdf_parser {
@@ -475,7 +475,7 @@ impl SteamCloudApp {
                 let mut games_res = parser.scan_all_cloud_games();
 
                 if let Ok(ref mut games) = games_res {
-                    if crate::steam_api::check_cdp_enabled() {
+                    if crate::cdp_client::CdpClient::is_cdp_running() {
                         log::info!("检测到 CDP 已开启，尝试通过 CDP 获取游戏列表...");
                         match crate::cdp_client::CdpClient::connect() {
                             Ok(mut client) => match client.fetch_game_list() {
@@ -616,7 +616,7 @@ impl SteamCloudApp {
             };
 
             // 获取 CDP 结果并合并
-            if crate::steam_api::check_cdp_enabled() && app_id > 0 {
+            if crate::cdp_client::CdpClient::is_cdp_running() && app_id > 0 {
                 log::info!("尝试通过 CDP 获取文件列表...");
                 match crate::cdp_client::CdpClient::connect() {
                     Ok(mut client) => {
@@ -1002,7 +1002,7 @@ impl SteamCloudApp {
                 let mut games_res = parser.scan_all_cloud_games();
 
                 if let Ok(ref mut games) = games_res {
-                    if crate::steam_api::check_cdp_enabled() {
+                    if crate::cdp_client::CdpClient::is_cdp_running() {
                         log::info!("检测到 CDP 已开启，尝试通过 CDP 获取游戏列表...");
                         match crate::cdp_client::CdpClient::connect() {
                             Ok(mut client) => match client.fetch_game_list() {
@@ -1245,16 +1245,8 @@ impl SteamCloudApp {
 
     fn load_all_users(&mut self) {
         if let Some(parser) = &self.vdf_parser {
-            if let Ok(user_ids) = parser.get_all_user_ids() {
-                let current_user = parser.get_user_id();
-                self.all_users = user_ids
-                    .into_iter()
-                    .map(|id| UserInfo {
-                        user_id: id.clone(),
-                        persona_name: None,
-                        is_current: id == current_user,
-                    })
-                    .collect();
+            if let Ok(users) = parser.get_all_users_info() {
+                self.all_users = users;
             }
         }
     }
@@ -1286,7 +1278,12 @@ impl SteamCloudApp {
                         ui.group(|ui| {
                             ui.horizontal(|ui| {
                                 ui.vertical(|ui| {
-                                    ui.strong(format!("用户 ID: {}", user.user_id));
+                                    if let Some(name) = &user.persona_name {
+                                        ui.strong(name);
+                                        ui.label(format!("ID: {}", user.user_id));
+                                    } else {
+                                        ui.strong(format!("用户 ID: {}", user.user_id));
+                                    }
                                     if user.is_current {
                                         ui.label("✅ 当前用户");
                                     }
@@ -1347,7 +1344,7 @@ impl SteamCloudApp {
                 ui.separator();
                 ui.add_space(10.0);
 
-                ui.label("License: MIT License");
+                ui.label("License: GPL-3.0 License");
                 ui.add_space(5.0);
                 ui.label("Copyright (c) 2025 Flacier");
 

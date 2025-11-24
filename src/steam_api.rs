@@ -7,10 +7,6 @@ use std::process::Command;
 use std::sync::{Arc, Mutex};
 use steamworks::Client;
 
-pub fn check_cdp_enabled() -> bool {
-    ureq::get("http://127.0.0.1:8080/json").call().is_ok()
-}
-
 pub fn restart_steam_with_debugging() -> Result<()> {
     log::info!("正在尝试以调试模式重启 Steam...");
 
@@ -337,7 +333,7 @@ impl SteamCloudManager {
                 .single()
                 .unwrap_or_else(Local::now);
 
-            let root_desc = Self::get_root_folder_name(entry.root);
+            let root_desc = VdfParser::get_root_description(entry.root);
 
             let cloud_file = CloudFile {
                 name: entry.filename.clone(),
@@ -477,87 +473,6 @@ impl SteamCloudManager {
                 client.run_callbacks();
             }
         }
-    }
-
-    fn get_root_folder_name(root: u32) -> String {
-        match root {
-            0 => "Steam云文件夹",
-            1 => "GameInstall",
-            2 => {
-                #[cfg(target_os = "windows")]
-                {
-                    "WinMyDocuments"
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    "MacDocuments"
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    "LinuxHome/Documents"
-                }
-            }
-            3 => {
-                #[cfg(target_os = "windows")]
-                {
-                    "WinAppDataRoaming"
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    "MacApplicationSupport"
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    "LinuxHome/.config"
-                }
-            }
-            4 => {
-                #[cfg(target_os = "windows")]
-                {
-                    "WinAppDataLocal"
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    "MacCaches"
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    "LinuxHome/.local/share"
-                }
-            }
-            5 => {
-                #[cfg(target_os = "macos")]
-                {
-                    "MacPreferences"
-                }
-                #[cfg(not(target_os = "macos"))]
-                {
-                    "Preferences"
-                }
-            }
-            9 => {
-                #[cfg(target_os = "windows")]
-                {
-                    "WinSavedGames"
-                }
-                #[cfg(not(target_os = "windows"))]
-                {
-                    "SavedGames"
-                }
-            }
-            12 => {
-                #[cfg(target_os = "windows")]
-                {
-                    "WinAppDataLocalLow"
-                }
-                #[cfg(not(target_os = "windows"))]
-                {
-                    "LocalLow"
-                }
-            }
-            _ => "Unknown",
-        }
-        .to_string()
     }
 }
 

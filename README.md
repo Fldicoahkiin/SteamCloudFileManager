@@ -154,37 +154,25 @@ pub struct SteamCloudManager {
 
 ### VDF 文件解析
 
-本工具采用 **双重方案** 确保最大兼容性：
+本工具采用 **混合架构方案** (VDF + CDP) 确保最大兼容性和功能性：
 
-**主要方案：VDF 解析**
+**1. VDF 解析 (本地)**
 - 直接读取 `remotecache.vdf` 文件获取完整文件列表
-- 支持所有 root 路径类型（0-12），不只是 `remote/` 文件夹
 - 可以显示文件在本地磁盘的实际存储位置
-- 适用于大多数现代游戏
+- 作为数据基础，确保即使无网络也能查看缓存状态
 
-**备用方案：Steam API**
-- 当 VDF 文件不存在或解析失败时自动回退
-- 使用 `ISteamRemoteStorage` API
-- 仅支持 root=0 的文件
-- 确保基本功能可用
+**2. CDP 协议 (云端)**
+- 通过 Steam CEF 调试接口直接与客户端通信
+- 实时获取云端文件列表和 **下载链接**
+- 自动合并云端状态到本地视图
 
-### ⚠️ 当前限制
+**3. Steam API**
+- `ISteamRemoteStorage` API
+- 用于文件上传和删除操作
 
-**显示的游戏数量**
-- 本工具显示：本地有 `remotecache.vdf` 的游戏（通常是最近运行过的游戏）
-- Steam 官网显示：所有曾在任何设备上有云存档的游戏
+### 后续维护计划
 
-**为什么会有差异？**
-- `remotecache.vdf` 只在游戏运行后由 Steam 客户端创建
-- 已卸载或未在本地运行过的游戏不会有本地 VDF 文件
-- Steam 官网通过服务器 API 直接访问所有云存档
-
-**解决方案（计划中）：**
-- 集成 Steam Web API 获取完整游戏列表
-- 需要用户提供 Steam Web API Key（免费）
-- 可选功能，不影响当前本地 VDF 解析
-
-更多技术细节请参考 [STEAM_CLOUD_LIMITATIONS.md](STEAM_CLOUD_LIMITATIONS.md)
+- [ ] **冲突检测**: 识别并标记 `CloudFile.conflict` 状态，提示用户解决同步冲突
 
 ## 贡献
 
@@ -198,7 +186,7 @@ pub struct SteamCloudManager {
 
 ## 许可证
 
-MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+GPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件
 
 ## 参考资源
 

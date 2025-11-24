@@ -70,7 +70,6 @@ pub struct AppInfo {
 #[derive(Debug, Clone)]
 pub struct UserInfo {
     pub user_id: String,
-    #[allow(dead_code)]
     pub persona_name: Option<String>,
     pub is_current: bool,
 }
@@ -78,7 +77,7 @@ pub struct UserInfo {
 impl VdfParser {
     pub fn new() -> Result<Self> {
         let steam_path = Self::find_steam_path()?;
-        let user_id = Self::find_user_id(&steam_path)?;
+        let (user_id, _) = Self::find_user_id(&steam_path)?;
         Ok(Self {
             steam_path,
             user_id,
@@ -145,28 +144,31 @@ impl VdfParser {
         Err(anyhow!("未找到Steam安装目录"))
     }
 
-    fn find_user_id(steam_path: &Path) -> Result<String> {
-        if let Some(uid) = Self::find_user_id_from_loginusers(steam_path) {
-            return Ok(uid);
+    fn find_user_id(steam_path: &Path) -> Result<(String, Option<String>)> {
+        if let Some((uid, name)) = Self::find_user_id_from_loginusers(steam_path) {
+            return Ok((uid, name));
         }
         let userdata_path = steam_path.join("userdata");
         if let Ok(entries) = fs::read_dir(&userdata_path) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.chars().all(|c| c.is_ascii_digit()) {
-                    return Ok(name);
+                    return Ok((name, None));
                 }
             }
         }
         Err(anyhow!("未找到用户ID"))
     }
 
-    fn find_user_id_from_loginusers(steam_path: &Path) -> Option<String> {
+    fn find_user_id_from_loginusers(steam_path: &Path) -> Option<(String, Option<String>)> {
         let p = steam_path.join("config").join("loginusers.vdf");
         let s = fs::read_to_string(&p).ok()?;
         let mut current_id64: Option<u64> = None;
         let mut most_recent_id64: Option<u64> = None;
+        let mut most_recent_name: Option<String> = None;
         let mut in_user_block = false;
+        let mut pending_name: Option<String> = None;
+
         for line in s.lines() {
             let t = line.trim();
             if t.starts_with('"')
@@ -175,14 +177,26 @@ impl VdfParser {
             {
                 if let Ok(id64) = t.trim_matches('"').parse::<u64>() {
                     current_id64 = Some(id64);
+                    pending_name = None;
                 }
                 in_user_block = true;
                 continue;
             }
-            if in_user_block && t.contains("\"MostRecent\"") {
-                if let Some(val) = Self::extract_value(t) {
-                    if val == "1" {
-                        most_recent_id64 = current_id64;
+            if in_user_block {
+                if t.contains("\"MostRecent\"") {
+                    if let Some(val) = Self::extract_value(t) {
+                        if val == "1" {
+                            most_recent_id64 = current_id64;
+                            most_recent_name = pending_name.clone();
+                        }
+                    }
+                } else if t.contains("\"PersonaName\"") {
+                    if let Some(val) = Self::extract_value(t) {
+                        pending_name = Some(val.to_string());
+                        // 如果这个用户已经是最近用户，更新名字
+                        if current_id64 == most_recent_id64 {
+                            most_recent_name = Some(val.to_string());
+                        }
                     }
                 }
             }
@@ -193,7 +207,7 @@ impl VdfParser {
         let id64 = most_recent_id64.or(current_id64)?;
         let base: u64 = 76561197960265728;
         if id64 > base {
-            Some((id64 - base).to_string())
+            Some(((id64 - base).to_string(), most_recent_name))
         } else {
             None
         }
@@ -468,6 +482,57 @@ impl VdfParser {
         Ok(path)
     }
 
+    pub fn get_root_description(root: u32) -> String {
+        match root {
+            0 => "Steam云文件夹 (Remote)",
+            1 => "游戏安装目录 (InstallDir)",
+            2 => {
+                #[cfg(target_os = "windows")]
+                return "我的文档 (Documents)".to_string();
+                #[cfg(target_os = "macos")]
+                return "文稿 (Documents)".to_string();
+                #[cfg(target_os = "linux")]
+                return "文档 (Documents)".to_string();
+            }
+            3 => {
+                #[cfg(target_os = "windows")]
+                return "AppData Roaming".to_string();
+                #[cfg(target_os = "macos")]
+                return "Application Support".to_string();
+                #[cfg(target_os = "linux")]
+                return ".config".to_string();
+            }
+            4 => {
+                #[cfg(target_os = "windows")]
+                return "AppData Local".to_string();
+                #[cfg(target_os = "macos")]
+                return "Caches".to_string();
+                #[cfg(target_os = "linux")]
+                return ".local/share".to_string();
+            }
+            5 => {
+                #[cfg(target_os = "macos")]
+                return "偏好设置 (Preferences)".to_string();
+                #[cfg(not(target_os = "macos"))]
+                return "图片 (Pictures)".to_string();
+            }
+            6 => "音乐 (Music)",
+            7 => "视频 (Videos)",
+            8 => "桌面 (Desktop)",
+            9 => "保存的游戏 (Saved Games)",
+            10 => "下载 (Downloads)",
+            11 => "公共/共享 (Public/Shared)",
+            12 => {
+                #[cfg(target_os = "windows")]
+                return "AppData LocalLow".to_string();
+                #[cfg(not(target_os = "windows"))]
+                return "LocalLow (Mapped)".to_string();
+            }
+            _ => "未知路径 (Unknown)",
+        }
+        .to_string()
+    }
+
     // 解析remotecache.vdf文件
     pub fn parse_remotecache(&self, app_id: u32) -> Result<Vec<VdfFileEntry>> {
         let vdf_path = self
@@ -706,20 +771,75 @@ impl VdfParser {
         })
     }
 
-    pub fn get_all_user_ids(&self) -> Result<Vec<String>> {
+    pub fn get_all_users_info(&self) -> Result<Vec<UserInfo>> {
         let userdata_path = self.steam_path.join("userdata");
-        let mut user_ids = Vec::new();
+        let mut users = Vec::new();
+
+        // 读取 loginusers.vdf 获取所有用户的昵称信息
+        let mut login_users = HashMap::new();
+        let loginusers_path = self.steam_path.join("config").join("loginusers.vdf");
+        if let Ok(content) = fs::read_to_string(&loginusers_path) {
+            let mut current_id64: Option<u64> = None;
+            let mut current_name: Option<String> = None;
+            let mut in_user_block = false;
+            let base: u64 = 76561197960265728;
+
+            for line in content.lines() {
+                let t = line.trim();
+                if t.starts_with('"')
+                    && t.ends_with('"')
+                    && t.chars().skip(1).take_while(|c| c.is_ascii_digit()).count() + 2 == t.len()
+                {
+                    if let Some(id) = current_id64 {
+                        if let Some(name) = current_name.take() {
+                            if id > base {
+                                login_users.insert((id - base).to_string(), name);
+                            }
+                        }
+                    }
+                    if let Ok(id64) = t.trim_matches('"').parse::<u64>() {
+                        current_id64 = Some(id64);
+                    }
+                    in_user_block = true;
+                    continue;
+                }
+
+                if in_user_block {
+                    if t.contains("\"PersonaName\"") {
+                        if let Some(val) = Self::extract_value(t) {
+                            current_name = Some(val.to_string());
+                        }
+                    }
+                    if t == "}" {
+                        if let Some(id) = current_id64 {
+                            if let Some(name) = current_name.take() {
+                                if id > base {
+                                    login_users.insert((id - base).to_string(), name);
+                                }
+                            }
+                        }
+                        in_user_block = false;
+                        current_id64 = None;
+                    }
+                }
+            }
+        }
 
         if let Ok(entries) = fs::read_dir(&userdata_path) {
             for entry in entries.flatten() {
                 let name = entry.file_name().to_string_lossy().to_string();
                 if name.chars().all(|c| c.is_ascii_digit()) {
-                    user_ids.push(name);
+                    let persona_name = login_users.get(&name).cloned();
+                    users.push(UserInfo {
+                        user_id: name.clone(),
+                        persona_name,
+                        is_current: name == self.user_id,
+                    });
                 }
             }
         }
 
-        Ok(user_ids)
+        Ok(users)
     }
 
     pub fn with_user_id(steam_path: PathBuf, user_id: String) -> Self {
