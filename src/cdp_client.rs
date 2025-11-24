@@ -11,8 +11,6 @@ use tungstenite::{stream::MaybeTlsStream, WebSocket};
 struct Target {
     #[serde(rename = "webSocketDebuggerUrl")]
     websocket_debugger_url: Option<String>,
-    #[allow(dead_code)]
-    url: String,
     #[serde(rename = "type")]
     target_type: String,
 }
@@ -37,6 +35,11 @@ struct CdpResponse {
 }
 
 impl CdpClient {
+    // 检查 CDP 服务是否可用
+    pub fn is_cdp_running() -> bool {
+        ureq::get("http://127.0.0.1:8080/json").call().is_ok()
+    }
+
     // 连接到 Steam CDP 端口
     pub fn connect() -> Result<Self> {
         // 获取目标列表
@@ -120,29 +123,6 @@ impl CdpClient {
             .and_then(|r| r.get("value"))
             .cloned()
             .unwrap_or(Value::Null))
-    }
-
-    // 获取当前页面的 Cookie
-    #[allow(dead_code)]
-    pub fn get_cookies(&mut self) -> Result<String> {
-        let result = self.send_command("Network.getCookies", serde_json::json!({}))?;
-
-        if let Some(cookies) = result.get("cookies").and_then(|c| c.as_array()) {
-            let cookie_str = cookies
-                .iter()
-                .map(|c| {
-                    format!(
-                        "{}={}",
-                        c["name"].as_str().unwrap_or(""),
-                        c["value"].as_str().unwrap_or("")
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("; ");
-            return Ok(cookie_str);
-        }
-
-        Ok(String::new())
     }
 
     pub fn fetch_game_list(&mut self) -> Result<Vec<CloudGameInfo>> {
