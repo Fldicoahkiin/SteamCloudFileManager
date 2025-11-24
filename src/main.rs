@@ -1,4 +1,5 @@
 mod app;
+mod cdp_client;
 mod steam_api;
 mod vdf_parser;
 
@@ -6,7 +7,11 @@ use app::SteamCloudApp;
 use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
-    env_logger::init();
+    let env = env_logger::Env::default().filter_or(
+        "RUST_LOG",
+        "info,SteamCloudFileManager=debug,ureq=warn,rustls=warn,tungstenite=warn",
+    );
+    env_logger::init_from_env(env);
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

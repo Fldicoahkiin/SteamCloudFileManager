@@ -85,7 +85,7 @@ impl VdfParser {
         })
     }
 
-    fn find_steam_path() -> Result<PathBuf> {
+    pub fn find_steam_path() -> Result<PathBuf> {
         #[cfg(target_os = "windows")]
         {
             let mut candidates: Vec<PathBuf> = Vec::new();
@@ -612,8 +612,9 @@ impl VdfParser {
                         let game_name = manifest
                             .as_ref()
                             .map(|m| m.name.clone())
-                            .or_else(|| appinfo.and_then(|a| a.name.clone()))
-                            .or_else(|| Self::fetch_app_name_from_store(app_id));
+                            .or_else(|| appinfo.and_then(|a| a.name.clone()));
+                        // 移除自动网络获取，避免启动慢
+                        // .or_else(|| Self::fetch_app_name_from_store(app_id));
 
                         if game_name.is_none() {
                             log::debug!(
@@ -901,21 +902,6 @@ impl VdfParser {
         Ok(categories)
     }
 
-    #[allow(dead_code)]
-    pub fn get_installed_games(&self) -> Result<Vec<AppManifest>> {
-        let manifests = self.scan_app_manifests()?;
-        Ok(manifests.into_values().collect())
-    }
-
-    #[allow(dead_code)]
-    pub fn is_game_installed(&self, app_id: u32) -> bool {
-        let manifest_path = self
-            .steam_path
-            .join("steamapps")
-            .join(format!("appmanifest_{}.acf", app_id));
-        manifest_path.exists()
-    }
-
     pub fn parse_appinfo_vdf(&self) -> Result<HashMap<u32, AppInfo>> {
         let appinfo_path = self.steam_path.join("appcache").join("appinfo.vdf");
 
@@ -956,22 +942,22 @@ impl VdfParser {
                 break;
             }
 
-            // Skip size, infostate, last_updated, access_token
+            // 跳过 size, infostate, last_updated, access_token
             for _ in 0..3 {
                 let _ = cursor.read_u32::<LittleEndian>();
             }
             let _ = cursor.read_u64::<LittleEndian>();
 
-            // Read SHA hash (20 bytes)
+            // 读取 SHA 哈希 (20 字节)
             let mut sha = vec![0u8; 20];
             if cursor.read_exact(&mut sha).is_err() {
                 break;
             }
 
-            // Skip change_number (4 bytes)
+            // 跳过 change_number (4 字节)
             let _ = cursor.read_u32::<LittleEndian>();
 
-            // Try to find the game name in the VDF structure
+            // 尝试在 VDF 结构中找到游戏名称
             if let Ok(name) = Self::parse_appinfo_name(&mut cursor, app_id) {
                 if !name.is_empty() && name.len() < 200 {
                     apps.insert(
@@ -986,7 +972,7 @@ impl VdfParser {
                 }
             }
 
-            // Skip to next entry (read remaining data)
+            // 跳到下一个条目（读取剩余数据）
             let mut buf = vec![0u8; 4096];
             let mut skipped = 0;
             while skipped < 500000 {
@@ -994,7 +980,7 @@ impl VdfParser {
                     break;
                 }
                 skipped += buf.len();
-                // Look for next app_id marker or end
+                // 寻找下一个 app_id 标记或结束
                 if buf.starts_with(&[0, 0, 0, 0]) {
                     break;
                 }
@@ -1007,34 +993,21 @@ impl VdfParser {
         Ok(apps)
     }
 
-    fn fetch_app_name_from_store(app_id: u32) -> Option<String> {
-        let url = format!(
-            "https://store.steampowered.com/api/appdetails?appids={}&l=schinese",
-            app_id
-        );
-        let resp = ureq::get(&url).call().ok()?;
-        let text = resp.into_string().ok()?;
-        let v: serde_json::Value = serde_json::from_str(&text).ok()?;
-        let key = app_id.to_string();
-        let data = v.get(&key)?.get("data")?;
-        data.get("name")?.as_str().map(|s: &str| s.to_string())
-    }
-
     fn parse_appinfo_name(cursor: &mut Cursor<Vec<u8>>, app_id: u32) -> Result<String> {
-        // VDF binary format: try to find "name" field
+        // VDF 二进制格式：尝试找到 "name" 字段
         let mut buf = vec![0u8; 1024];
         if cursor.read(&mut buf).is_err() {
             return Err(anyhow!("无法读取"));
         }
 
-        // Look for "common" section and "name" field
+        // 寻找 "common" 部分和 "name" 字段
         let buf_str = String::from_utf8_lossy(&buf);
 
-        // Try to find name pattern
+        // 尝试找到 name 模式
         if let Some(name_pos) = buf_str.find("name\0") {
-            let start = name_pos + 5; // Skip "name\0"
+            let start = name_pos + 5; // 跳过 "name\0"
             if start < buf.len() {
-                // Find the string after "name"
+                // 找到 "name" 后的字符串
                 let remaining = &buf[start..];
                 if let Some(null_pos) = remaining.iter().position(|&b| b == 0) {
                     if let Ok(name) = String::from_utf8(remaining[..null_pos].to_vec()) {
@@ -1048,22 +1021,5 @@ impl VdfParser {
         }
 
         Err(anyhow!("未找到游戏名称"))
-    }
-
-    #[allow(dead_code)]
-    fn read_simple_string(cursor: &mut Cursor<Vec<u8>>, max_len: usize) -> Result<String> {
-        let mut bytes = Vec::new();
-        for _ in 0..max_len {
-            match cursor.read_u8() {
-                Ok(0) => break,
-                Ok(b) if b < 128 && (b.is_ascii_graphic() || b == b' ') => bytes.push(b),
-                Ok(_) => continue,
-                Err(_) => break,
-            }
-        }
-        if bytes.is_empty() {
-            return Err(anyhow!("空字符串"));
-        }
-        String::from_utf8(bytes).map_err(|e| anyhow!("UTF-8 解码失败: {}", e))
     }
 }
