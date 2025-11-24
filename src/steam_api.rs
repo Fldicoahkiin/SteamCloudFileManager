@@ -3,8 +3,80 @@ use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, TimeZone};
 use std::io::Read;
 use std::path::Path;
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use steamworks::Client;
+
+pub fn check_cdp_enabled() -> bool {
+    ureq::get("http://127.0.0.1:8080/json").call().is_ok()
+}
+
+pub fn restart_steam_with_debugging() -> Result<()> {
+    log::info!("正在尝试以调试模式重启 Steam...");
+
+    #[cfg(target_os = "macos")]
+    {
+        // 闭现有 Steam
+        let _ = Command::new("pkill").arg("-f").arg("Steam").status();
+        let _ = Command::new("pkill").arg("-f").arg("steam_osx").status();
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        // open -a Steam --args -cef-enable-debugging
+        Command::new("open")
+            .arg("-a")
+            .arg("Steam")
+            .arg("--args")
+            .arg("-cef-enable-debugging")
+            .spawn()
+            .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // 关闭现有 Steam
+        let _ = Command::new("taskkill")
+            .args(["/F", "/IM", "steam.exe"])
+            .status();
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        // 找到并启动 Steam
+        let steam_dir = VdfParser::find_steam_path()?;
+        let steam_exe = steam_dir.join("steam.exe");
+
+        if !steam_exe.exists() {
+            return Err(anyhow!("找不到 steam.exe"));
+        }
+
+        // 使用 cmd /C start 来启动
+        Command::new("cmd")
+            .args(["/C", "start", ""])
+            .arg(steam_exe)
+            .arg("-cef-enable-debugging")
+            .spawn()
+            .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = Command::new("pkill").arg("steam").status();
+
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        Command::new("steam")
+            .arg("-cef-enable-debugging")
+            .spawn()
+            .or_else(|_| {
+                // 如果 PATH 中没有，尝试使用 VdfParser 找到的路径
+                let _steam_dir = VdfParser::find_steam_path()?;
+                // Linux 下可能是 steam.sh 或者 ubuntu 下是 /usr/games/steam
+                Err(anyhow!("无法启动 Steam (Linux)"))
+            })?;
+    }
+
+    Ok(())
+}
 
 #[derive(Default)]
 pub struct SteamCloudManager {
@@ -19,9 +91,10 @@ pub struct CloudFile {
     pub timestamp: DateTime<Local>,
     pub is_persisted: bool,
     pub exists: bool,
-    #[allow(dead_code)]
     pub root: u32,
     pub root_description: String,
+    #[allow(dead_code)]
+    pub conflict: bool,
 }
 
 impl SteamCloudManager {
@@ -163,7 +236,6 @@ impl SteamCloudManager {
     }
 
     pub fn get_files(&self) -> Result<Vec<CloudFile>> {
-        // 首先尝试使用VDF解析器（能获取所有文件）
         if let Ok(vdf_files) = self.get_files_from_vdf() {
             if !vdf_files.is_empty() {
                 log::info!("使用VDF解析器成功获取 {} 个文件", vdf_files.len());
@@ -226,6 +298,7 @@ impl SteamCloudManager {
                 exists: steam_file_handle.exists(),
                 root: 0,
                 root_description: "Steam云文件夹 (remote)".to_string(),
+                conflict: false,
             };
             files.push(file);
         }
@@ -234,7 +307,7 @@ impl SteamCloudManager {
         Ok(files)
     }
 
-    /// 从remotecache.vdf获取文件列表（绕过Steam API限制）
+    // 从remotecache.vdf获取文件列表
     pub fn get_files_from_vdf(&self) -> Result<Vec<CloudFile>> {
         if self.app_id == 0 {
             return Err(anyhow!("未设置App ID"));
@@ -278,6 +351,7 @@ impl SteamCloudManager {
                     .unwrap_or(false),
                 root: entry.root,
                 root_description: root_desc.clone(),
+                conflict: false,
             };
 
             if let Some(path) = &entry.actual_path {

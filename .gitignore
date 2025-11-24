@@ -29,4 +29,6 @@ debug/
 Thumbs.db
 desktop.ini
 
-VDF_TECHNICAL_DOC.md
+/tmp
+/VDF*
+/CDP*

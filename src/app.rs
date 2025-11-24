@@ -54,6 +54,7 @@ pub struct SteamCloudApp {
     all_users: Vec<UserInfo>,
     show_user_selector: bool,
     show_about: bool,
+    show_debug_warning: bool,
 }
 
 impl SteamCloudApp {
@@ -228,22 +229,56 @@ impl SteamCloudApp {
                 let is_selected = self.selected_files.contains(&index);
 
                 row.col(|ui| {
-                    ui.label(&file.root_description);
+                    // 文件夹列显示 root_description (e.g. WinAppDataLocal)
+                    // 如果是 CDP 文件，root_description 格式为 CDP:<URL>|<FOLDER>
+                    let display_folder = if file.root_description.starts_with("CDP:") {
+                        file.root_description
+                            .split('|')
+                            .nth(1)
+                            .unwrap_or("CDP File")
+                    } else {
+                        &file.root_description
+                    };
+                    ui.label(display_folder)
+                        .on_hover_text(&file.root_description);
                 });
 
                 row.col(|ui| {
-                    if ui.selectable_label(is_selected, &file.name).clicked() {
-                        if self.multi_select_mode {
+                    #[allow(deprecated)]
+                    let response =
+                        ui.add(egui::SelectableLabel::new(is_selected, &file.name).truncate());
+
+                    if response.clicked() {
+                        let modifiers = ui.ctx().input(|i| i.modifiers);
+                        let ctrl = modifiers.ctrl || modifiers.command;
+                        let shift = modifiers.shift;
+
+                        if self.multi_select_mode || ctrl {
                             if is_selected {
                                 self.selected_files.retain(|&x| x != index);
                             } else {
                                 self.selected_files.push(index);
                             }
-                        } else {
-                            self.selected_files.clear();
-                            if !is_selected {
+                        } else if shift {
+                            if let Some(&last) = self.selected_files.last() {
+                                let (min, max) = if last < index {
+                                    (last, index)
+                                } else {
+                                    (index, last)
+                                };
+                                // Shift通常是连续选择，这里简单实现为添加范围
+                                for i in min..=max {
+                                    if !self.selected_files.contains(&i) {
+                                        self.selected_files.push(i);
+                                    }
+                                }
+                            } else {
                                 self.selected_files.push(index);
                             }
+                        } else {
+                            // 单选模式
+                            self.selected_files.clear();
+                            self.selected_files.push(index);
                         }
                     }
                 });
@@ -426,6 +461,7 @@ impl SteamCloudApp {
             all_users: Vec::new(),
             show_user_selector: false,
             show_about: false,
+            show_debug_warning: !crate::steam_api::check_cdp_enabled(),
         };
 
         if let Some(parser) = &app.vdf_parser {
@@ -436,8 +472,61 @@ impl SteamCloudApp {
             let user_id = parser.get_user_id().to_string();
             std::thread::spawn(move || {
                 let parser = VdfParser::with_user_id(steam_path, user_id);
-                let res = parser.scan_all_cloud_games().map_err(|e| e.to_string());
-                let _ = tx.send(res);
+                let mut games_res = parser.scan_all_cloud_games();
+
+                if let Ok(ref mut games) = games_res {
+                    if crate::steam_api::check_cdp_enabled() {
+                        log::info!("检测到 CDP 已开启，尝试通过 CDP 获取游戏列表...");
+                        match crate::cdp_client::CdpClient::connect() {
+                            Ok(mut client) => match client.fetch_game_list() {
+                                Ok(cdp_games) => {
+                                    log::info!("CDP 返回 {} 个游戏", cdp_games.len());
+                                    let map: std::collections::HashMap<u32, usize> = games
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, g)| (g.app_id, i))
+                                        .collect();
+
+                                    let mut added_count = 0;
+                                    let mut updated_count = 0;
+
+                                    for cdp_game in cdp_games {
+                                        if let Some(&idx) = map.get(&cdp_game.app_id) {
+                                            let g = &mut games[idx];
+                                            g.file_count = cdp_game.file_count;
+                                            g.total_size = cdp_game.total_size;
+                                            if let Some(name) = cdp_game.game_name {
+                                                if g.game_name.is_none()
+                                                    || g.game_name.as_deref() == Some("")
+                                                {
+                                                    g.game_name = Some(name);
+                                                    updated_count += 1;
+                                                }
+                                            }
+                                        } else {
+                                            games.push(cdp_game);
+                                            added_count += 1;
+                                        }
+                                    }
+                                    log::info!(
+                                        "CDP 合并完成: 新增 {} 个, 更新 {} 个, 总计 {} 个",
+                                        added_count,
+                                        updated_count,
+                                        games.len()
+                                    );
+                                }
+                                Err(e) => log::warn!("CDP 获取游戏列表失败: {}", e),
+                            },
+                            Err(e) => log::warn!("CDP 连接失败: {}", e),
+                        }
+                    }
+                }
+
+                if let Ok(ref games) = games_res {
+                    log::info!("准备发送到UI的游戏数量: {}", games.len());
+                }
+
+                let _ = tx.send(games_res.map_err(|e| e.to_string()));
             });
         }
 
@@ -504,41 +593,72 @@ impl SteamCloudApp {
             return;
         }
 
-        log::info!("开始刷新云文件列表...");
-        self.is_refreshing = true;
-
-        let result = {
-            let mgr = self.steam_manager.lock().unwrap();
-            mgr.get_files()
-        };
-
-        match result {
-            Ok(files) => {
-                let count = files.len();
-                log::info!("成功获取 {} 个云文件", count);
-
-                if count == 0 {
-                    log::warn!("云文件列表为空，可能原因：");
-                    log::warn!("1. 游戏确实没有云存档");
-                    log::warn!("2. Steam API 还在初始化中，请等待几秒后重试");
-                    log::warn!("3. 游戏的云同步功能未启用");
-                }
-
-                self.files = files;
-                self.selected_files.clear();
-                self.update_quota();
-                self.update_local_save_paths();
-
-                self.status_message = format!("已加载 {} 个文件", count);
-                self.remote_ready = true;
-            }
-            Err(err) => {
-                log::error!("刷新文件列表失败: {}", err);
-                self.show_error(&format!("刷新文件列表失败: {}", err));
-            }
+        if self.loader_rx.is_some() {
+            log::warn!("正在刷新中...");
+            return;
         }
 
-        self.is_refreshing = false;
+        log::info!("开始刷新云文件列表...");
+        self.is_refreshing = true;
+        self.files.clear(); // 清空列表，等待加载
+
+        let steam_manager = self.steam_manager.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.loader_rx = Some(rx);
+
+        let app_id = self.app_id_input.trim().parse::<u32>().unwrap_or(0);
+
+        std::thread::spawn(move || {
+            // 获取 Steam API / VDF 结果
+            let mut files = {
+                let mgr = steam_manager.lock().unwrap();
+                mgr.get_files().unwrap_or_default()
+            };
+
+            // 获取 CDP 结果并合并
+            if crate::steam_api::check_cdp_enabled() && app_id > 0 {
+                log::info!("尝试通过 CDP 获取文件列表...");
+                match crate::cdp_client::CdpClient::connect() {
+                    Ok(mut client) => {
+                        match client.fetch_game_files(app_id) {
+                            Ok(cdp_files) => {
+                                log::info!("CDP 返回 {} 个文件", cdp_files.len());
+                                // 合并以 CDP 为主，如果 VDF 中有对应文件，合并其 exists/path 等状态
+
+                                let file_map: std::collections::HashMap<String, usize> = files
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(i, f)| (f.name.clone(), i))
+                                    .collect();
+
+                                for cdp_file in cdp_files {
+                                    if let Some(&idx) = file_map.get(&cdp_file.name) {
+                                        // 更新现有文件信息
+                                        let f = &mut files[idx];
+
+                                        // 使用 CDP 的数据更新云端状态
+                                        f.size = cdp_file.size;
+                                        f.timestamp = cdp_file.timestamp;
+                                        f.is_persisted = true; // CDP 确认存在于云端
+
+                                        if cdp_file.root_description.starts_with("CDP:") {
+                                            f.root_description = cdp_file.root_description;
+                                        }
+                                    } else {
+                                        // 新增文件
+                                        files.push(cdp_file);
+                                    }
+                                }
+                            }
+                            Err(e) => log::warn!("CDP 获取文件列表失败: {}", e),
+                        }
+                    }
+                    Err(e) => log::warn!("CDP 连接失败: {}", e),
+                }
+            }
+
+            let _ = tx.send(Ok(files));
+        });
     }
 
     fn update_quota(&mut self) {
@@ -657,41 +777,72 @@ impl SteamCloudApp {
         }
 
         let file_index = self.selected_files[0];
-        let filename = self.files[file_index].name.clone();
+        let file = self.files[file_index].clone();
+        let filename = file.name.clone();
 
         if let Some(path) = FileDialog::new().set_file_name(&filename).save_file() {
-            self.download_file_to_path(&filename, &path);
+            self.download_file_to_path(&file, &path);
         }
     }
 
-    fn download_file_to_path(&mut self, filename: &str, path: &PathBuf) {
-        let result = {
-            let manager = self.steam_manager.lock().unwrap();
-            manager.read_file(filename)
-        };
+    fn download_file_to_path(&mut self, file: &CloudFile, path: &PathBuf) {
+        let url_prefix = "CDP:";
+        if file.root_description.starts_with(url_prefix) {
+            // CDP 下载，格式: CDP:<URL>|<FOLDER>
+            let content = &file.root_description[url_prefix.len()..];
+            let url = content.split('|').next().unwrap_or("");
 
-        match result {
-            Ok(data) => {
-                if let Some(parent) = path.parent() {
-                    if !parent.exists() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            self.show_error(&format!("创建目录失败: {}", e));
-                            return;
-                        }
+            log::info!("正在从 CDP 下载: {}", url);
+
+            match ureq::get(url).call() {
+                Ok(resp) => {
+                    let mut reader = resp.into_reader();
+                    let mut data = Vec::new();
+                    if let Err(e) = std::io::Read::read_to_end(&mut reader, &mut data) {
+                        self.show_error(&format!("读取响应流失败: {}", e));
+                        return;
                     }
+
+                    self.save_data_to_path(&data, path);
                 }
-
-                match std::fs::write(path, data) {
-                    Ok(()) => {
-                        self.status_message = format!("文件已下载: {}", path.display());
-                    }
-                    Err(e) => {
-                        self.show_error(&format!("保存文件失败: {}", e));
-                    }
+                Err(e) => {
+                    self.show_error(&format!("HTTP 下载失败: {}", e));
                 }
             }
+        } else {
+            // Steam API 下载 (本地缓存)
+            let result = {
+                let manager = self.steam_manager.lock().unwrap();
+                manager.read_file(&file.name)
+            };
+
+            match result {
+                Ok(data) => {
+                    self.save_data_to_path(&data, path);
+                }
+                Err(e) => {
+                    self.show_error(&format!("API 下载失败 (可能文件未缓存): {}", e));
+                }
+            }
+        }
+    }
+
+    fn save_data_to_path(&mut self, data: &[u8], path: &PathBuf) {
+        if let Some(parent) = path.parent() {
+            if !parent.exists() {
+                if let Err(e) = std::fs::create_dir_all(parent) {
+                    self.show_error(&format!("创建目录失败: {}", e));
+                    return;
+                }
+            }
+        }
+
+        match std::fs::write(path, data) {
+            Ok(()) => {
+                self.status_message = format!("文件已下载: {}", path.display());
+            }
             Err(e) => {
-                self.show_error(&format!("下载文件失败: {}", e));
+                self.show_error(&format!("保存文件失败: {}", e));
             }
         }
     }
@@ -845,10 +996,64 @@ impl SteamCloudApp {
             self.scan_games_rx = Some(rx);
             let steam_path = parser.get_steam_path().clone();
             let user_id = parser.get_user_id().to_string();
+
             std::thread::spawn(move || {
                 let parser = VdfParser::with_user_id(steam_path, user_id);
-                let res = parser.scan_all_cloud_games().map_err(|e| e.to_string());
-                let _ = tx.send(res);
+                let mut games_res = parser.scan_all_cloud_games();
+
+                if let Ok(ref mut games) = games_res {
+                    if crate::steam_api::check_cdp_enabled() {
+                        log::info!("检测到 CDP 已开启，尝试通过 CDP 获取游戏列表...");
+                        match crate::cdp_client::CdpClient::connect() {
+                            Ok(mut client) => match client.fetch_game_list() {
+                                Ok(cdp_games) => {
+                                    log::info!("CDP 返回 {} 个游戏", cdp_games.len());
+                                    let map: std::collections::HashMap<u32, usize> = games
+                                        .iter()
+                                        .enumerate()
+                                        .map(|(i, g)| (g.app_id, i))
+                                        .collect();
+
+                                    let mut added_count = 0;
+                                    let mut updated_count = 0;
+
+                                    for cdp_game in cdp_games {
+                                        if let Some(&idx) = map.get(&cdp_game.app_id) {
+                                            let g = &mut games[idx];
+                                            g.file_count = cdp_game.file_count;
+                                            g.total_size = cdp_game.total_size;
+                                            if let Some(name) = cdp_game.game_name {
+                                                if g.game_name.is_none()
+                                                    || g.game_name.as_deref() == Some("")
+                                                {
+                                                    g.game_name = Some(name);
+                                                    updated_count += 1;
+                                                }
+                                            }
+                                        } else {
+                                            games.push(cdp_game);
+                                            added_count += 1;
+                                        }
+                                    }
+                                    log::info!(
+                                        "CDP 合并完成: 新增 {} 个, 更新 {} 个, 总计 {} 个",
+                                        added_count,
+                                        updated_count,
+                                        games.len()
+                                    );
+                                }
+                                Err(e) => log::warn!("CDP 获取游戏列表失败: {}", e),
+                            },
+                            Err(e) => log::warn!("CDP 连接失败: {}", e),
+                        }
+                    }
+                }
+
+                if let Ok(ref games) = games_res {
+                    log::info!("准备发送到UI的游戏数量: {}", games.len());
+                }
+
+                let _ = tx.send(games_res.map_err(|e| e.to_string()));
             });
         } else {
             self.show_error("VDF 解析器未初始化");
@@ -1156,6 +1361,22 @@ impl SteamCloudApp {
     }
 
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
+        if self.show_debug_warning {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("⚠ 注意：未检测到 Steam 调试模式")
+                        .color(egui::Color32::YELLOW),
+                );
+                if ui.button("重启 Steam (开启调试)").clicked() {
+                    if let Err(e) = crate::steam_api::restart_steam_with_debugging() {
+                        self.show_error(&format!("重启失败: {}", e));
+                    } else {
+                        self.status_message = "正在重启 Steam...".to_string();
+                    }
+                }
+            });
+        }
+
         ui.horizontal(|ui| {
             if ui.button("关于").clicked() {
                 self.show_about = true;
@@ -1167,14 +1388,10 @@ impl SteamCloudApp {
                 self.load_all_users();
                 self.show_user_selector = true;
             }
+
             if ui.button("游戏库").clicked() {
-                if !self.cloud_games.is_empty() {
-                    self.show_game_selector = true;
-                } else if !self.is_scanning_games {
-                    self.scan_cloud_games();
-                } else {
-                    self.show_game_selector = true;
-                }
+                self.scan_cloud_games();
+                self.show_game_selector = true;
             }
 
             ui.separator();
@@ -1185,55 +1402,30 @@ impl SteamCloudApp {
             }
 
             ui.label("App ID:");
-            ui.add(egui::TextEdit::singleline(&mut self.app_id_input).desired_width(150.0));
-
-            let connect_btn = ui.add_enabled(
-                !self.is_connecting,
-                egui::Button::new(if self.is_connecting {
-                    "正在连接..."
-                } else {
-                    "连接"
-                }),
-            );
-            if connect_btn.clicked() {
-                self.connect_to_steam();
+            // ui.add(egui::TextEdit::singleline(&mut self.app_id_input).desired_width(150.0));
+            let response =
+                ui.add(egui::TextEdit::singleline(&mut self.app_id_input).desired_width(150.0));
+            if response.changed() {
+                self.is_connected = false;
+                self.remote_ready = false;
+                self.disconnect_from_steam();
             }
 
             if self.is_connected {
-                if ui.button("断开连接").clicked() {
+                if ui.button("断开").clicked() {
                     self.disconnect_from_steam();
                 }
+            } else if ui.button("连接").clicked() {
+                self.connect_to_steam();
+            }
 
-                let ready = self
-                    .since_connected
-                    .map(|t| t.elapsed() >= Duration::from_millis(800))
-                    .unwrap_or(false);
-                let refresh_btn = ui.add_enabled(
-                    !self.is_refreshing && ready,
-                    egui::Button::new(if self.is_refreshing {
-                        "刷新中..."
-                    } else {
-                        "刷新"
-                    }),
-                );
-                if refresh_btn.clicked() {
-                    self.refresh_files();
-                }
-                if !ready {
-                    ui.label("准备云存储接口...");
-                }
+            if self.is_connecting {
+                ui.spinner();
             }
         });
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        if self.is_refreshing {
-            ui.centered_and_justified(|ui| {
-                ui.label("正在刷新文件列表...");
-            });
-            return;
-        }
-
         if self.files.is_empty() {
             ui.centered_and_justified(|ui| {
                 ui.label("没有找到云文件");
@@ -1588,6 +1780,7 @@ impl eframe::App for SteamCloudApp {
                     self.files = files;
                     self.selected_files.clear();
                     self.update_quota();
+                    self.update_local_save_paths();
                     self.status_message = format!("已加载 {} 个文件", count);
                     self.is_refreshing = false;
                     self.remote_ready = true;
