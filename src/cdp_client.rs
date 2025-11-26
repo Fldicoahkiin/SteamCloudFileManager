@@ -1,5 +1,5 @@
+use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::CloudFile;
-use crate::vdf_parser::CloudGameInfo;
 use anyhow::{anyhow, Result};
 use chrono::{Datelike, Local};
 use serde::{Deserialize, Serialize};
@@ -177,7 +177,7 @@ impl CdpClient {
                 let file_count = item["file_count"].as_u64().unwrap_or(0) as usize;
 
                 let size_str = item["total_size_str"].as_str().unwrap_or("");
-                let total_size = parse_size_str(size_str);
+                let total_size = crate::utils::parse_size(size_str);
                 if total_size == 0 && !size_str.trim().is_empty() {
                     log::warn!(
                         "App {} ({:?}) 大小解析为0: Raw='{}'",
@@ -274,7 +274,7 @@ impl CdpClient {
 
                     all_files.push(CloudFile {
                         name: full_name,
-                        size: parse_size_str(size_str),
+                        size: crate::utils::parse_size(size_str),
                         timestamp,
                         is_persisted: true,
                         exists: true,
@@ -408,27 +408,4 @@ fn parse_steam_time(s: &str) -> Option<chrono::DateTime<Local>> {
     Local
         .with_ymd_and_hms(year, month, day, hour, minute, 0)
         .single()
-}
-
-fn parse_size_str(s: &str) -> u64 {
-    let s = s.replace(",", "").to_lowercase();
-    // 处理可能的非标准空格
-    let s = s.replace("\u{a0}", " ");
-    let parts: Vec<&str> = s.split_whitespace().collect();
-    if parts.is_empty() {
-        return 0;
-    }
-
-    let num = parts[0].parse::<f64>().unwrap_or(0.0);
-    if parts.len() > 1 {
-        match parts[1] {
-            "kb" | "k" => (num * 1024.0) as u64,
-            "mb" | "m" => (num * 1024.0 * 1024.0) as u64,
-            "gb" | "g" => (num * 1024.0 * 1024.0 * 1024.0) as u64,
-            "b" | "bytes" => num as u64,
-            _ => num as u64,
-        }
-    } else {
-        num as u64
-    }
 }

@@ -1,5 +1,6 @@
+use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::{CloudFile, SteamCloudManager};
-use crate::vdf_parser::{CloudGameInfo, UserInfo, VdfParser};
+use crate::vdf_parser::{UserInfo, VdfParser};
 use eframe::egui;
 use rfd::FileDialog;
 use std::path::PathBuf;
@@ -282,7 +283,7 @@ impl SteamCloudApp {
                 });
 
                 row.col(|ui| {
-                    ui.label(Self::format_size_u64(file.size));
+                    ui.label(crate::utils::format_size(file.size));
                 });
 
                 row.col(|ui| {
@@ -306,19 +307,6 @@ impl SteamCloudApp {
                 });
             }
         });
-    }
-
-    fn format_size_u64(size: u64) -> String {
-        let bytes = size as f64;
-        if bytes < 1024.0 {
-            format!("{} B", size)
-        } else if bytes < 1024.0 * 1024.0 {
-            format!("{:.2} KB", bytes / 1024.0)
-        } else if bytes < 1024.0 * 1024.0 * 1024.0 {
-            format!("{:.2} MB", bytes / (1024.0 * 1024.0))
-        } else {
-            format!("{:.2} GB", bytes / (1024.0 * 1024.0 * 1024.0))
-        }
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
@@ -538,7 +526,7 @@ impl SteamCloudApp {
         }
 
         if self.loader_rx.is_some() {
-            log::warn!("正在刷新中...");
+            log::debug!("正在刷新中，跳过重复请求");
             return;
         }
 
@@ -553,39 +541,25 @@ impl SteamCloudApp {
         let app_id = self.app_id_input.trim().parse::<u32>().unwrap_or(0);
 
         std::thread::spawn(move || {
-            let mut files = {
-                let mgr = steam_manager.lock().unwrap();
-                mgr.get_files().unwrap_or_default()
-            };
+            // 使用 FileService 统一获取文件
+            let file_service = crate::file_manager::FileService::with_steam_manager(steam_manager);
 
-            // CDP 数据合并
-            if crate::cdp_client::CdpClient::is_cdp_running() && app_id > 0 {
-                log::info!("尝试通过 CDP 获取文件列表...");
-                if let Ok(mut client) = crate::cdp_client::CdpClient::connect() {
-                    if let Ok(cdp_files) = client.fetch_game_files(app_id) {
-                        log::info!("CDP 返回 {} 个文件", cdp_files.len());
-                        let file_map: std::collections::HashMap<String, usize> = files
-                            .iter()
-                            .enumerate()
-                            .map(|(i, f)| (f.name.clone(), i))
-                            .collect();
-
-                        for cdp_file in cdp_files {
-                            if let Some(&idx) = file_map.get(&cdp_file.name) {
-                                let f = &mut files[idx];
-                                f.size = cdp_file.size;
-                                f.timestamp = cdp_file.timestamp;
-                                f.is_persisted = true;
-                                if cdp_file.root_description.starts_with("CDP:") {
-                                    f.root_description = cdp_file.root_description;
-                                }
-                            } else {
-                                files.push(cdp_file);
-                            }
-                        }
+            let files = match file_service.get_cloud_files(app_id) {
+                Ok(files) => {
+                    // CDP 数据合并
+                    if app_id > 0 {
+                        file_service
+                            .merge_cdp_files(files, app_id)
+                            .unwrap_or_else(|_| Vec::new())
+                    } else {
+                        files
                     }
                 }
-            }
+                Err(e) => {
+                    log::error!("获取文件列表失败: {}", e);
+                    Vec::new()
+                }
+            };
 
             let _ = tx.send(Ok(files));
         });
@@ -666,7 +640,14 @@ impl SteamCloudApp {
         for file in &self.files {
             if file.exists {
                 if let Some(parser) = parser_opt {
-                    if let Ok(path) = parser.resolve_path(file.root, &file.name, app_id) {
+                    // 使用 path_resolver 模块解析路径
+                    if let Ok(path) = crate::path_resolver::resolve_cloud_file_path(
+                        file.root,
+                        &file.name,
+                        parser.get_steam_path(),
+                        parser.get_user_id(),
+                        app_id,
+                    ) {
                         if let Some(parent) = path.parent() {
                             let parent_path = parent.to_path_buf();
                             if parent_path.exists() {
@@ -687,10 +668,10 @@ impl SteamCloudApp {
         if !self.local_save_paths.is_empty() {
             log::info!("检测到 {} 个本地存档路径", self.local_save_paths.len());
             for (desc, path) in &self.local_save_paths {
-                log::info!("  - {}: {}", desc, path.display());
+                log::debug!("  - {}: {}", desc, path.display());
             }
         } else {
-            log::warn!("未找到本地存档路径");
+            log::debug!("未找到本地存档路径");
         }
     }
 
@@ -912,8 +893,9 @@ impl SteamCloudApp {
         steam_path: PathBuf,
         user_id: String,
     ) -> Result<Vec<CloudGameInfo>, String> {
-        let parser = VdfParser::with_user_id(steam_path, user_id);
-        let mut games = parser.scan_all_cloud_games().map_err(|e| e.to_string())?;
+        // 使用 game_scanner 模块扫描游戏
+        let mut games = crate::game_scanner::scan_cloud_games(&steam_path, &user_id)
+            .map_err(|e| e.to_string())?;
 
         let mut cdp_order = std::collections::HashMap::new();
         if crate::cdp_client::CdpClient::is_cdp_running() {
@@ -1063,7 +1045,7 @@ impl SteamCloudApp {
                                         ui.label(format!(
                                             "{} 个文件 | {}",
                                             game.file_count,
-                                            Self::format_size_u64(game.total_size)
+                                            crate::utils::format_size(game.total_size)
                                         ));
 
                                         if let Some(dir) = &game.install_dir {
@@ -1586,7 +1568,7 @@ impl SteamCloudApp {
                             total_size = total_size.saturating_add(file.size);
                         }
                     }
-                    ui.label(format!("总大小: {}", Self::format_size_u64(total_size)));
+                    ui.label(format!("总大小: {}", crate::utils::format_size(total_size)));
                 }
             });
         });
@@ -1657,8 +1639,8 @@ impl SteamCloudApp {
                 ui.label("配额:");
                 let used = total - available;
                 let usage_percent = (used as f32 / total as f32 * 100.0).round();
-                let used_str = Self::format_size_u64(used);
-                let total_str = Self::format_size_u64(total);
+                let used_str = crate::utils::format_size(used);
+                let total_str = crate::utils::format_size(total);
                 ui.label(format!(
                     "{:.1}% 已使用 ({}/{})",
                     usage_percent, used_str, total_str
