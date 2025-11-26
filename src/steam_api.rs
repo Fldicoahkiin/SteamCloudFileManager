@@ -1,4 +1,3 @@
-use crate::vdf_parser::VdfParser;
 use anyhow::{anyhow, Result};
 use chrono::{DateTime, Local, TimeZone};
 use std::io::Read;
@@ -38,7 +37,7 @@ pub fn restart_steam_with_debugging() -> Result<()> {
         std::thread::sleep(std::time::Duration::from_secs(2));
 
         // 找到并启动 Steam
-        let steam_dir = VdfParser::find_steam_path()?;
+        let steam_dir = crate::vdf_parser::VdfParser::find_steam_path()?;
         let steam_exe = steam_dir.join("steam.exe");
 
         if !steam_exe.exists() {
@@ -65,7 +64,7 @@ pub fn restart_steam_with_debugging() -> Result<()> {
             .spawn()
             .or_else(|_| {
                 // 如果 PATH 中没有，尝试使用 VdfParser 找到的路径
-                let _steam_dir = VdfParser::find_steam_path()?;
+                let _steam_dir = crate::vdf_parser::VdfParser::find_steam_path()?;
                 // Linux 下可能是 steam.sh 或者 ubuntu 下是 /usr/games/steam
                 Err(anyhow!("无法启动 Steam (Linux)"))
             })?;
@@ -231,21 +230,11 @@ impl SteamCloudManager {
         Ok(())
     }
 
-    pub fn get_files(&self) -> Result<Vec<CloudFile>> {
-        if let Ok(vdf_files) = self.get_files_from_vdf() {
-            if !vdf_files.is_empty() {
-                log::info!("使用VDF解析器成功获取 {} 个文件", vdf_files.len());
-                return Ok(vdf_files);
-            }
-        }
-
-        // 如果VDF解析失败，回退到Steam API
-        log::info!("VDF解析失败或无文件，尝试Steam API...");
-
+    // 从 Steam API 获取文件列表
+    // 注意：这个方法现在由 FileService 统一调用
+    pub fn get_files_from_api(&self) -> Result<Vec<CloudFile>> {
         let client = self.client.lock().unwrap();
-        let client = client
-            .as_ref()
-            .ok_or_else(|| anyhow!("Steam客户端未连接"))?;
+        let client = client.as_ref().ok_or_else(|| anyhow!("未连接到 Steam"))?;
 
         let remote_storage = client.remote_storage();
 
@@ -253,117 +242,57 @@ impl SteamCloudManager {
         let cloud_enabled_account = remote_storage.is_cloud_enabled_for_account();
         let cloud_enabled_app = remote_storage.is_cloud_enabled_for_app();
 
-        log::info!(
+        log::debug!(
             "云同步状态 - 账户: {}, 应用: {}",
             cloud_enabled_account,
             cloud_enabled_app
         );
 
         if !cloud_enabled_account {
-            log::warn!("此Steam账户未启用云同步功能");
+            log::info!("此 Steam 账户未启用云同步功能");
         }
 
         if !cloud_enabled_app {
-            log::warn!("此应用未启用云同步功能");
+            log::info!("此应用未启用云同步功能");
         }
 
         let steam_files = remote_storage.files();
-        log::info!("Steam API返回 {} 个文件", steam_files.len());
+        log::debug!("Steam API 返回 {} 个文件", steam_files.len());
 
-        let mut files = Vec::new();
+        let files: Vec<CloudFile> = steam_files
+            .iter()
+            .map(|steam_file| {
+                let file_handle = remote_storage.file(&steam_file.name);
+                self.build_cloud_file_from_api(&file_handle, &steam_file.name, steam_file.size)
+            })
+            .collect();
 
-        for (i, steam_file) in steam_files.iter().enumerate() {
-            log::debug!(
-                "文件 {}: {} ({} bytes)",
-                i + 1,
-                steam_file.name,
-                steam_file.size
-            );
-
-            let steam_file_handle = remote_storage.file(&steam_file.name);
-            let timestamp = Local
-                .timestamp_opt(steam_file_handle.timestamp(), 0)
-                .single()
-                .unwrap_or_else(Local::now);
-
-            let file = CloudFile {
-                name: steam_file.name.clone(),
-                size: steam_file.size,
-                timestamp,
-                is_persisted: steam_file_handle.is_persisted(),
-                exists: steam_file_handle.exists(),
-                root: 0,
-                root_description: "Steam云文件夹 (remote)".to_string(),
-                conflict: false,
-            };
-            files.push(file);
-        }
-
-        log::info!("最终返回 {} 个云文件", files.len());
+        log::debug!("构建完成 {} 个 CloudFile 对象", files.len());
         Ok(files)
     }
 
-    // 从remotecache.vdf获取文件列表
-    pub fn get_files_from_vdf(&self) -> Result<Vec<CloudFile>> {
-        if self.app_id == 0 {
-            return Err(anyhow!("未设置App ID"));
+    // 从 Steam API 构建 CloudFile
+    fn build_cloud_file_from_api(
+        &self,
+        file_handle: &steamworks::SteamFile,
+        name: &str,
+        size: u64,
+    ) -> CloudFile {
+        let timestamp = Local
+            .timestamp_opt(file_handle.timestamp(), 0)
+            .single()
+            .unwrap_or_else(Local::now);
+
+        CloudFile {
+            name: name.to_string(),
+            size,
+            timestamp,
+            is_persisted: file_handle.is_persisted(),
+            exists: file_handle.exists(),
+            root: 0,
+            root_description: "Steam云文件夹 (Remote)".to_string(),
+            conflict: false,
         }
-
-        log::info!("尝试从VDF解析文件列表，App ID: {}", self.app_id);
-
-        // 创建VDF解析器
-        let parser = VdfParser::new()?;
-
-        // 解析remotecache.vdf
-        let vdf_entries = parser.parse_remotecache(self.app_id)?;
-
-        let mut files = Vec::new();
-
-        for entry in vdf_entries {
-            log::debug!(
-                "VDF文件: {} (root={}, size={}, 实际路径={:?})",
-                entry.filename,
-                entry.root,
-                entry.size,
-                entry.actual_path
-            );
-
-            let timestamp = Local
-                .timestamp_opt(entry.timestamp, 0)
-                .single()
-                .unwrap_or_else(Local::now);
-
-            let root_desc = VdfParser::get_root_description(entry.root);
-
-            let cloud_file = CloudFile {
-                name: entry.filename.clone(),
-                size: entry.size,
-                timestamp,
-                is_persisted: entry.sync_state == 1,
-                exists: entry
-                    .actual_path
-                    .as_ref()
-                    .map(|p| p.exists())
-                    .unwrap_or(false),
-                root: entry.root,
-                root_description: root_desc.clone(),
-                conflict: false,
-            };
-
-            if let Some(path) = &entry.actual_path {
-                log::info!(
-                    "文件 {} 位于 {} ({})",
-                    entry.filename,
-                    root_desc,
-                    path.display()
-                );
-            }
-
-            files.push(cloud_file);
-        }
-
-        log::info!("VDF解析完成: {} 个文件", files.len());
-        Ok(files)
     }
 
     pub fn get_quota(&self) -> Result<(u64, u64)> {

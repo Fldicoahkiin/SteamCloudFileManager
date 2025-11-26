@@ -1,6 +1,11 @@
 mod app;
 mod cdp_client;
+mod file_manager;
+mod game_scanner;
+mod path_resolver;
 mod steam_api;
+mod user_manager;
+mod utils;
 mod vdf_parser;
 
 use app::SteamCloudApp;
