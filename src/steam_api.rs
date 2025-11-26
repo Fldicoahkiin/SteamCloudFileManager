@@ -12,7 +12,7 @@ pub fn restart_steam_with_debugging() -> Result<()> {
 
     #[cfg(target_os = "macos")]
     {
-        // 闭现有 Steam
+        // 关闭现有 Steam
         let _ = Command::new("pkill").arg("-f").arg("Steam").status();
         let _ = Command::new("pkill").arg("-f").arg("steam_osx").status();
 
@@ -367,9 +367,30 @@ impl SteamCloudManager {
     }
 
     pub fn get_quota(&self) -> Result<(u64, u64)> {
-        // TODO: 升级到支持 GetQuota API 的 steamworks-rs 版本
-        // Steam 原生 API ISteamRemoteStorage::GetQuota 可以获取准确配额
-        // 当前 steamworks-rs 0.11 未暴露此接口，使用动态估算替代
+        // 尝试使用 unsafe 直接调用底层 API
+        unsafe {
+            use steamworks_sys as sys;
+
+            // 获取 ISteamRemoteStorage 接口指针 (SDK 1.57+ 对应 v016)
+            let interface = sys::SteamAPI_SteamRemoteStorage_v016();
+
+            if !interface.is_null() {
+                let mut total: u64 = 0;
+                let mut available: u64 = 0;
+                if sys::SteamAPI_ISteamRemoteStorage_GetQuota(interface, &mut total, &mut available)
+                {
+                    log::debug!(
+                        "通过 unsafe API 获取配额: 总计 {} / 可用 {}",
+                        total,
+                        available
+                    );
+                    return Ok((total, available));
+                }
+            }
+        }
+
+        // 回退到动态估算
+        log::debug!("无法通过 unsafe API 获取配额，使用估算值");
         let used_bytes = self.calculate_used_space()?;
 
         // 根据已用空间动态估算总配额
@@ -387,6 +408,12 @@ impl SteamCloudManager {
 
         let available_bytes = estimated_total.saturating_sub(used_bytes);
 
+        log::debug!(
+            "配额估算: 已用 {} / 估算总量 {} (可用 {})",
+            used_bytes,
+            estimated_total,
+            available_bytes
+        );
         Ok((estimated_total, available_bytes))
     }
 

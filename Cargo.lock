@@ -21,6 +21,7 @@ dependencies = [
  "serde",
  "serde_json",
  "steamworks",
+ "steamworks-sys",
  "sysinfo",
  "tungstenite",
  "ureq",
