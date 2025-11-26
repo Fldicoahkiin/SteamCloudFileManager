@@ -651,13 +651,8 @@ impl VdfParser {
 
         log::info!("开始扫描游戏库...");
         let all_manifests = self.scan_app_manifests().unwrap_or_default();
-        log::info!("发现 {} 个已安装游戏", all_manifests.len());
-
         let all_categories = self.parse_shared_config().unwrap_or_default();
-        log::info!("解析 {} 个游戏分类", all_categories.len());
-
         let all_appinfo = self.parse_appinfo_vdf().unwrap_or_default();
-        log::info!("从 appinfo.vdf 读取 {} 个游戏信息", all_appinfo.len());
 
         if let Ok(entries) = fs::read_dir(&userdata_path) {
             for entry in entries.flatten() {
@@ -678,8 +673,6 @@ impl VdfParser {
                             .as_ref()
                             .map(|m| m.name.clone())
                             .or_else(|| appinfo.and_then(|a| a.name.clone()));
-                        // 移除自动网络获取，避免启动慢
-                        // .or_else(|| Self::fetch_app_name_from_store(app_id));
 
                         if game_name.is_none() {
                             log::debug!(
@@ -711,7 +704,7 @@ impl VdfParser {
 
         games.sort_by(|a, b| b.last_played.unwrap_or(0).cmp(&a.last_played.unwrap_or(0)));
 
-        log::info!("扫描完成，共 {} 个有云存档的游戏", games.len());
+        log::info!("VDF发现共 {} 个有云存档的游戏", games.len());
         Ok(games)
     }
     pub fn get_game_config(&self, app_id: u32) -> Result<GameConfig> {

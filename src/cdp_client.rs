@@ -136,7 +136,7 @@ impl CdpClient {
                 // 过滤掉表头（通常第一行）和无效行
                 return rows.map(tr => {
                     const tds = tr.querySelectorAll('td');
-                    // 游戏列表页通常有4列：游戏名, 文件数, 大小, 链接
+                    // 游戏列表页有4列：游戏名, 文件数, 大小, 链接
                     if(tds.length < 3) return null;
                     
                     // 在行内查找包含 appid 的链接
@@ -226,7 +226,6 @@ impl CdpClient {
 
             let script = r#"
                 (function() {
-                    // 修复选择器，避免重复选择。只选择 accountTable 下的 tr
                     const rows = Array.from(document.querySelectorAll('.accountTable tr'));
                     return rows.map(tr => {
                         const tds = tr.querySelectorAll('td');
