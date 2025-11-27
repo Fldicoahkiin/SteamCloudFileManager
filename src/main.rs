@@ -1,9 +1,11 @@
 mod app;
 mod cdp_client;
+mod error;
 mod file_manager;
 mod game_scanner;
 mod path_resolver;
 mod steam_api;
+mod ui;
 mod user_manager;
 mod utils;
 mod vdf_parser;
@@ -12,11 +14,17 @@ use app::SteamCloudApp;
 use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
-    let env = env_logger::Env::default().filter_or(
-        "RUST_LOG",
-        "info,SteamCloudFileManager=debug,ureq=warn,rustls=warn,tungstenite=warn",
-    );
-    env_logger::init_from_env(env);
+    // 初始化 tracing 日志
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "info,SteamCloudFileManager=debug,ureq=warn,rustls=warn,tungstenite=warn".into()
+            }),
+        )
+        .with_target(true)
+        .with_thread_ids(false)
+        .with_line_number(true)
+        .init();
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()

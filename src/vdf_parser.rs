@@ -119,7 +119,7 @@ impl VdfParser {
             return Err(anyhow!("remotecache.vdf不存在: {:?}", vdf_path));
         }
 
-        log::debug!("解析 VDF 文件: {:?}", vdf_path);
+        tracing::debug!("解析 VDF 文件: {:?}", vdf_path);
 
         let content = fs::read_to_string(&vdf_path)?;
         let mut files = Vec::new();
@@ -192,7 +192,7 @@ impl VdfParser {
             }
         }
 
-        log::debug!("VDF 解析完成: {} 个文件条目", files.len());
+        tracing::debug!("VDF 解析完成: {} 个文件条目", files.len());
         Ok(files)
     }
 
@@ -228,14 +228,14 @@ impl VdfParser {
         let appinfo_path = self.steam_path.join("appcache").join("appinfo.vdf");
 
         if !appinfo_path.exists() {
-            log::debug!("appinfo.vdf 不存在，跳过解析");
+            tracing::debug!("appinfo.vdf 不存在，跳过解析");
             return Ok(HashMap::new());
         }
 
         let data = match fs::read(&appinfo_path) {
             Ok(d) => d,
             Err(e) => {
-                log::warn!("无法读取 appinfo.vdf: {}", e);
+                tracing::warn!("无法读取 appinfo.vdf: {}", e);
                 return Ok(HashMap::new());
             }
         };
@@ -246,13 +246,13 @@ impl VdfParser {
         let magic = match cursor.read_u32::<LittleEndian>() {
             Ok(m) => m,
             Err(_) => {
-                log::warn!("appinfo.vdf 格式无效");
+                tracing::warn!("appinfo.vdf 格式无效");
                 return Ok(HashMap::new());
             }
         };
 
         if magic != 0x07564427 && magic != 0x07564428 && magic != 0x07564429 {
-            log::warn!("appinfo.vdf 格式不支持: 0x{:X}", magic);
+            tracing::warn!("appinfo.vdf 格式不支持: 0x{:X}", magic);
             return Ok(HashMap::new());
         }
 
@@ -311,7 +311,7 @@ impl VdfParser {
             count += 1;
         }
 
-        log::info!("从 appinfo.vdf 解析到 {} 个游戏", apps.len());
+        tracing::info!("从 appinfo.vdf 解析到 {} 个游戏", apps.len());
         Ok(apps)
     }
 
@@ -334,7 +334,7 @@ impl VdfParser {
                 if let Some(null_pos) = remaining.iter().position(|&b| b == 0) {
                     if let Ok(name) = String::from_utf8(remaining[..null_pos].to_vec()) {
                         if !name.is_empty() && name.is_ascii() {
-                            log::debug!("App {} 名称: {}", app_id, name);
+                            tracing::debug!("App {} 名称: {}", app_id, name);
                             return Ok(name);
                         }
                     }

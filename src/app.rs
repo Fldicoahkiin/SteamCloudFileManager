@@ -1,3 +1,4 @@
+use crate::error::{AppError, AppResult};
 use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::{CloudFile, SteamCloudManager};
 use crate::vdf_parser::{UserInfo, VdfParser};
@@ -59,147 +60,79 @@ pub struct SteamCloudApp {
 }
 
 impl SteamCloudApp {
-    fn find_system_fonts() -> Vec<std::path::PathBuf> {
-        let mut font_paths = Vec::new();
-
-        #[cfg(target_os = "macos")]
-        {
-            let home_font = format!(
-                "{}/Library/Fonts",
-                std::env::var("HOME").unwrap_or_default()
-            );
-            let dirs = vec![
-                "/System/Library/Fonts",
-                "/Library/Fonts",
-                home_font.as_str(),
-            ];
-
-            for dir in dirs {
-                if let Ok(entries) = std::fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.extension().and_then(|s| s.to_str()) == Some("ttf") {
-                            font_paths.push(path);
-                        }
-                    }
-                }
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        {
-            let mut font_dirs = Vec::new();
-
-            if let Ok(windir) = std::env::var("WINDIR") {
-                font_dirs.push(PathBuf::from(format!("{}/Fonts", windir)));
-            }
-
-            if let Ok(localappdata) = std::env::var("LOCALAPPDATA") {
-                font_dirs.push(PathBuf::from(format!(
-                    "{}\\Microsoft\\Windows\\Fonts",
-                    localappdata
-                )));
-            }
-
-            for font_dir in font_dirs {
-                if let Ok(entries) = std::fs::read_dir(&font_dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if let Some(ext) = path.extension() {
-                            let ext_str = ext.to_str().unwrap_or("").to_lowercase();
-                            if ext_str == "ttf" || ext_str == "ttc" || ext_str == "otf" {
-                                font_paths.push(path);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            let mut font_dirs = Vec::new();
-            font_dirs.push("/usr/share/fonts".to_string());
-            font_dirs.push("/usr/local/share/fonts".to_string());
-            font_dirs.push("/usr/share/fonts/truetype".to_string());
-
-            if let Ok(home) = std::env::var("HOME") {
-                font_dirs.push(format!("{}/.fonts", home));
-                font_dirs.push(format!("{}/.local/share/fonts", home));
-            }
-
-            for dir in font_dirs {
-                if let Ok(walker) = std::fs::read_dir(&dir) {
-                    for entry in walker.flatten() {
-                        let path = entry.path();
-                        if path.is_dir() {
-                            if let Ok(sub_entries) = std::fs::read_dir(&path) {
-                                for sub_entry in sub_entries.flatten() {
-                                    let sub_path = sub_entry.path();
-                                    if sub_path.extension().and_then(|s| s.to_str()) == Some("ttf")
-                                    {
-                                        font_paths.push(sub_path);
-                                    }
-                                }
-                            }
-                        } else if path.extension().and_then(|s| s.to_str()) == Some("ttf") {
-                            font_paths.push(path);
-                        }
-                    }
-                }
-            }
-        }
-
-        font_paths.sort_by_key(|p| {
-            let name = p
-                .file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .to_lowercase();
-
-            #[cfg(target_os = "windows")]
-            {
-                if name.contains("msyh") || name.contains("microsoft yahei") {
-                    0
-                } else if name.contains("simsun") {
-                    1
-                } else if name.contains("simhei") {
-                    2
-                } else if name.contains("arial") {
-                    3
-                } else if name.contains("segoe") {
-                    4
-                } else if name.contains("noto") && name.contains("cjk") {
-                    5
-                } else {
-                    100
-                }
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                if name.contains("msyh") || name.contains("microsoft yahei") {
-                    0
-                } else if name.contains("simhei") || name.contains("heiti") {
-                    1
-                } else if name.contains("arial") {
-                    2
-                } else if name.contains("noto") && name.contains("cjk") {
-                    3
-                } else if name.contains("sarasa") {
-                    4
-                } else if name.contains("source") && name.contains("han") {
-                    5
-                } else if name.contains("wenquanyi") {
-                    10
-                } else {
-                    100
-                }
-            }
-        });
-
-        font_paths
+    // 错误处理辅助方法
+    fn handle_error(&mut self, error: AppError) {
+        tracing::error!(error = ?error, "操作失败");
+        self.show_error(&error.to_string());
     }
+
+    // 获取或初始化 VdfParser
+    fn ensure_vdf_parser(&mut self) -> Option<&VdfParser> {
+        if self.vdf_parser.is_none() {
+            self.vdf_parser = VdfParser::new().ok();
+        }
+        self.vdf_parser.as_ref()
+    }
+
+    // 通用的批量文件操作方法
+    fn batch_file_operation<F>(
+        &mut self,
+        operation: F,
+        _operation_name: &str,
+    ) -> (usize, Vec<String>)
+    where
+        F: Fn(&str) -> anyhow::Result<bool>,
+    {
+        let filenames: Vec<String> = self
+            .selected_files
+            .iter()
+            .map(|&index| &self.files[index].name)
+            .cloned()
+            .collect();
+
+        let mut success_count = 0;
+        let mut failed_files = Vec::new();
+
+        for filename in &filenames {
+            match operation(filename) {
+                Ok(true) => success_count += 1,
+                Ok(false) => failed_files.push(filename.to_string()),
+                Err(e) => failed_files.push(format!("{} (错误: {})", filename, e)),
+            }
+        }
+
+        (success_count, failed_files)
+    }
+
+    fn ensure_connected(&self) -> AppResult<()> {
+        if !self.is_connected {
+            return Err(AppError::SteamNotConnected);
+        }
+        Ok(())
+    }
+
+    fn validate_app_id(&self) -> AppResult<u32> {
+        self.app_id_input
+            .trim()
+            .parse::<u32>()
+            .map_err(|_| AppError::InvalidAppId)
+    }
+
+    fn get_selected_file_index(&self) -> AppResult<usize> {
+        if self.selected_files.is_empty() {
+            return Err(AppError::FileNotSelected);
+        }
+        Ok(self.selected_files[0])
+    }
+
+    // 解析配置文件（示例）
+    #[allow(dead_code)]
+    fn parse_config_value(&self, value: &str) -> AppResult<u32> {
+        value
+            .parse::<u32>()
+            .map_err(|e| AppError::ParseError(format!("解析配置值失败: {}", e)))
+    }
+
     fn draw_file_items_table(&mut self, body: egui_extras::TableBody) {
         let row_height = 20.0;
         let files: Vec<(usize, &CloudFile)> = self
@@ -393,7 +326,7 @@ impl SteamCloudApp {
             }
         }
 
-        let font_paths = Self::find_system_fonts();
+        let font_paths = crate::ui::find_system_fonts();
 
         for path in font_paths {
             if let Ok(data) = std::fs::read(&path) {
@@ -450,17 +383,8 @@ impl SteamCloudApp {
             show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
         };
 
-        if let Some(parser) = &app.vdf_parser {
-            app.is_scanning_games = true;
-            let (tx, rx) = std::sync::mpsc::channel();
-            app.scan_games_rx = Some(rx);
-            let steam_path = parser.get_steam_path().clone();
-            let user_id = parser.get_user_id().to_string();
-            std::thread::spawn(move || {
-                let result = Self::fetch_and_merge_games(steam_path, user_id);
-                let _ = tx.send(result);
-            });
-        }
+        // 启动时自动扫描游戏
+        app.scan_cloud_games();
 
         app
     }
@@ -472,37 +396,45 @@ impl SteamCloudApp {
         }
 
         if self.is_connecting || self.connect_rx.is_some() {
-            log::warn!("正在连接中，请勿重复点击");
+            tracing::warn!("正在连接中，请勿重复点击");
             return;
         }
 
-        match self.app_id_input.trim().parse::<u32>() {
-            Ok(app_id) => {
-                log::info!("开始连接到 Steam，App ID: {}", app_id);
-                self.is_connecting = true;
-                self.is_connected = false;
-                self.remote_ready = false;
-                self.files.clear();
-                self.selected_files.clear();
-                self.quota_info = None;
-                self.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
-
-                let steam_manager = self.steam_manager.clone();
-                let (tx, rx) = std::sync::mpsc::channel();
-                self.connect_rx = Some(rx);
-
-                std::thread::spawn(move || {
-                    let result = {
-                        let mut manager = steam_manager.lock().unwrap();
-                        manager.connect(app_id)
-                    };
-                    let _ = tx.send(result.map(|_| app_id).map_err(|e| e.to_string()));
-                });
+        let app_id = match self.validate_app_id() {
+            Ok(id) => id,
+            Err(e) => {
+                self.handle_error(e);
+                return;
             }
-            Err(_) => {
-                self.show_error("请输入有效的App ID");
-            }
-        }
+        };
+
+        tracing::info!(app_id = app_id, "开始连接到 Steam");
+        self.is_connecting = true;
+        self.is_connected = false;
+        self.remote_ready = false;
+        self.files.clear();
+        self.selected_files.clear();
+        self.quota_info = None;
+        self.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
+
+        let steam_manager = self.steam_manager.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.connect_rx = Some(rx);
+
+        std::thread::spawn(move || {
+            let result = {
+                let mut manager = match steam_manager.lock() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Steam 管理器锁错误");
+                        let _ = tx.send(Err("Steam 管理器锁错误".to_string()));
+                        return;
+                    }
+                };
+                manager.connect(app_id)
+            };
+            let _ = tx.send(result.map(|_| app_id).map_err(|e| e.to_string()));
+        });
     }
 
     fn disconnect_from_steam(&mut self) {
@@ -520,17 +452,17 @@ impl SteamCloudApp {
     }
 
     fn refresh_files(&mut self) {
-        if !self.is_connected {
-            self.show_error("未连接到Steam");
+        if let Err(e) = self.ensure_connected() {
+            self.handle_error(e);
             return;
         }
 
         if self.loader_rx.is_some() {
-            log::debug!("正在刷新中，跳过重复请求");
+            tracing::debug!("正在刷新中，跳过重复请求");
             return;
         }
 
-        log::info!("开始刷新云文件列表...");
+        tracing::info!("开始刷新云文件列表");
         self.is_refreshing = true;
         self.files.clear();
 
@@ -556,7 +488,7 @@ impl SteamCloudApp {
                     }
                 }
                 Err(e) => {
-                    log::error!("获取文件列表失败: {}", e);
+                    tracing::error!("获取文件列表失败: {}", e);
                     Vec::new()
                 }
             };
@@ -632,21 +564,16 @@ impl SteamCloudApp {
             }
         };
 
-        if self.vdf_parser.is_none() {
-            self.vdf_parser = VdfParser::new().ok();
-        }
-        let parser_opt = self.vdf_parser.as_ref();
+        let parser_data = self
+            .ensure_vdf_parser()
+            .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
         for file in &self.files {
             if file.exists {
-                if let Some(parser) = parser_opt {
+                if let Some((ref steam_path, ref user_id)) = parser_data {
                     // 使用 path_resolver 模块解析路径
                     if let Ok(path) = crate::path_resolver::resolve_cloud_file_path(
-                        file.root,
-                        &file.name,
-                        parser.get_steam_path(),
-                        parser.get_user_id(),
-                        app_id,
+                        file.root, &file.name, steam_path, user_id, app_id,
                     ) {
                         if let Some(parent) = path.parent() {
                             let parent_path = parent.to_path_buf();
@@ -666,27 +593,34 @@ impl SteamCloudApp {
         self.local_save_paths = paths;
 
         if !self.local_save_paths.is_empty() {
-            log::info!("检测到 {} 个本地存档路径", self.local_save_paths.len());
+            tracing::info!("检测到 {} 个本地存档路径", self.local_save_paths.len());
             for (desc, path) in &self.local_save_paths {
-                log::debug!("  - {}: {}", desc, path.display());
+                tracing::debug!("  - {}: {}", desc, path.display());
             }
         } else {
-            log::debug!("未找到本地存档路径");
+            tracing::debug!("未找到本地存档路径");
         }
     }
 
     fn download_selected_file(&mut self) {
+        let file_index = match self.get_selected_file_index() {
+            Ok(idx) => idx,
+            Err(e) => {
+                self.handle_error(e);
+                return;
+            }
+        };
+
         if self.selected_files.len() != 1 {
-            self.show_error("请选择一个文件进行下载");
+            self.show_error("请只选择一个文件");
             return;
         }
-
-        let file_index = self.selected_files[0];
-        let file = self.files[file_index].clone();
-        let filename = file.name.clone();
+        // 只克隆必要的字段，而不是整个对象
+        let filename = self.files[file_index].name.clone();
+        let file_for_download = self.files[file_index].clone();
 
         if let Some(path) = FileDialog::new().set_file_name(&filename).save_file() {
-            self.download_file_to_path(&file, &path);
+            self.download_file_to_path(&file_for_download, &path);
         }
     }
 
@@ -696,7 +630,7 @@ impl SteamCloudApp {
             let content = &file.root_description[url_prefix.len()..];
             let url = content.split('|').next().unwrap_or("");
 
-            log::info!("正在从 CDP 下载: {}", url);
+            tracing::info!("正在从 CDP 下载: {}", url);
 
             match ureq::get(url).call() {
                 Ok(resp) => {
@@ -714,9 +648,9 @@ impl SteamCloudApp {
                 }
             }
         } else {
-            let result = {
-                let manager = self.steam_manager.lock().unwrap();
-                manager.read_file(&file.name)
+            let result = match self.steam_manager.lock() {
+                Ok(manager) => manager.read_file(&file.name),
+                Err(e) => Err(anyhow::anyhow!("Steam 管理器锁错误: {}", e)),
             };
 
             match result {
@@ -767,9 +701,9 @@ impl SteamCloudApp {
 
                     let filename = filename.as_str();
 
-                    let result = {
-                        let manager = self.steam_manager.lock().unwrap();
-                        manager.write_file(filename, &data)
+                    let result = match self.steam_manager.lock() {
+                        Ok(manager) => manager.write_file(filename, &data),
+                        Err(e) => Err(anyhow::anyhow!("Steam 管理器锁错误: {}", e)),
                     };
 
                     match result {
@@ -798,33 +732,14 @@ impl SteamCloudApp {
             return;
         }
 
-        let filenames: Vec<String> = self
-            .selected_files
-            .iter()
-            .map(|&index| self.files[index].name.clone())
-            .collect();
-
-        let mut forgotten_count = 0;
-        let mut failed_files = Vec::new();
-
-        for filename in &filenames {
-            let result = {
-                let manager = self.steam_manager.lock().unwrap();
-                manager.forget_file(filename)
-            };
-
-            match result {
-                Ok(true) => {
-                    forgotten_count += 1;
-                }
-                Ok(false) => {
-                    failed_files.push(filename.clone());
-                }
-                Err(e) => {
-                    failed_files.push(format!("{} (错误: {})", filename, e));
-                }
-            }
-        }
+        let steam_manager = self.steam_manager.clone();
+        let (forgotten_count, failed_files) = self.batch_file_operation(
+            |filename| match steam_manager.lock() {
+                Ok(manager) => manager.forget_file(filename),
+                Err(e) => Err(anyhow::anyhow!("Steam 管理器锁错误: {}", e)),
+            },
+            "forget",
+        );
 
         if !failed_files.is_empty() {
             self.show_error(&format!(
@@ -845,33 +760,14 @@ impl SteamCloudApp {
             return;
         }
 
-        let filenames: Vec<String> = self
-            .selected_files
-            .iter()
-            .map(|&index| self.files[index].name.clone())
-            .collect();
-
-        let mut deleted_count = 0;
-        let mut failed_files = Vec::new();
-
-        for filename in &filenames {
-            let result = {
-                let manager = self.steam_manager.lock().unwrap();
-                manager.delete_file(filename)
-            };
-
-            match result {
-                Ok(true) => {
-                    deleted_count += 1;
-                }
-                Ok(false) => {
-                    failed_files.push(filename.clone());
-                }
-                Err(e) => {
-                    failed_files.push(format!("{} (错误: {})", filename, e));
-                }
-            }
-        }
+        let steam_manager = self.steam_manager.clone();
+        let (deleted_count, failed_files) = self.batch_file_operation(
+            |filename| match steam_manager.lock() {
+                Ok(manager) => manager.delete_file(filename),
+                Err(e) => Err(anyhow::anyhow!("Steam 管理器锁错误: {}", e)),
+            },
+            "delete",
+        );
 
         if !failed_files.is_empty() {
             self.show_error(&format!("部分文件删除失败: {}", failed_files.join(", ")));
@@ -888,21 +784,17 @@ impl SteamCloudApp {
         self.show_error = true;
     }
 
-    // 统一的游戏扫描逻辑：VDF扫描 + CDP数据获取与合并 + 排序
     fn fetch_and_merge_games(
         steam_path: PathBuf,
         user_id: String,
     ) -> Result<Vec<CloudGameInfo>, String> {
-        // 使用 game_scanner 模块扫描游戏
         let mut games = crate::game_scanner::scan_cloud_games(&steam_path, &user_id)
             .map_err(|e| e.to_string())?;
 
         let mut cdp_order = std::collections::HashMap::new();
         if crate::cdp_client::CdpClient::is_cdp_running() {
-            log::info!("检测到 CDP，尝试获取游戏列表...");
             if let Ok(mut client) = crate::cdp_client::CdpClient::connect() {
                 if let Ok(cdp_games) = client.fetch_game_list() {
-                    log::info!("CDP 返回 {} 个游戏", cdp_games.len());
                     let map: std::collections::HashMap<u32, usize> = games
                         .iter()
                         .enumerate()
@@ -930,11 +822,10 @@ impl SteamCloudApp {
                             added += 1;
                         }
                     }
-                    log::info!(
-                        "CDP 合并: 新增 {}, 更新 {}, 总计 {}",
+                    tracing::info!(
+                        "CDP 合并完成: 新增 {} 个游戏, 更新 {} 个信息",
                         added,
-                        updated,
-                        games.len()
+                        updated
                     );
                 }
             }
@@ -962,21 +853,20 @@ impl SteamCloudApp {
             }
         });
 
-        log::info!("游戏扫描完成，共 {} 个", games.len());
         Ok(games)
     }
 
     fn scan_cloud_games(&mut self) {
-        if self.vdf_parser.is_none() {
-            self.vdf_parser = VdfParser::new().ok();
-        }
-        if let Some(parser) = &self.vdf_parser {
+        // 先获取必要的数据，避免借用冲突
+        let parser_data = self
+            .ensure_vdf_parser()
+            .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
+
+        if let Some((steam_path, user_id)) = parser_data {
             self.is_scanning_games = true;
             self.status_message = "正在扫描游戏库...".to_string();
             let (tx, rx) = std::sync::mpsc::channel();
             self.scan_games_rx = Some(rx);
-            let steam_path = parser.get_steam_path().clone();
-            let user_id = parser.get_user_id().to_string();
 
             std::thread::spawn(move || {
                 let result = Self::fetch_and_merge_games(steam_path, user_id);
@@ -988,113 +878,12 @@ impl SteamCloudApp {
     }
 
     fn draw_game_selector(&mut self, ctx: &egui::Context) {
-        let games = self.cloud_games.clone();
-        let mut selected_app_id = None;
-
-        egui::Window::new("游戏库")
-            .open(&mut self.show_game_selector)
-            .resizable(true)
-            .default_size([600.0, 500.0])
-            .show(ctx, |ui| {
-                if self.is_scanning_games && games.is_empty() {
-                    ui.label("正在扫描游戏库...");
-                } else if games.is_empty() {
-                    ui.label("未发现云存档的游戏");
-                } else {
-                    ui.heading(format!("{} 个有云存档的游戏", games.len()));
-                    ui.add_space(10.0);
-                    egui::ScrollArea::vertical().show(ui, |ui| {
-                        for game in &games {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    ui.vertical(|ui| {
-                                        ui.horizontal(|ui| {
-                                            if let Some(name) = &game.game_name {
-                                                ui.strong(name);
-                                                if game.is_installed {
-                                                    ui.colored_label(
-                                                        egui::Color32::from_rgb(0, 200, 0),
-                                                        "已安装",
-                                                    );
-                                                } else {
-                                                    ui.colored_label(
-                                                        egui::Color32::from_rgb(150, 150, 150),
-                                                        "未安装",
-                                                    );
-                                                }
-                                            } else {
-                                                ui.strong(format!("App ID: {}", game.app_id));
-                                                if game.is_installed {
-                                                    ui.colored_label(
-                                                        egui::Color32::from_rgb(0, 200, 0),
-                                                        "已安装",
-                                                    );
-                                                } else {
-                                                    ui.colored_label(
-                                                        egui::Color32::from_rgb(150, 150, 150),
-                                                        "未安装",
-                                                    );
-                                                }
-                                            }
-                                        });
-
-                                        if game.game_name.is_some() {
-                                            ui.label(format!("App ID: {}", game.app_id));
-                                        }
-
-                                        ui.label(format!(
-                                            "{} 个文件 | {}",
-                                            game.file_count,
-                                            crate::utils::format_size(game.total_size)
-                                        ));
-
-                                        if let Some(dir) = &game.install_dir {
-                                            ui.label(format!("安装目录: {}", dir));
-                                        }
-
-                                        if !game.categories.is_empty() {
-                                            ui.label(format!(
-                                                "标签: {}",
-                                                game.categories.join(", ")
-                                            ));
-                                        }
-
-                                        if let Some(playtime) = game.playtime {
-                                            let hours = playtime / 60;
-                                            ui.label(format!("游戏时间: {:.2} 小时", hours as f64));
-                                        }
-
-                                        if let Some(last_played) = game.last_played {
-                                            if last_played > 0 {
-                                                use chrono::{DateTime, Local};
-                                                use std::time::{Duration, UNIX_EPOCH};
-                                                let dt = UNIX_EPOCH
-                                                    + Duration::from_secs(last_played as u64);
-                                                let local: DateTime<Local> = dt.into();
-                                                ui.label(format!(
-                                                    "最后运行: {}",
-                                                    local.format("%Y-%m-%d %H:%M")
-                                                ));
-                                            }
-                                        }
-                                    });
-
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center),
-                                        |ui| {
-                                            if ui.button("选择").clicked() {
-                                                selected_app_id = Some(game.app_id);
-                                            }
-                                        },
-                                    );
-                                });
-                            });
-
-                            ui.add_space(5.0);
-                        }
-                    });
-                }
-            });
+        let selected_app_id = crate::ui::draw_game_selector_window(
+            ctx,
+            &mut self.show_game_selector,
+            &self.cloud_games,
+            self.is_scanning_games,
+        );
 
         if let Some(app_id) = selected_app_id {
             self.app_id_input = app_id.to_string();
@@ -1123,8 +912,7 @@ impl SteamCloudApp {
 
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
-                let dropped_files = i.raw.dropped_files.clone();
-                for file in dropped_files {
+                for file in &i.raw.dropped_files {
                     if let Some(path) = &file.path {
                         self.upload_file_from_path(path);
                     }
@@ -1149,9 +937,9 @@ impl SteamCloudApp {
 
         match std::fs::read(path) {
             Ok(data) => {
-                let result = {
-                    let manager = self.steam_manager.lock().unwrap();
-                    manager.write_file(&filename, &data)
+                let result = match self.steam_manager.lock() {
+                    Ok(manager) => manager.write_file(&filename, &data),
+                    Err(e) => Err(anyhow::anyhow!("Steam 管理器锁错误: {}", e)),
                 };
 
                 match result {
@@ -1189,48 +977,13 @@ impl SteamCloudApp {
     }
 
     fn draw_user_selector(&mut self, ctx: &egui::Context) {
-        let users = self.all_users.clone();
-        let mut selected_user = None;
+        let selected_user_id = crate::ui::draw_user_selector_window(
+            ctx,
+            &mut self.show_user_selector,
+            &self.all_users,
+        );
 
-        egui::Window::new("选择用户")
-            .open(&mut self.show_user_selector)
-            .resizable(true)
-            .default_size([400.0, 300.0])
-            .show(ctx, |ui| {
-                ui.heading(format!("{} 个Steam用户", users.len()));
-                ui.add_space(10.0);
-
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    for user in &users {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    if let Some(name) = &user.persona_name {
-                                        ui.strong(name);
-                                        ui.label(format!("ID: {}", user.user_id));
-                                    } else {
-                                        ui.strong(format!("用户 ID: {}", user.user_id));
-                                    }
-                                });
-
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if user.is_current {
-                                            ui.label("✅ 当前用户");
-                                        } else if ui.button("切换").clicked() {
-                                            selected_user = Some(user.user_id.clone());
-                                        }
-                                    },
-                                );
-                            });
-                        });
-                        ui.add_space(5.0);
-                    }
-                });
-            });
-
-        if let Some(user_id) = selected_user {
+        if let Some(user_id) = selected_user_id {
             self.switch_user(user_id);
             self.show_user_selector = false;
         }
@@ -1285,64 +1038,58 @@ impl SteamCloudApp {
 
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
         if self.show_debug_warning {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new("⚠ 注意：未检测到 Steam 调试模式")
-                        .color(egui::Color32::YELLOW),
-                );
-                if ui.button("重启 Steam (开启调试)").clicked() {
-                    if let Err(e) = crate::steam_api::restart_steam_with_debugging() {
-                        self.show_error(&format!("重启失败: {}", e));
-                    } else {
-                        self.status_message = "正在重启 Steam...".to_string();
-                    }
+            crate::ui::draw_debug_warning(ui, || {
+                if let Err(e) = crate::steam_api::restart_steam_with_debugging() {
+                    self.show_error(&format!("重启失败: {}", e));
+                } else {
+                    self.status_message = "正在重启 Steam...".to_string();
                 }
             });
         }
 
         ui.horizontal(|ui| {
-            if ui.button("关于").clicked() {
-                self.show_about = true;
-            }
+            let user_id = self.vdf_parser.as_ref().map(|p| p.get_user_id());
 
-            ui.separator();
+            crate::ui::draw_toolbar_buttons(
+                ui,
+                user_id,
+                &mut self.show_about,
+                &mut self.show_user_selector,
+                &mut self.show_game_selector,
+            );
 
-            if ui.button("用户").clicked() {
+            if self.show_user_selector && self.all_users.is_empty() {
                 self.load_all_users();
-                self.show_user_selector = true;
             }
 
-            if ui.button("游戏库").clicked() {
+            if self.show_game_selector
+                && !self.is_scanning_games
+                && self.scan_games_rx.is_none()
+                && self.cloud_games.is_empty()
+            {
                 self.scan_cloud_games();
-                self.show_game_selector = true;
             }
 
-            ui.separator();
+            let action = crate::ui::draw_connection_controls(
+                ui,
+                &mut self.app_id_input,
+                self.is_connected,
+                self.is_connecting,
+            );
 
-            if let Some(parser) = &self.vdf_parser {
-                ui.label(format!("用户: {}", parser.get_user_id()));
-                ui.separator();
-            }
-
-            ui.label("App ID:");
-            let response =
-                ui.add(egui::TextEdit::singleline(&mut self.app_id_input).desired_width(150.0));
-            if response.changed() {
-                self.is_connected = false;
-                self.remote_ready = false;
-                self.disconnect_from_steam();
-            }
-
-            if self.is_connected {
-                if ui.button("断开").clicked() {
+            match action {
+                crate::ui::ConnectionAction::InputChanged => {
+                    self.is_connected = false;
+                    self.remote_ready = false;
                     self.disconnect_from_steam();
                 }
-            } else if ui.button("连接").clicked() {
-                self.connect_to_steam();
-            }
-
-            if self.is_connecting {
-                ui.spinner();
+                crate::ui::ConnectionAction::Connect => {
+                    self.connect_to_steam();
+                }
+                crate::ui::ConnectionAction::Disconnect => {
+                    self.disconnect_from_steam();
+                }
+                crate::ui::ConnectionAction::None => {}
             }
         });
     }
@@ -1493,138 +1240,89 @@ impl SteamCloudApp {
     fn draw_action_buttons(&mut self, ui: &mut egui::Ui) {
         ui.separator();
 
-        ui.horizontal(|ui| {
-            let can_ops = self.is_connected
-                && self.remote_ready
-                && !self.is_refreshing
-                && !self.is_connecting;
+        let can_ops =
+            self.is_connected && self.remote_ready && !self.is_refreshing && !self.is_connecting;
 
-            if ui.button("全选").clicked() {
-                self.selected_files.clear();
-                for i in 0..self.files.len() {
-                    self.selected_files.push(i);
-                }
+        let has_selection = !self.selected_files.is_empty();
+        let selected_count = self.selected_files.len();
+        let total_count = self.files.len();
+
+        let selected_total_size: u64 = self
+            .selected_files
+            .iter()
+            .filter_map(|&idx| self.files.get(idx))
+            .map(|f| f.size)
+            .sum();
+
+        let action = crate::ui::draw_file_action_buttons(
+            ui,
+            can_ops,
+            has_selection,
+            selected_count,
+            total_count,
+            selected_total_size,
+        );
+
+        match action {
+            crate::ui::FileAction::SelectAll => {
+                self.selected_files = (0..self.files.len()).collect();
             }
-
-            if ui.button("反选").clicked() {
-                let current_selected = self.selected_files.clone();
-                self.selected_files.clear();
-                for i in 0..self.files.len() {
-                    if !current_selected.contains(&i) {
-                        self.selected_files.push(i);
-                    }
-                }
+            crate::ui::FileAction::InvertSelection => {
+                let current_selected: std::collections::HashSet<_> =
+                    self.selected_files.iter().copied().collect();
+                self.selected_files = (0..self.files.len())
+                    .filter(|i| !current_selected.contains(i))
+                    .collect();
             }
-
-            if ui.button("清除选择").clicked() {
+            crate::ui::FileAction::ClearSelection => {
                 self.selected_files.clear();
             }
-
-            ui.separator();
-
-            if ui
-                .add_enabled(
-                    can_ops && !self.selected_files.is_empty(),
-                    egui::Button::new("下载选中"),
-                )
-                .clicked()
-            {
+            crate::ui::FileAction::DownloadSelected => {
                 self.download_selected_file();
             }
-
-            if ui
-                .add_enabled(can_ops, egui::Button::new("上传文件"))
-                .clicked()
-            {
+            crate::ui::FileAction::UploadFile => {
                 self.upload_file();
             }
-
-            if ui
-                .add_enabled(
-                    can_ops && !self.selected_files.is_empty(),
-                    egui::Button::new("删除选中"),
-                )
-                .clicked()
-            {
+            crate::ui::FileAction::DeleteSelected => {
                 self.delete_selected_files();
             }
-
-            if ui
-                .add_enabled(can_ops, egui::Button::new("取消云同步"))
-                .clicked()
-            {
+            crate::ui::FileAction::ForgetSelected => {
                 self.forget_selected_files();
             }
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let selected_count = self.selected_files.len();
-                let total_count = self.files.len();
-                ui.label(format!("已选: {}/{}", selected_count, total_count));
-
-                if selected_count > 0 {
-                    let mut total_size: u64 = 0;
-                    for &idx in &self.selected_files {
-                        if let Some(file) = self.files.get(idx) {
-                            total_size = total_size.saturating_add(file.size);
-                        }
-                    }
-                    ui.label(format!("总大小: {}", crate::utils::format_size(total_size)));
-                }
-            });
-        });
+            crate::ui::FileAction::None => {}
+        }
     }
 
     fn draw_status_panel(&mut self, ui: &mut egui::Ui) {
         ui.separator();
 
-        ui.horizontal(|ui| {
-            ui.label("状态:");
-            ui.label(&self.status_message);
+        // 状态消息栏
+        let cloud_enabled = if self.is_connected {
+            self.steam_manager
+                .lock()
+                .ok()
+                .and_then(|m| m.is_cloud_enabled_for_app().ok())
+        } else {
+            None
+        };
 
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if self.is_connected {
-                    if let Ok(manager) = self.steam_manager.lock() {
-                        if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
-                            let cloud_status = if enabled {
-                                "云存储: 开启"
-                            } else {
-                                "云存储: 关闭"
-                            };
-                            if ui.selectable_label(false, cloud_status).clicked() {
-                                let _ = manager.set_cloud_enabled_for_app(!enabled);
-                            }
-                        }
-                    }
+        let toggled = crate::ui::draw_status_message(ui, &self.status_message, cloud_enabled);
+
+        if toggled {
+            if let Ok(manager) = self.steam_manager.lock() {
+                if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
+                    let _ = manager.set_cloud_enabled_for_app(!enabled);
                 }
-            });
-        });
+            }
+        }
 
+        // 云存储状态
         if self.is_connected {
             if self.remote_ready {
                 if let Ok(manager) = self.steam_manager.lock() {
-                    ui.horizontal(|ui| {
-                        ui.label("账户云存储:");
-                        match manager.is_cloud_enabled_for_account() {
-                            Ok(enabled) => ui.label(if enabled {
-                                "✅ 已启用"
-                            } else {
-                                "❌ 已禁用"
-                            }),
-                            Err(_) => ui.label("❓ 未知"),
-                        };
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label("应用云存储:");
-                        match manager.is_cloud_enabled_for_app() {
-                            Ok(enabled) => ui.label(if enabled {
-                                "✅ 已启用"
-                            } else {
-                                "❌ 已禁用"
-                            }),
-                            Err(_) => ui.label("❓ 未知"),
-                        };
-                    });
+                    let account_enabled = manager.is_cloud_enabled_for_account().ok();
+                    let app_enabled = manager.is_cloud_enabled_for_app().ok();
+                    crate::ui::draw_cloud_status(ui, account_enabled, app_enabled);
                 }
             } else {
                 ui.horizontal(|ui| {
@@ -1634,18 +1332,9 @@ impl SteamCloudApp {
             }
         }
 
+        // 配额信息
         if let Some((total, available)) = self.quota_info {
-            ui.horizontal(|ui| {
-                ui.label("配额:");
-                let used = total - available;
-                let usage_percent = (used as f32 / total as f32 * 100.0).round();
-                let used_str = crate::utils::format_size(used);
-                let total_str = crate::utils::format_size(total);
-                ui.label(format!(
-                    "{:.1}% 已使用 ({}/{})",
-                    usage_percent, used_str, total_str
-                ));
-            });
+            crate::ui::draw_quota_info(ui, total, available);
         }
     }
 }
@@ -1660,7 +1349,7 @@ impl eframe::App for SteamCloudApp {
             if !self.remote_ready && !self.is_refreshing {
                 if let Some(since) = self.since_connected {
                     if since.elapsed() >= Duration::from_secs(2) {
-                        log::info!("Steam API已准备就绪");
+                        tracing::info!("Steam API已准备就绪");
                         self.refresh_files();
                         self.remote_ready = true;
                     }
@@ -1676,7 +1365,7 @@ impl eframe::App for SteamCloudApp {
                     self.status_message = format!("已连接到Steam (App ID: {})", app_id);
                     self.since_connected = Some(Instant::now());
                     self.connect_rx = None;
-                    log::info!("Steam连接成功");
+                    tracing::info!("Steam连接成功");
                 }
                 Ok(Err(err)) => {
                     self.is_connecting = false;
