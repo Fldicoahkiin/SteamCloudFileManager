@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use steamworks::Client;
 
 pub fn restart_steam_with_debugging() -> Result<()> {
-    log::info!("正在尝试以调试模式重启 Steam...");
+    tracing::info!("正在尝试以调试模式重启 Steam...");
 
     #[cfg(target_os = "macos")]
     {
@@ -135,7 +135,7 @@ impl SteamCloudManager {
         let init_result = {
             // 创建steam_appid.txt文件
             if let Err(e) = std::fs::write("steam_appid.txt", app_id.to_string()) {
-                log::warn!("无法创建 steam_appid.txt: {}", e);
+                tracing::warn!("无法创建 steam_appid.txt: {}", e);
             }
 
             // 尝试初始化
@@ -146,7 +146,7 @@ impl SteamCloudManager {
 
             if result.is_err() {
                 // 如果失败，再尝试环境变量方式
-                log::info!("steam_appid.txt方式失败，尝试环境变量初始化");
+                tracing::info!("steam_appid.txt方式失败，尝试环境变量初始化");
                 Client::init()
             } else {
                 result
@@ -158,10 +158,10 @@ impl SteamCloudManager {
             let mut result = Client::init();
 
             if result.is_err() {
-                log::info!("环境变量初始化失败，尝试使用 steam_appid.txt");
+                tracing::info!("环境变量初始化失败，尝试使用 steam_appid.txt");
 
                 if let Err(e) = std::fs::write("steam_appid.txt", app_id.to_string()) {
-                    log::warn!("无法创建 steam_appid.txt: {}", e);
+                    tracing::warn!("无法创建 steam_appid.txt: {}", e);
                 }
 
                 result = Client::init();
@@ -185,7 +185,7 @@ impl SteamCloudManager {
     pub fn disconnect(&mut self) {
         if let Ok(mut guard) = self.client.lock() {
             if guard.is_some() {
-                log::info!("断开 Steam 连接 (App ID: {})", self.app_id);
+                tracing::info!("断开 Steam 连接 (App ID: {})", self.app_id);
                 *guard = None;
                 drop(guard);
                 std::thread::sleep(std::time::Duration::from_millis(50));
@@ -242,22 +242,22 @@ impl SteamCloudManager {
         let cloud_enabled_account = remote_storage.is_cloud_enabled_for_account();
         let cloud_enabled_app = remote_storage.is_cloud_enabled_for_app();
 
-        log::debug!(
+        tracing::debug!(
             "云同步状态 - 账户: {}, 应用: {}",
             cloud_enabled_account,
             cloud_enabled_app
         );
 
         if !cloud_enabled_account {
-            log::info!("此 Steam 账户未启用云同步功能");
+            tracing::info!("此 Steam 账户未启用云同步功能");
         }
 
         if !cloud_enabled_app {
-            log::info!("此应用未启用云同步功能");
+            tracing::info!("此应用未启用云同步功能");
         }
 
         let steam_files = remote_storage.files();
-        log::debug!("Steam API 返回 {} 个文件", steam_files.len());
+        tracing::debug!("Steam API 返回 {} 个文件", steam_files.len());
 
         let files: Vec<CloudFile> = steam_files
             .iter()
@@ -267,7 +267,7 @@ impl SteamCloudManager {
             })
             .collect();
 
-        log::debug!("构建完成 {} 个 CloudFile 对象", files.len());
+        tracing::debug!("构建完成 {} 个 CloudFile 对象", files.len());
         Ok(files)
     }
 
@@ -308,7 +308,7 @@ impl SteamCloudManager {
                 let mut available: u64 = 0;
                 if sys::SteamAPI_ISteamRemoteStorage_GetQuota(interface, &mut total, &mut available)
                 {
-                    log::debug!(
+                    tracing::debug!(
                         "通过 unsafe API 获取配额: 总计 {} / 可用 {}",
                         total,
                         available
@@ -319,7 +319,7 @@ impl SteamCloudManager {
         }
 
         // 回退到动态估算
-        log::debug!("无法通过 unsafe API 获取配额，使用估算值");
+        tracing::debug!("无法通过 unsafe API 获取配额，使用估算值");
         let used_bytes = self.calculate_used_space()?;
 
         // 根据已用空间动态估算总配额
@@ -337,7 +337,7 @@ impl SteamCloudManager {
 
         let available_bytes = estimated_total.saturating_sub(used_bytes);
 
-        log::debug!(
+        tracing::debug!(
             "配额估算: 已用 {} / 估算总量 {} (可用 {})",
             used_bytes,
             estimated_total,
@@ -435,7 +435,7 @@ impl SteamCloudManager {
 impl Drop for SteamCloudManager {
     fn drop(&mut self) {
         if self.is_connected() {
-            log::info!("关闭Steam API连接");
+            tracing::info!("关闭Steam API连接");
         }
 
         Self::cleanup_app_id_file();

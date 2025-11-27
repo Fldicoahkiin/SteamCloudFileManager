@@ -126,7 +126,7 @@ impl CdpClient {
     }
 
     pub fn fetch_game_list(&mut self) -> Result<Vec<CloudGameInfo>> {
-        log::info!("正在导航到 Steam 云存储页面...");
+        tracing::info!("正在导航到 Steam 云存储页面...");
         self.navigate("https://store.steampowered.com/account/remotestorage")?;
 
         let script = r#"
@@ -155,7 +155,7 @@ impl CdpClient {
         "#;
 
         let value = self.evaluate(script)?;
-        log::debug!("CDP 原始游戏列表数据: {:?}", value);
+        tracing::debug!("CDP 原始游戏列表数据: {:?}", value);
 
         let mut games = Vec::new();
 
@@ -171,7 +171,7 @@ impl CdpClient {
                     .map(|s| s.to_string())
                     .filter(|s| !s.is_empty());
                 if let Some(ref name) = game_name {
-                    log::debug!("解析到游戏: ID={}, Name={}", app_id, name);
+                    tracing::debug!("解析到游戏: ID={}, Name={}", app_id, name);
                 }
 
                 let file_count = item["file_count"].as_u64().unwrap_or(0) as usize;
@@ -179,7 +179,7 @@ impl CdpClient {
                 let size_str = item["total_size_str"].as_str().unwrap_or("");
                 let total_size = crate::utils::parse_size(size_str);
                 if total_size == 0 && !size_str.trim().is_empty() {
-                    log::warn!(
+                    tracing::warn!(
                         "App {} ({:?}) 大小解析为0: Raw='{}'",
                         app_id,
                         game_name,
@@ -199,8 +199,11 @@ impl CdpClient {
                     categories: Vec::new(),
                 });
             }
+        } else {
+            tracing::warn!("CDP 返回的数据不是数组: {:?}", value);
         }
 
+        tracing::info!("CDP 解析完成，获取到 {} 个游戏", games.len());
         Ok(games)
     }
 
@@ -258,12 +261,11 @@ impl CdpClient {
                 for item in arr {
                     let folder = item["folder"].as_str().unwrap_or("").to_string();
                     let filename = item["name"].as_str().unwrap_or("unknown").to_string();
-                    let full_name = filename.clone();
                     let size_str = item["size_str"].as_str().unwrap_or("");
                     let time_str = item["time_str"].as_str().unwrap_or("");
 
                     // 存储 URL 到 root_description，格式: CDP:<URL>|<FOLDER>
-                    let url = item["url"].as_str().unwrap_or("").to_string();
+                    let url = item["url"].as_str().unwrap_or("");
                     let root_description = if !url.is_empty() {
                         format!("CDP:{}|{}", url, folder)
                     } else {
@@ -273,7 +275,7 @@ impl CdpClient {
                     let timestamp = parse_steam_time(time_str).unwrap_or_else(Local::now);
 
                     all_files.push(CloudFile {
-                        name: full_name,
+                        name: filename,
                         size: crate::utils::parse_size(size_str),
                         timestamp,
                         is_persisted: true,

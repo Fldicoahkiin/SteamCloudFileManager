@@ -32,23 +32,22 @@ impl FileService {
         }
 
         // VDF
-        match self.get_files_from_vdf(app_id) {
-            Ok(files) if !files.is_empty() => {
-                log::info!("使用 VDF 获取到 {} 个文件", files.len());
-                return Ok(files);
-            }
-            Ok(_) => log::debug!("VDF 返回空列表，尝试其他方式"),
-            Err(e) => log::debug!("VDF 获取失败: {}，尝试 Steam API", e),
+        let vdf_files = self.get_files_from_vdf(app_id)?;
+        if !vdf_files.is_empty() {
+            tracing::info!("获取到 {} 个云文件", vdf_files.len());
+            return Ok(vdf_files);
+        } else {
+            tracing::debug!("VDF 返回空列表，尝试其他方式");
         }
 
         // Steam API
         if let Some(manager) = &self.steam_manager {
             match self.get_files_from_steam_api(manager) {
                 Ok(files) => {
-                    log::info!("使用 Steam API 获取到 {} 个文件", files.len());
+                    tracing::info!(source = "Steam API", "获取云文件成功");
                     return Ok(files);
                 }
-                Err(e) => log::warn!("Steam API 获取失败: {}", e),
+                Err(e) => tracing::warn!(error = %e, "Steam API 获取失败"),
             }
         }
 
@@ -57,7 +56,7 @@ impl FileService {
 
     // 从 VDF 获取文件列表
     fn get_files_from_vdf(&self, app_id: u32) -> Result<Vec<CloudFile>> {
-        log::debug!("尝试从 VDF 解析文件列表，App ID: {}", app_id);
+        tracing::debug!(app_id = app_id, "尝试从 VDF 解析文件列表");
 
         let parser = VdfParser::new()?;
         let vdf_entries = parser.parse_remotecache(app_id)?;
@@ -70,7 +69,7 @@ impl FileService {
             .map(|entry| build_cloud_file_from_vdf(entry, &steam_path, &user_id, app_id))
             .collect();
 
-        log::debug!("VDF 解析完成: {} 个文件", files.len());
+        tracing::debug!(count = files.len(), "VDF 解析完成");
         Ok(files)
     }
 
@@ -93,11 +92,11 @@ impl FileService {
             return Ok(files);
         }
 
-        log::info!("尝试通过 CDP 补充文件信息...");
+        tracing::info!("尝试通过 CDP 补充文件信息");
 
         if let Ok(mut client) = crate::cdp_client::CdpClient::connect() {
             if let Ok(cdp_files) = client.fetch_game_files(app_id) {
-                log::info!("CDP 返回 {} 个文件", cdp_files.len());
+                tracing::info!(count = cdp_files.len(), "CDP 返回文件");
 
                 let file_map: std::collections::HashMap<String, usize> = files
                     .iter()

@@ -263,7 +263,13 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     let mut games = Vec::new();
     let userdata_path = steam_path.join("userdata").join(user_id);
 
-    log::info!("开始扫描有云存档的游戏...");
+    tracing::info!("Steam 路径: {:?}", steam_path);
+    tracing::info!("用户数据路径: {:?}", userdata_path);
+
+    if !userdata_path.exists() {
+        tracing::error!("用户数据路径不存在: {:?}", userdata_path);
+        return Ok(games);
+    }
 
     let all_manifests = scan_app_manifests(steam_path).unwrap_or_default();
     let all_categories = parse_shared_config(steam_path, user_id).unwrap_or_default();
@@ -276,12 +282,15 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     };
 
     if let Ok(entries) = fs::read_dir(&userdata_path) {
-        for entry in entries.flatten() {
+        let entries: Vec<_> = entries.flatten().collect();
+        tracing::info!("找到 {} 个用户数据目录条目", entries.len());
+
+        for entry in entries {
             let entry_name = entry.file_name().to_string_lossy().to_string();
             if let Ok(app_id) = entry_name.parse::<u32>() {
                 let vdf_path = entry.path().join("remotecache.vdf");
                 if vdf_path.exists() {
-                    log::debug!("发现云存档游戏: App ID {}", app_id);
+                    tracing::debug!(app_id = app_id, "发现云存档游戏");
 
                     // 使用 VdfParser 解析文件
                     let files = if let Ok(parser) = crate::vdf_parser::VdfParser::new() {
@@ -302,11 +311,11 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
                         .or_else(|| appinfo.and_then(|a| a.name.clone()));
 
                     if game_name.is_none() {
-                        log::debug!(
-                            "App ID {} 无游戏名称 (manifest: {}, appinfo: {})",
-                            app_id,
-                            manifest.is_some(),
-                            appinfo.is_some()
+                        tracing::debug!(
+                            app_id = app_id,
+                            has_manifest = manifest.is_some(),
+                            has_appinfo = appinfo.is_some(),
+                            "App ID 无游戏名称"
                         );
                     }
 
@@ -330,7 +339,6 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     }
 
     games.sort_by(|a, b| b.last_played.unwrap_or(0).cmp(&a.last_played.unwrap_or(0)));
-
-    log::info!("扫描完成，发现 {} 个有云存档的游戏", games.len());
+    tracing::info!("VDF 扫描完成，发现 {} 个有云存档的游戏", games.len());
     Ok(games)
 }
