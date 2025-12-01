@@ -24,6 +24,10 @@ debug/
 /dist
 /release
 /final-release
+*.dmg
+*.app
+dmg_temp/
+AppIcon.iconset/
 
 # OS specific
 Thumbs.db
@@ -32,3 +36,4 @@ desktop.ini
 /VDF*
 /CDP*
 /ERROR*
+/build.sh

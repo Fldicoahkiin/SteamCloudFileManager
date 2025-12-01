@@ -19,28 +19,47 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            name: Linux
+            name: Linux-x64
             target: x86_64-unknown-linux-gnu
-            asset: steam-cloud-file-manager-linux-x64
+            use_bundle: false
+            asset_name: steam-cloud-file-manager-linux-x64
+            
           - os: windows-latest
-            name: Windows
+            name: Windows-x64
             target: x86_64-pc-windows-msvc
-            asset: steam-cloud-file-manager-windows-x64.exe
+            use_bundle: false
+            asset_name: steam-cloud-file-manager-windows-x64.exe
+            
+          - os: windows-latest
+            name: Windows-ARM64
+            target: aarch64-pc-windows-msvc
+            use_bundle: false
+            asset_name: steam-cloud-file-manager-windows-arm64.exe
+            
           - os: macos-latest
             name: macOS-Intel
             target: x86_64-apple-darwin
-            asset: steam-cloud-file-manager-macos-intel
+            use_bundle: true
+            asset_name: steam-cloud-file-manager-macos-intel.dmg
+            
           - os: macos-latest
             name: macOS-ARM
             target: aarch64-apple-darwin
-            asset: steam-cloud-file-manager-macos-arm
+            use_bundle: true
+            asset_name: steam-cloud-file-manager-macos-arm.dmg
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整 git 历史以便 build.rs 能获取 commit hash
 
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+      
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
 
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
@@ -48,46 +67,128 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
 
-      - name: Build Release
-        run: cargo build --release --target ${{ matrix.target }} --locked
+      - name: Install cargo-bundle
+        if: matrix.use_bundle
+        run: cargo install cargo-bundle
 
-      - name: Prepare artifact
+      - name: Build
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Copy Steam API library (Windows/Linux)
+        if: "!matrix.use_bundle"
         shell: bash
         run: |
-          cd target/${{ matrix.target }}/release
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cp SteamCloudFileManager.exe ${{ matrix.asset }}
+          
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            # Windows: 查找 steam_api64.dll
+            STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "steam_api64.dll" 2>/dev/null | head -n 1)
+            if [ -z "$STEAM_LIB" ]; then
+              STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "steam_api.dll" 2>/dev/null | head -n 1)
+            fi
+            
+            if [ -n "$STEAM_LIB" ]; then
+              echo "Found Steam API library: $STEAM_LIB"
+              cp "$STEAM_LIB" target/${{ matrix.target }}/release/
+              echo "Copied to: target/${{ matrix.target }}/release/"
+            else
+              echo "Warning: Steam API library not found for Windows"
+              ls -la target/${{ matrix.target }}/release/build/ || true
+            fi
           else
-            cp SteamCloudFileManager ${{ matrix.asset }}
-            chmod +x ${{ matrix.asset }}
+            # Linux: 查找 libsteam_api.so
+            STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
+            
+            if [ -n "$STEAM_LIB" ]; then
+              echo "Found Steam API library: $STEAM_LIB"
+              cp "$STEAM_LIB" target/${{ matrix.target }}/release/
+              echo "Copied to: target/${{ matrix.target }}/release/"
+            else
+              echo "Warning: Steam API library not found for Linux"
+              ls -la target/${{ matrix.target }}/release/build/ || true
+            fi
           fi
+
+      - name: Bundle macOS app
+        if: matrix.use_bundle
+        run: |
+          cargo bundle --release --target ${{ matrix.target }}
+
+      - name: Install create-dmg
+        if: matrix.use_bundle
+        run: brew install create-dmg
       
       - name: Create macOS DMG
-        if: matrix.os == 'macos-latest'
+        if: matrix.use_bundle
         run: |
-          mkdir -p dmg_tmp
-          cp target/${{ matrix.target }}/release/${{ matrix.asset }} dmg_tmp/
+          APP_PATH=$(find target/${{ matrix.target }}/release/bundle/osx -name "*.app" | head -n 1)
           
-          hdiutil create -volname "Steam Cloud File Manager" \
-            -srcfolder dmg_tmp \
-            -ov -format UDZO \
-            ${{ matrix.asset }}.dmg
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found"
+            exit 1
+          fi
           
-          rm -rf dmg_tmp
+          echo "Found app at: $APP_PATH"
           
-      - name: Upload artifact (macOS)
-        if: matrix.os == 'macos-latest'
+          # 复制 Steam API 动态库
+          STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "libsteam_api.dylib" 2>/dev/null | head -n 1)
+          
+          if [ -n "$STEAM_LIB" ]; then
+            echo "Found Steam API library: $STEAM_LIB"
+            cp "$STEAM_LIB" "$APP_PATH/Contents/MacOS/"
+            echo "Steam API library copied"
+          fi
+          
+          # 使用 create-dmg 创建 DMG
+          create-dmg \
+            --volname "Steam Cloud File Manager" \
+            --window-pos 200 120 \
+            --window-size 800 450 \
+            --icon-size 100 \
+            --icon "$(basename "$APP_PATH")" 200 190 \
+            --hide-extension "$(basename "$APP_PATH")" \
+            --app-drop-link 600 185 \
+            "${{ matrix.asset_name }}" \
+            "$APP_PATH" \
+            || hdiutil create -volname "Steam Cloud File Manager" -srcfolder "$APP_PATH" -ov -format UDZO "${{ matrix.asset_name }}"
+
+      - name: Prepare Windows/Linux artifact
+        if: "!matrix.use_bundle"
+        shell: bash
+        run: |
+          mkdir -p dist
+          cd target/${{ matrix.target }}/release
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            # Windows: 打包成 zip
+            cp SteamCloudFileManager.exe dist/
+            # 复制 Steam API DLL
+            STEAM_DLL=$(find ../build/steamworks-sys-*/out -name "steam_api64.dll" -o -name "steam_api.dll" 2>/dev/null | head -n 1)
+            if [ -n "$STEAM_DLL" ]; then
+              cp "$STEAM_DLL" dist/
+            fi
+            cd dist
+            7z a -tzip ../../../../${{ matrix.asset_name }}.zip *
+          else
+            # Linux: 打包成 tar.gz
+            cp SteamCloudFileManager dist/
+            # 复制 Steam API SO
+            STEAM_SO=$(find ../build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
+            if [ -n "$STEAM_SO" ]; then
+              cp "$STEAM_SO" dist/
+            fi
+            cd dist
+            tar czf ../../../../${{ matrix.asset_name }}.tar.gz *
+          fi
+
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}.dmg
-          path: ${{ matrix.asset }}.dmg
-          
-      - name: Upload artifact (non-macOS)
-        if: matrix.os != 'macos-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset }}
-          path: target/${{ matrix.target }}/release/${{ matrix.asset }}
+          name: ${{ matrix.asset_name }}
+          path: |
+            ${{ matrix.asset_name }}
+            ${{ matrix.asset_name }}.zip
+            ${{ matrix.asset_name }}.tar.gz
 
   create-release:
     name: Create Release
@@ -118,11 +219,20 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
           
-          echo -e "## What's Changed\n" > release-notes.md
-          git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD >> release-notes.md
-          echo -e "\n" >> release-notes.md
+          # What's Changed
+          echo "" > release-notes.md
+          echo "" >> release-notes.md
           
-          sed "s/{VERSION}/$VERSION/g; s/{PREVIOUS_TAG}/$PREVIOUS_TAG/g" .github/release-template.md >> release-notes.md
+          # Contributors
+          cat .github/release-template.md >> release-notes.md
+          echo "" >> release-notes.md
+          
+          # Full Changelog
+          echo "## Full Changelog" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "[\`${PREVIOUS_TAG}...${VERSION}\`](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION})" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
           
       - name: Create Release
         uses: softprops/action-gh-release@v2

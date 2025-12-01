@@ -103,7 +103,9 @@ impl VdfParser {
             }
         }
 
-        Err(anyhow!("未找到Steam安装目录"))
+        Err(anyhow!(
+            "未找到 Steam 安装目录\n\n请确保：\n1. 已安装 Steam 客户端\n2. Steam 安装在标准位置\n3. 至少运行过一次 Steam\n\n如果 Steam 安装在非标准位置，请设置环境变量 STEAM_PATH"
+        ))
     }
 
     // 解析remotecache.vdf文件

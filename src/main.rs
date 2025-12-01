@@ -9,6 +9,7 @@ mod ui;
 mod user_manager;
 mod utils;
 mod vdf_parser;
+mod version;
 
 use app::SteamCloudApp;
 use eframe::egui;
@@ -25,6 +26,9 @@ fn main() -> Result<(), eframe::Error> {
         .with_thread_ids(false)
         .with_line_number(true)
         .init();
+
+    // 打印版本信息
+    tracing::info!("\n{}", version::version_info());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
