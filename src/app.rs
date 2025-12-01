@@ -57,6 +57,7 @@ pub struct SteamCloudApp {
     show_user_selector: bool,
     show_about: bool,
     show_debug_warning: bool,
+    about_icon_texture: Option<egui::TextureHandle>,
 }
 
 impl SteamCloudApp {
@@ -381,6 +382,7 @@ impl SteamCloudApp {
             show_user_selector: false,
             show_about: false,
             show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
+            about_icon_texture: None,
         };
 
         // 启动时自动扫描游戏
@@ -988,54 +990,175 @@ impl SteamCloudApp {
             self.show_user_selector = false;
         }
     }
-
     fn draw_about_window(&mut self, ctx: &egui::Context) {
+        let steam_blue = egui::Color32::from_rgb(102, 192, 244);
+        let text_subtle = ctx.style().visuals.text_color().gamma_multiply(0.6);
+        let text_normal = ctx.style().visuals.text_color();
+
         egui::Window::new("About")
             .open(&mut self.show_about)
             .resizable(false)
             .collapsible(false)
-            .default_width(450.0)
+            .default_width(400.0)
             .show(ctx, |ui| {
+                ui.add_space(16.0);
+
                 ui.vertical_centered(|ui| {
-                    ui.heading("Steam Cloud File Manager");
-                    ui.add_space(10.0);
-                    ui.label("Version 1.0.0");
-                    ui.add_space(15.0);
+                    // 加载应用图标
+                    if self.about_icon_texture.is_none() {
+                        let icon_bytes =
+                            include_bytes!("../assets/steam_cloud-macOS-Default-1024x1024@1x.png");
+                        if let Ok(img) = image::load_from_memory(icon_bytes) {
+                            let img =
+                                img.resize_exact(128, 128, image::imageops::FilterType::Lanczos3);
+                            let rgba = img.to_rgba8();
+                            let color_image = egui::ColorImage::from_rgba_unmultiplied(
+                                [128, 128],
+                                rgba.as_flat_samples().as_slice(),
+                            );
+                            self.about_icon_texture = Some(ui.ctx().load_texture(
+                                "about_icon",
+                                color_image,
+                                Default::default(),
+                            ));
+                        }
+                    }
+
+                    if let Some(texture) = &self.about_icon_texture {
+                        ui.image(texture);
+                    }
+
+                    ui.add_space(16.0);
+
+                    ui.label(
+                        egui::RichText::new("Steam Cloud File Manager")
+                            .size(22.0)
+                            .strong()
+                            .color(text_normal),
+                    );
                 });
+
+                ui.add_space(24.0);
+
+                ui.horizontal(|ui| {
+                    let width = ui.available_width();
+                    let content_width = 280.0;
+                    ui.add_space((width - content_width) / 2.0);
+
+                    ui.vertical(|ui| {
+                        ui.set_width(content_width);
+
+                        egui::Grid::new("tech_grid")
+                            .num_columns(2)
+                            .spacing([24.0, 8.0])
+                            .striped(false)
+                            .show(ui, |ui| {
+                                let mut row = |key: &str, val: String| {
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            ui.label(
+                                                egui::RichText::new(key)
+                                                    .size(13.0)
+                                                    .color(text_subtle),
+                                            );
+                                        },
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(val)
+                                            .size(13.0)
+                                            .color(text_normal)
+                                            .monospace(),
+                                    );
+                                    ui.end_row();
+                                };
+
+                                row("Version", crate::version::full_version().to_string());
+                            });
+                    });
+                });
+
+                ui.add_space(24.0);
 
                 ui.separator();
-                ui.add_space(10.0);
+                ui.add_space(16.0);
 
                 ui.horizontal(|ui| {
-                    ui.label("Author:");
-                    ui.hyperlink_to("Flacier", "https://github.com/Fldicoahkiin");
+                    let width = ui.available_width();
+                    let content_width = 380.0;
+                    ui.add_space((width - content_width) / 2.0);
+
+                    ui.vertical(|ui| {
+                        ui.set_width(content_width);
+
+                        egui::Grid::new("links_grid")
+                            .num_columns(2)
+                            .spacing([12.0, 8.0])
+                            .show(ui, |ui| {
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        ui.label(
+                                            egui::RichText::new("Author:")
+                                                .size(12.0)
+                                                .color(text_subtle),
+                                        );
+                                    },
+                                );
+                                ui.hyperlink_to(
+                                    egui::RichText::new("Flacier").size(12.0).color(steam_blue),
+                                    "https://github.com/Fldicoahkiin",
+                                );
+                                ui.end_row();
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        ui.label(
+                                            egui::RichText::new("Repository:")
+                                                .size(12.0)
+                                                .color(text_subtle),
+                                        );
+                                    },
+                                );
+                                ui.hyperlink_to(
+                                    egui::RichText::new(
+                                        "https://github.com/Fldicoahkiin/SteamCloudFileManager",
+                                    )
+                                    .size(12.0)
+                                    .color(steam_blue),
+                                    "https://github.com/Fldicoahkiin/SteamCloudFileManager",
+                                );
+                                ui.end_row();
+                            });
+                    });
                 });
 
-                ui.horizontal(|ui| {
-                    ui.label("Repository:");
-                    ui.hyperlink_to(
-                        "GitHub",
-                        "https://github.com/Fldicoahkiin/SteamCloudFileManager",
+                ui.add_space(16.0);
+
+                ui.vertical_centered(|ui| {
+                    ui.label(
+                        egui::RichText::new("Copyright © 2025 Flacier")
+                            .size(10.0)
+                            .color(text_subtle),
+                    );
+                    ui.add_space(2.0);
+                    ui.label(
+                        egui::RichText::new("GPL-3.0 License")
+                            .size(10.0)
+                            .color(text_subtle),
+                    );
+                    ui.add_space(2.0);
+                    ui.label(
+                        egui::RichText::new("Powered by Rust & egui")
+                            .size(10.0)
+                            .color(text_subtle),
                     );
                 });
 
                 ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
-
-                ui.label("License: GPL-3.0 License");
-                ui.add_space(5.0);
-                ui.label("Copyright (c) 2025 Flacier");
-
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
-
-                ui.add_space(10.0);
-                ui.label("Built with Rust and egui");
             });
     }
-
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
         if self.show_debug_warning {
             crate::ui::draw_debug_warning(ui, || {
