@@ -5,6 +5,7 @@ mod file_manager;
 mod game_scanner;
 mod path_resolver;
 mod steam_api;
+mod steam_process;
 mod ui;
 mod user_manager;
 mod utils;
