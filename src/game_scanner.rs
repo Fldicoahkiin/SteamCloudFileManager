@@ -342,3 +342,72 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     tracing::info!("VDF 扫描完成，发现 {} 个有云存档的游戏", games.len());
     Ok(games)
 }
+
+// 获取并合并游戏列表（包括 CDP 数据）
+pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Vec<CloudGameInfo>> {
+    let mut games = scan_cloud_games(&steam_path, &user_id)?;
+
+    let mut cdp_order = std::collections::HashMap::new();
+    if crate::cdp_client::CdpClient::is_cdp_running() {
+        if let Ok(mut client) = crate::cdp_client::CdpClient::connect() {
+            if let Ok(cdp_games) = client.fetch_game_list() {
+                let map: std::collections::HashMap<u32, usize> = games
+                    .iter()
+                    .enumerate()
+                    .map(|(i, g)| (g.app_id, i))
+                    .collect();
+
+                let mut added = 0;
+                let mut updated = 0;
+
+                for (idx, cdp_game) in cdp_games.into_iter().enumerate() {
+                    cdp_order.insert(cdp_game.app_id, idx);
+
+                    if let Some(&i) = map.get(&cdp_game.app_id) {
+                        let g = &mut games[i];
+                        g.file_count = cdp_game.file_count;
+                        g.total_size = cdp_game.total_size;
+                        if let Some(name) = cdp_game.game_name {
+                            if g.game_name.is_none() || g.game_name.as_deref() == Some("") {
+                                g.game_name = Some(name);
+                                updated += 1;
+                            }
+                        }
+                    } else {
+                        games.push(cdp_game);
+                        added += 1;
+                    }
+                }
+                tracing::info!(
+                    "CDP 合并完成: 新增 {} 个游戏, 更新 {} 个信息",
+                    added,
+                    updated
+                );
+            }
+        }
+    }
+
+    // 排序：已安装 -> CDP顺序 -> 名称
+    games.sort_by(|a, b| {
+        if a.is_installed != b.is_installed {
+            return b.is_installed.cmp(&a.is_installed);
+        }
+
+        match (cdp_order.get(&a.app_id), cdp_order.get(&b.app_id)) {
+            (Some(ia), Some(ib)) => ia.cmp(ib),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => {
+                let name_a = a.game_name.as_deref().unwrap_or("");
+                let name_b = b.game_name.as_deref().unwrap_or("");
+                if name_a.is_empty() && name_b.is_empty() {
+                    a.app_id.cmp(&b.app_id)
+                } else {
+                    name_a.cmp(name_b)
+                }
+            }
+        }
+    });
+
+    Ok(games)
+}

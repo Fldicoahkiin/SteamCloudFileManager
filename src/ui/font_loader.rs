@@ -1,4 +1,125 @@
+use egui;
 use std::path::PathBuf;
+
+// 设置应用字体
+pub fn setup_fonts(ctx: &egui::Context) {
+    let mut fonts = egui::FontDefinitions::default();
+
+    // 加载符号字体
+    load_symbol_fonts(&mut fonts);
+
+    // 加载 CJK 字体
+    load_cjk_fonts(&mut fonts);
+
+    ctx.set_fonts(fonts);
+}
+
+// 加载符号字体
+fn load_symbol_fonts(fonts: &mut egui::FontDefinitions) {
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(windir) = std::env::var("WINDIR") {
+            let symbols_path = PathBuf::from(&windir).join("Fonts").join("seguisym.ttf");
+            if let Ok(data) = std::fs::read(&symbols_path) {
+                fonts.font_data.insert(
+                    "symbols".to_owned(),
+                    egui::FontData::from_owned(data).into(),
+                );
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Proportional)
+                    .or_default()
+                    .push("symbols".to_owned());
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Monospace)
+                    .or_default()
+                    .push("symbols".to_owned());
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let candidates = [
+            "/System/Library/Fonts/Apple Symbols.ttf",
+            "/System/Library/Fonts/Supplemental/Symbols.ttf",
+        ];
+        for p in candidates {
+            if let Ok(data) = std::fs::read(p) {
+                fonts.font_data.insert(
+                    "symbols".to_owned(),
+                    egui::FontData::from_owned(data).into(),
+                );
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Proportional)
+                    .or_default()
+                    .push("symbols".to_owned());
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Monospace)
+                    .or_default()
+                    .push("symbols".to_owned());
+                break;
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansSymbols2-Regular.ttf",
+            "/usr/share/fonts/noto/NotoSansSymbols2-Regular.ttf",
+        ];
+        for p in candidates {
+            if let Ok(data) = std::fs::read(p) {
+                fonts.font_data.insert(
+                    "symbols".to_owned(),
+                    egui::FontData::from_owned(data).into(),
+                );
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Proportional)
+                    .or_default()
+                    .push("symbols".to_owned());
+                fonts
+                    .families
+                    .entry(egui::FontFamily::Monospace)
+                    .or_default()
+                    .push("symbols".to_owned());
+                break;
+            }
+        }
+    }
+}
+
+// 加载 CJK 字体
+fn load_cjk_fonts(fonts: &mut egui::FontDefinitions) {
+    let font_paths = find_system_fonts();
+
+    for path in font_paths {
+        if let Ok(data) = std::fs::read(&path) {
+            fonts.font_data.insert(
+                "system_cjk".to_owned(),
+                egui::FontData::from_owned(data).into(),
+            );
+            fonts
+                .families
+                .entry(egui::FontFamily::Proportional)
+                .or_default()
+                .insert(0, "system_cjk".to_owned());
+            fonts
+                .families
+                .entry(egui::FontFamily::Monospace)
+                .or_default()
+                .push("system_cjk".to_owned());
+            break;
+        }
+    }
+}
 
 pub fn find_system_fonts() -> Vec<PathBuf> {
     let mut font_paths = Vec::new();

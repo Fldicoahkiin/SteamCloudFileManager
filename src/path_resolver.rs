@@ -364,3 +364,46 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
         .join("common")
         .join(format!("Game_{}", app_id)))
 }
+
+// 收集本地存档路径
+pub fn collect_local_save_paths(
+    files: &[crate::steam_api::CloudFile],
+    steam_path: &Path,
+    user_id: &str,
+    app_id: u32,
+) -> Vec<(String, PathBuf)> {
+    use std::collections::HashMap;
+
+    let mut path_map: HashMap<String, PathBuf> = HashMap::new();
+
+    for file in files {
+        if file.exists {
+            // 使用 path_resolver 模块解析路径
+            if let Ok(path) =
+                resolve_cloud_file_path(file.root, &file.name, steam_path, user_id, app_id)
+            {
+                if let Some(parent) = path.parent() {
+                    let parent_path = parent.to_path_buf();
+                    if parent_path.exists() {
+                        let key = format!("{} ({})", file.root_description, file.root);
+                        path_map.entry(key).or_insert(parent_path);
+                    }
+                }
+            }
+        }
+    }
+
+    let mut paths: Vec<(String, PathBuf)> = path_map.into_iter().collect();
+    paths.sort_by(|a, b| a.0.cmp(&b.0));
+
+    if !paths.is_empty() {
+        tracing::info!("检测到 {} 个本地存档路径", paths.len());
+        for (desc, path) in &paths {
+            tracing::debug!("  - {}: {}", desc, path.display());
+        }
+    } else {
+        tracing::debug!("未找到本地存档路径");
+    }
+
+    paths
+}
