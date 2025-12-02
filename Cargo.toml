@@ -41,6 +41,9 @@ winapi = { version = "0.3", features = [
     "knownfolders",
 ] }
 
+[build-dependencies]
+chrono = "0.4"
+
 [package.metadata.bundle]
 name = "Steam Cloud File Manager"
 identifier = "com.flacier.steamcloudfilemanager"

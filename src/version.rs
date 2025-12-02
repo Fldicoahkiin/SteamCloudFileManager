@@ -35,6 +35,30 @@ pub fn version_info() -> String {
     )
 }
 
+// 获取操作系统名称
+pub fn os_name() -> &'static str {
+    std::env::consts::OS
+}
+
+// 获取系统架构
+pub fn os_arch() -> &'static str {
+    std::env::consts::ARCH
+}
+
+// 获取编译时间
+pub fn build_time() -> &'static str {
+    env!("BUILD_TIME")
+}
+
+// 获取编译配置 (debug/release)
+pub fn build_profile() -> &'static str {
+    if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

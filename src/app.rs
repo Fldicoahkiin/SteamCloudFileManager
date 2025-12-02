@@ -1042,7 +1042,7 @@ impl SteamCloudApp {
 
                 ui.horizontal(|ui| {
                     let width = ui.available_width();
-                    let content_width = 280.0;
+                    let content_width = 320.0;
                     ui.add_space((width - content_width) / 2.0);
 
                     ui.vertical(|ui| {
@@ -1050,7 +1050,7 @@ impl SteamCloudApp {
 
                         egui::Grid::new("tech_grid")
                             .num_columns(2)
-                            .spacing([24.0, 8.0])
+                            .spacing([16.0, 8.0])
                             .striped(false)
                             .show(ui, |ui| {
                                 let mut row = |key: &str, val: String| {
@@ -1074,6 +1074,22 @@ impl SteamCloudApp {
                                 };
 
                                 row("Version", crate::version::full_version().to_string());
+                                row(
+                                    "OS",
+                                    format!(
+                                        "{} ({})",
+                                        crate::version::os_name(),
+                                        crate::version::os_arch()
+                                    ),
+                                );
+                                row(
+                                    "Build",
+                                    format!(
+                                        "{} - {}",
+                                        crate::version::build_profile(),
+                                        crate::version::build_time()
+                                    ),
+                                );
                             });
                     });
                 });
@@ -1161,13 +1177,42 @@ impl SteamCloudApp {
     }
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
         if self.show_debug_warning {
-            crate::ui::draw_debug_warning(ui, || {
-                if let Err(e) = crate::steam_api::restart_steam_with_debugging() {
-                    self.show_error(&format!("重启失败: {}", e));
-                } else {
-                    self.status_message = "正在重启 Steam...".to_string();
-                }
-            });
+            let (restart_clicked, dismiss_clicked) = crate::ui::draw_debug_warning_ui(ui);
+
+            // 处理重启操作
+            if restart_clicked {
+                tracing::info!("用户点击自动重启 Steam");
+                self.status_message = "正在重启 Steam，请稍候...".to_string();
+                
+                // 在后台线程执行重启
+                let ctx = ui.ctx().clone();
+                std::thread::spawn(move || {
+                    match crate::steam_process::restart_steam_with_debugging() {
+                        Ok(_) => {
+                            tracing::info!("Steam 重启成功，等待 5 秒后检测 CDP...");
+                            std::thread::sleep(std::time::Duration::from_secs(5));
+                            
+                            // 检测 CDP 是否可用
+                            if crate::cdp_client::CdpClient::is_cdp_running() {
+                                tracing::info!("CDP 调试端口已可用");
+                            } else {
+                                tracing::warn!("CDP 调试端口仍不可用，请稍后再试");
+                            }
+                            ctx.request_repaint();
+                        }
+                        Err(e) => {
+                            tracing::error!(error = %e, "Steam 重启失败");
+                            ctx.request_repaint();
+                        }
+                    }
+                });
+            }
+
+            // 处理忽略操作
+            if dismiss_clicked {
+                tracing::info!("用户选择暂时忽略 CDP 调试警告");
+                self.show_debug_warning = false;
+            }
         }
 
         ui.horizontal(|ui| {
