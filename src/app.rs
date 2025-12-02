@@ -1183,7 +1183,7 @@ impl SteamCloudApp {
             if restart_clicked {
                 tracing::info!("用户点击自动重启 Steam");
                 self.status_message = "正在重启 Steam，请稍候...".to_string();
-                
+
                 // 在后台线程执行重启
                 let ctx = ui.ctx().clone();
                 std::thread::spawn(move || {
@@ -1191,7 +1191,7 @@ impl SteamCloudApp {
                         Ok(_) => {
                             tracing::info!("Steam 重启成功，等待 5 秒后检测 CDP...");
                             std::thread::sleep(std::time::Duration::from_secs(5));
-                            
+
                             // 检测 CDP 是否可用
                             if crate::cdp_client::CdpClient::is_cdp_running() {
                                 tracing::info!("CDP 调试端口已可用");
