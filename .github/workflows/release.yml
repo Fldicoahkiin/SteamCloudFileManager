@@ -28,13 +28,13 @@ jobs:
             name: Windows-x64
             target: x86_64-pc-windows-msvc
             use_bundle: false
-            asset_name: steam-cloud-file-manager-windows-x64.exe
+            asset_name: steam-cloud-file-manager-windows-x64
             
           - os: windows-latest
             name: Windows-ARM64
             target: aarch64-pc-windows-msvc
             use_bundle: false
-            asset_name: steam-cloud-file-manager-windows-arm64.exe
+            asset_name: steam-cloud-file-manager-windows-arm64
             
           - os: macos-latest
             name: macOS-Intel
@@ -156,8 +156,8 @@ jobs:
         if: "!matrix.use_bundle"
         shell: bash
         run: |
-          mkdir -p dist
           cd target/${{ matrix.target }}/release
+          mkdir -p dist
           
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             # Windows: 打包成 zip
