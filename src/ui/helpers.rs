@@ -274,3 +274,56 @@ pub fn draw_status_message(
     });
     toggled
 }
+
+// 状态面板的用户操作
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum StatusPanelAction {
+    None,
+    ToggleCloudEnabled,
+}
+
+// 状态面板的状态数据
+pub struct StatusPanelState {
+    pub status_message: String,
+    pub cloud_enabled: Option<bool>,
+    pub is_connected: bool,
+    pub remote_ready: bool,
+    pub account_enabled: Option<bool>,
+    pub app_enabled: Option<bool>,
+    pub quota_info: Option<(u64, u64)>,
+}
+
+// 绘制完整的状态面板
+pub fn draw_complete_status_panel(
+    ui: &mut egui::Ui,
+    state: &StatusPanelState,
+) -> StatusPanelAction {
+    let mut action = StatusPanelAction::None;
+
+    ui.separator();
+
+    // 状态消息栏
+    let toggled = draw_status_message(ui, &state.status_message, state.cloud_enabled);
+    if toggled {
+        action = StatusPanelAction::ToggleCloudEnabled;
+    }
+
+    // 云存储状态
+    if state.is_connected {
+        if state.remote_ready {
+            draw_cloud_status(ui, state.account_enabled, state.app_enabled);
+        } else {
+            ui.horizontal(|ui| {
+                ui.label("云存储状态:");
+                ui.label("未就绪");
+            });
+        }
+    }
+
+    // 配额信息
+    if let Some((total, available)) = state.quota_info {
+        draw_quota_info(ui, total, available);
+    }
+
+    action
+}

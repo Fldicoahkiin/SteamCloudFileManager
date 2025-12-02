@@ -5,8 +5,6 @@ pub enum AppError {
     SteamNotConnected,
     SteamLockError(String),
     InvalidAppId,
-    FileNotSelected,
-    ParseError(String),
     IoError(std::io::Error),
     AnyhowError(anyhow::Error),
 }
@@ -17,8 +15,6 @@ impl std::fmt::Display for AppError {
             AppError::SteamNotConnected => write!(f, "Steam 未连接"),
             AppError::SteamLockError(msg) => write!(f, "Steam 管理器锁错误: {}", msg),
             AppError::InvalidAppId => write!(f, "无效的 App ID"),
-            AppError::FileNotSelected => write!(f, "未选择文件"),
-            AppError::ParseError(msg) => write!(f, "解析错误: {}", msg),
             AppError::IoError(e) => write!(f, "IO 错误: {}", e),
             AppError::AnyhowError(e) => write!(f, "{}", e),
         }

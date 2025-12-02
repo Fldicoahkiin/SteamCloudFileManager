@@ -289,3 +289,30 @@ fn restart_steam_linux() -> Result<()> {
     tracing::info!("Steam 已成功启动");
     Ok(())
 }
+
+// 处理 Steam 重启操作
+pub fn handle_steam_restart_async<F>(on_complete: F)
+where
+    F: Fn() + Send + 'static,
+{
+    std::thread::spawn(move || {
+        match restart_steam_with_debugging() {
+            Ok(_) => {
+                tracing::info!("Steam 重启成功，等待 5 秒后检测 CDP...");
+                std::thread::sleep(std::time::Duration::from_secs(5));
+
+                // 检测 CDP 是否可用
+                if crate::cdp_client::CdpClient::is_cdp_running() {
+                    tracing::info!("CDP 调试端口已可用");
+                } else {
+                    tracing::warn!("CDP 调试端口仍不可用，请稍后再试");
+                }
+                on_complete();
+            }
+            Err(e) => {
+                tracing::error!(error = %e, "Steam 重启失败");
+                on_complete();
+            }
+        }
+    });
+}
