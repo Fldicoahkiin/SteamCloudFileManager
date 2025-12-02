@@ -30,6 +30,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 获取完整 git 历史以便 build.rs 能获取 commit hash
 
       - uses: dtolnay/rust-toolchain@stable
         with:
