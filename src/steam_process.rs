@@ -9,13 +9,13 @@ pub fn is_steam_running() -> bool {
             .arg("-f")
             .arg("/Applications/Steam.app")
             .output();
-        
+
         if let Ok(output) = result {
             if output.status.success() && !output.stdout.is_empty() {
                 return true;
             }
         }
-        
+
         Command::new("pgrep")
             .arg("-x")
             .arg("steam_osx")
@@ -31,7 +31,7 @@ pub fn is_steam_running() -> bool {
             .output()
             .map(|o| {
                 let output = String::from_utf8_lossy(&o.stdout);
-                output.to_lowercase().contains("steam.exe") 
+                output.to_lowercase().contains("steam.exe")
                     && !output.contains("INFO:")
                     && !output.contains("没有运行")
             })
@@ -53,7 +53,7 @@ pub fn is_steam_running() -> bool {
 fn wait_for_steam_shutdown(max_wait_secs: u64) -> bool {
     let start = std::time::Instant::now();
     let max_duration = std::time::Duration::from_secs(max_wait_secs);
-    
+
     while start.elapsed() < max_duration {
         if !is_steam_running() {
             tracing::info!("确认 Steam 进程已关闭");
@@ -61,7 +61,7 @@ fn wait_for_steam_shutdown(max_wait_secs: u64) -> bool {
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
     }
-    
+
     tracing::warn!("Steam 进程关闭超时，可能未完全关闭");
     false
 }
@@ -70,9 +70,9 @@ fn wait_for_steam_shutdown(max_wait_secs: u64) -> bool {
 fn wait_for_steam_startup(max_wait_secs: u64) -> bool {
     let start = std::time::Instant::now();
     let max_duration = std::time::Duration::from_secs(max_wait_secs);
-    
+
     tracing::info!("等待 Steam 启动...");
-    
+
     while start.elapsed() < max_duration {
         if is_steam_running() {
             let elapsed = start.elapsed().as_secs();
@@ -81,7 +81,7 @@ fn wait_for_steam_startup(max_wait_secs: u64) -> bool {
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
-    
+
     tracing::warn!("Steam 进程启动超时");
     false
 }
@@ -119,8 +119,16 @@ fn restart_steam_macos() -> Result<()> {
         tracing::info!("正在关闭 macOS 上的 Steam 进程...");
 
         // 关闭现有 Steam
-        Command::new("pkill").arg("-f").arg("/Applications/Steam.app").status().ok();
-        Command::new("pkill").arg("-x").arg("steam_osx").status().ok();
+        Command::new("pkill")
+            .arg("-f")
+            .arg("/Applications/Steam.app")
+            .status()
+            .ok();
+        Command::new("pkill")
+            .arg("-x")
+            .arg("steam_osx")
+            .status()
+            .ok();
 
         // 等待进程关闭
         if !wait_for_steam_shutdown(10) {
@@ -239,22 +247,16 @@ fn restart_steam_linux() -> Result<()> {
     }
 
     tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
-    
+
     // 尝试从 PATH 启动
-    let spawn_result = Command::new("steam")
-        .arg("-cef-enable-debugging")
-        .spawn();
-    
+    let spawn_result = Command::new("steam").arg("-cef-enable-debugging").spawn();
+
     if spawn_result.is_err() {
         tracing::warn!("PATH 中找不到 steam 命令，尝试其他路径...");
-        
+
         // 尝试常见路径
-        let common_paths = [
-            "/usr/bin/steam",
-            "/usr/games/steam",
-            "/usr/local/bin/steam",
-        ];
-        
+        let common_paths = ["/usr/bin/steam", "/usr/games/steam", "/usr/local/bin/steam"];
+
         let mut found = false;
         for path in &common_paths {
             if std::path::Path::new(path).exists() {
@@ -269,7 +271,7 @@ fn restart_steam_linux() -> Result<()> {
                 }
             }
         }
-        
+
         if !found {
             return Err(anyhow!(
                 "无法启动 Steam，请手动在终端执行：\nsteam -cef-enable-debugging\n\n或者尝试：\n/usr/bin/steam -cef-enable-debugging"
