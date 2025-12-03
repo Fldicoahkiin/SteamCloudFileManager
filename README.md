@@ -11,172 +11,120 @@
 
 > 基于 Rust 和 egui 构建的跨平台 Steam 云存档管理工具
 
-本工具提供了一个图形界面来管理不同游戏的 Steam 云存档文件。它直接连接到 Steam 的远程存储 API，允许用户无需启动游戏即可查看、下载、上传和管理云存档。
+## 功能
 
-## 目录
+一个图形界面的 Steam 云存档管理工具，无需启动游戏就能直接操作云端文件。
 
-- [安装](#安装)
-  - [依赖项](#依赖项)
-  - [从源码构建](#从源码构建)
-- [使用方法](#使用方法)
-  - [基本操作](#基本操作)
-  - [文件管理](#文件管理)
-  - [切换游戏](#切换游戏)
-- [API](#api)
-- [贡献](#贡献)
-- [许可证](#许可证)
-- [致谢](#致谢)
+Steam 客户端自带的云存档管理功能比较简陋，这个工具提供了更完整的文件列表和批量操作支持：
+
+- 查看完整的云存档文件列表（包括文件夹结构）
+- 批量下载/上传文件
+- 删除或取消同步指定文件
+- 快速切换不同游戏
+- 查看文件在本地磁盘的实际位置
+- 显示云端同步状态
 
 ## 安装
 
-### 依赖项
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载预编译版本
 
-**运行时要求：**
-- Steam 客户端（必须运行并已登录）
-- 操作系统：
-  - Windows 10 或更高版本
-  - macOS 10.15 (Catalina) 或更高版本
-  - Linux（glibc 2.31+，如 Ubuntu 20.04、Debian 11、Fedora 34 或同等版本）
+或者自己构建：
 
-**构建要求：**
-- **Rust 1.88+** (推荐使用 1.90.0 或更新版本)
-  - edition 2021
-  - egui 0.33 需要 Rust 1.88+
-- Cargo 包管理器
-- C++ 构建工具（因平台而异）：
-  - Windows: Visual Studio 2019+ 或 Visual Studio 构建工具
-  - macOS: Xcode 命令行工具
-  - Linux: gcc/g++ 或 clang
-
-### 从源码构建
-
-克隆仓库：
 ```bash
-git clone https://github.com/yourusername/SteamCloudFileManager.git
+git clone https://github.com/Fldicoahkiin/SteamCloudFileManager.git
 cd SteamCloudFileManager
-```
-
-构建项目：
-```bash
 cargo build --release
 ```
 
-编译后的二进制文件位于：
-- Windows: `target/release/SteamCloudFileManager.exe`
-- macOS/Linux: `target/release/SteamCloudFileManager`
+**构建依赖：**
 
-## 使用方法
+- **Cargo**
+- **Rust 1.90.0+** (因为 egui 0.33 需要 Rust 1.88+，推荐 1.90+)
+  - 使用 Rust 2021 edition
+  - 安装：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+
+- **C++ 编译工具链：**
+  - **Windows**: 
+    - Visual Studio 2019 或更新版本（推荐安装 "Desktop development with C++" 工作负载）
+    - 或 [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
+  - **macOS**: 
+    - Xcode Command Line Tools: `xcode-select --install`
+  - **Linux**: 
+    - gcc/g++ 或 clang
+    - Ubuntu/Debian: `sudo apt install build-essential`
+    - Fedora: `sudo dnf install gcc gcc-c++`
+    - Arch: `sudo pacman -S base-devel`
+
+**运行依赖：**
+- Steam 客户端（必须以调试模式运行）
+
+## 使用
+
+### Steam 调试模式
+
+本工具使用 CDP 协议与 Steam 通信，**必须**以调试模式启动 Steam。
+
+**Windows:**
+1. 右键点击 Steam 快捷方式，选择“属性”
+2. 在“目标”栏末尾添加：`-cef-enable-debugging`
+3. 点击“确定”并启动 Steam
+
+**macOS:**
+1. 退出 Steam
+2. 在终端执行：
+   ```bash
+   open -a Steam --args -cef-enable-debugging
+   ```
+
+**Linux:**
+1. 关闭 Steam
+2. 在终端执行：
+   ```bash
+   steam -cef-enable-debugging &
+   ```
+   或者修改 Steam 快捷方式，在 Exec 行末尾添加 `-cef-enable-debugging`
+
+**注意：**本软件提供了“以调试模式重启 Steam”按钮，可以自动根据引导完成上述操作。
 
 ### 基本操作
 
-1. **启动 Steam 客户端**
-   确保 Steam 正在运行并且你已登录账户。
+1. 确保 Steam 已以调试模式运行
+2. 启动本工具
+3. 选择游戏：
+   - 点击“游戏库”按钮，从扫描到的游戏列表中选择
+   - 或者直接在 App ID 输入框中输入游戏的 App ID
+4. 点击“连接”按钮
+5. 连接成功后即可下载/上传/删除文件
 
-2. **启动应用程序**
-   ```bash
-   ./target/release/SteamCloudFileManager
-   ```
+App ID 可以在 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
 
-3. **连接到游戏**
-   - 在输入框中输入游戏的 App ID
-   - 点击"连接"
-   - 文件列表将自动加载
+## 技术架构
 
-   查找 App ID 的方法：
-   - Steam 商店 URL：`https://store.steampowered.com/app/[APP_ID]/`
-   - SteamDB：https://steamdb.info/
+### 1. VDF 解析
+- 直接读取 `remotecache.vdf` 获取完整文件列表
+- 显示文件在本地磁盘的实际存储位置
+- 支持所有 Root 路径类型（0-12）
 
-### 文件管理
-
-**下载文件**
-1. 从列表中选择一个或多个文件
-2. 点击"下载选中文件"
-3. 在文件对话框中选择保存位置
-
-**上传文件**
-1. 点击"上传文件"
-2. 选择要上传的本地文件
-3. 文件将立即同步到 Steam 云
-
-**删除文件**
-1. 选择目标文件
-2. 点击"删除选中文件"
-3. 确认删除操作
-
-**取消云同步**
-1. 选择要取消同步的文件
-2. 点击"取消云同步"
-3. 文件保留在本地但停止同步
-
-### 切换游戏
-
-要管理不同游戏的文件：
-1. 点击"断开连接"
-2. 输入新的 App ID
-3. 点击"连接"
-
-或者，直接输入新的 App ID 并连接即可立即切换。
-
-## API
-
-应用程序通过以下主要 API 与 Steam 进行交互：
-
-### Steam 远程存储 API
-
-| 函数 | 描述 |
-|------|------|
-| `GetFileCount()` | 获取文件总数 |
-| `GetFileNameAndSize()` | 获取文件元数据 |
-| `FileExists()` | 检查文件是否存在 |
-| `FilePersisted()` | 验证持久化状态 |
-| `GetFileTimestamp()` | 获取修改时间 |
-| `FileRead()` | 下载文件内容 |
-| `FileWrite()` | 上传文件内容 |
-| `FileDelete()` | 从云端删除文件 |
-| `FileForget()` | 停止跟踪文件 |
-| `IsCloudEnabledForAccount()` | 检查账户云状态 |
-| `IsCloudEnabledForApp()` | 检查应用云状态 |
-| `SetCloudEnabledForApp()` | 切换应用云同步 |
-
-### 内部 API
-
-```rust
-pub struct SteamCloudManager {
-    pub fn connect(app_id: u32) -> Result<()>
-    pub fn disconnect()
-    pub fn get_files() -> Result<Vec<CloudFile>>
-    pub fn read_file(filename: &str) -> Result<Vec<u8>>
-    pub fn write_file(filename: &str, data: &[u8]) -> Result<()>
-    pub fn delete_file(filename: &str) -> Result<bool>
-    pub fn forget_file(filename: &str) -> Result<bool>
-}
-```
-
-### VDF 文件解析
-
-本工具采用 **混合架构方案** (VDF + CDP) 确保最大兼容性和功能性：
-
-**1. VDF 解析 (本地)**
-- 直接读取 `remotecache.vdf` 文件获取完整文件列表
-- 可以显示文件在本地磁盘的实际存储位置
-- 作为数据基础，确保即使无网络也能查看缓存状态
-
-**2. CDP 协议 (云端)**
-- 通过 Steam CEF 调试接口直接与客户端通信
-- 实时获取云端文件列表和 **下载链接**
+### 2. CDP 协议
+- 通过 Steam CEF 调试接口与客户端通信
+- 实时获取云端文件列表和下载链接
 - 自动合并云端状态到本地视图
 
-**3. Steam API**
-- `ISteamRemoteStorage` API
-- 用于文件上传和删除操作
+### 3. Steamworks API
+- 使用 `ISteamRemoteStorage` API
+- 处理文件上传和删除操作
 
-### 后续维护计划
+## TODO
 
-- [ ] **冲突检测**: 识别并标记 `CloudFile.conflict` 状态，提示用户解决同步冲突
+- [ ] 批量下载
+- [ ] 批量上传
+- [ ] 拖拽上传
+- [ ] 文件夹分级管理
+- [ ] 多语言支持
 
 ## 贡献
 
-欢迎提交Issue和Pull Request
+欢迎提交 Issue 和 Pull Request！
 
 ## 贡献者
 
@@ -186,31 +134,25 @@ pub struct SteamCloudManager {
 
 ## 许可证
 
-GPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件
-
-## 参考资源
-
-### 官方文档
-- [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud) - Root Paths配置说明
-- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - C++ API参考
-- [Steamworks SDK](https://partner.steamgames.com/doc/sdk) - 完整SDK下载
-
-### 社区
-- [Stack Exchange: What data is in Steam Cloud?](https://gaming.stackexchange.com/questions/146644) - Root值映射确认
-- Reddit r/Steam - VDF文件格式讨论
-
-### 开源
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - C# Steamworks封装
-- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - VDF文件解析库
-- [Rust Steamworks](https://github.com/Thinkofname/steamworks-rs) - 本项目使用的Rust绑定
-
-### 文章
-- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - Root Override配置
+本项目采用 GPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件
 
 ## 致谢
 
 - [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
+- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs)
+- [egui](https://github.com/emilk/egui)
+- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe)
+- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs)
+- [tungstenite](https://github.com/snapview/tungstenite-rs)
+- [rfd](https://github.com/PolyMeilex/rfd)
+- [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
+- [ureq](https://github.com/algesten/ureq)
 - [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api)
+- [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud)
+- [VDF Parser (Python)](https://github.com/ValvePython/vdf)
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
+- [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
+- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
 
 ## Star History
 
