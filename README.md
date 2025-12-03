@@ -25,6 +25,17 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 - 查看文件在本地磁盘的实际位置
 - 显示云端同步状态
 
+## 平台支持
+
+| 平台 | 架构 | 支持状态 | 说明 |
+|------|------|----------|------|
+| Windows | x64 | ✅ 支持 | |
+| Windows | ARM64 | ❌ 不支持 | Steam SDK 不提供 ARM64 版本 |
+| macOS | Intel (x64) | ✅ 支持 | |
+| macOS | Apple Silicon (ARM64) | ✅ 支持 | |
+| Linux | x64 | ✅ 支持 | |
+
+
 ## 安装
 
 从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载预编译版本
