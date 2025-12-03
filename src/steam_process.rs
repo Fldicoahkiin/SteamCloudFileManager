@@ -1,5 +1,15 @@
 use anyhow::{anyhow, Result};
 use std::process::Command;
+use std::sync::mpsc::Sender;
+
+// Steam 重启状态
+#[derive(Debug, Clone)]
+pub enum RestartStatus {
+    Closing,
+    Starting,
+    Success,
+    Error(String),
+}
 
 // 检测 Steam 是否正在运行
 pub fn is_steam_running() -> bool {
@@ -86,60 +96,135 @@ fn wait_for_steam_startup(max_wait_secs: u64) -> bool {
     false
 }
 
-// 以调试模式重启 Steam
-pub fn restart_steam_with_debugging() -> Result<()> {
-    let steam_running = is_steam_running();
+// 带状态回调的 Steam 重启函数
+pub fn restart_steam_with_status<F>(tx: Sender<RestartStatus>, on_update: F)
+where
+    F: Fn() + Send + 'static,
+{
+    // 发送关闭状态
+    let _ = tx.send(RestartStatus::Closing);
+    on_update();
 
-    if steam_running {
-        tracing::info!("检测到 Steam 正在运行，开始重启...");
-    } else {
-        tracing::info!("Steam 未运行，直接以调试模式启动...");
+    // 执行关闭操作
+    let close_result = close_steam();
+
+    if let Err(e) = close_result {
+        let error_msg = e.to_string();
+        if error_msg.contains("MANUAL_OPERATION_REQUIRED") {
+            let _ = tx.send(RestartStatus::Error("自动关闭失败".to_string()));
+        } else {
+            let _ = tx.send(RestartStatus::Error(error_msg));
+        }
+        on_update();
+        return;
+    }
+
+    // 发送启动状态
+    let _ = tx.send(RestartStatus::Starting);
+    on_update();
+
+    // 执行启动操作
+    let start_result = start_steam();
+
+    if let Err(e) = start_result {
+        let _ = tx.send(RestartStatus::Error(e.to_string()));
+        on_update();
+        return;
+    }
+
+    // 发送成功状态
+    let _ = tx.send(RestartStatus::Success);
+    on_update();
+}
+
+// 关闭 Steam
+fn close_steam() -> Result<()> {
+    if !is_steam_running() {
+        return Ok(());
     }
 
     #[cfg(target_os = "macos")]
     {
-        restart_steam_macos()
+        close_steam_macos()
     }
 
     #[cfg(target_os = "windows")]
     {
-        restart_steam_windows()
+        close_steam_windows()
     }
 
     #[cfg(target_os = "linux")]
     {
-        restart_steam_linux()
+        close_steam_linux()
+    }
+}
+
+// 启动 Steam
+fn start_steam() -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        start_steam_macos()
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        start_steam_windows()
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        start_steam_linux()
     }
 }
 
 #[cfg(target_os = "macos")]
-fn restart_steam_macos() -> Result<()> {
-    // 检测 Steam 是否运行
-    if is_steam_running() {
-        tracing::info!("正在关闭 macOS 上的 Steam 进程...");
+fn close_steam_macos() -> Result<()> {
+    tracing::info!("正在关闭 macOS 上的 Steam 进程...");
 
-        // 关闭现有 Steam
+    // 使用 AppleScript 优雅退出
+    let quit_script = r#"
+        tell application "Steam"
+            quit
+        end tell
+    "#;
+
+    Command::new("osascript")
+        .arg("-e")
+        .arg(quit_script)
+        .status()
+        .ok();
+
+    // 等待一下
+    std::thread::sleep(std::time::Duration::from_secs(2));
+
+    // 如果还在运行，尝试强制杀死
+    if is_steam_running() {
+        tracing::warn!("Steam 未响应退出命令，尝试强制结束进程...");
         Command::new("pkill")
+            .arg("-9")
             .arg("-f")
             .arg("/Applications/Steam.app")
             .status()
             .ok();
         Command::new("pkill")
+            .arg("-9")
             .arg("-x")
             .arg("steam_osx")
             .status()
             .ok();
-
-        // 等待进程关闭
-        if !wait_for_steam_shutdown(10) {
-            return Err(anyhow!(
-                "Steam 进程关闭超时，请手动关闭 Steam 后重试\n\n手动操作：\n1. 右键 Dock 图标 -> 退出\n2. 打开终端，执行：open -a Steam --args -cef-enable-debugging"
-            ));
-        }
-    } else {
-        tracing::info!("Steam 未运行，直接启动...");
     }
 
+    // 等待进程关闭
+    if !wait_for_steam_shutdown(5) {
+        tracing::warn!("自动关闭 Steam 失败，需要手动操作");
+        return Err(anyhow!("MANUAL_OPERATION_REQUIRED"));
+    }
+
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn start_steam_macos() -> Result<()> {
     tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
     Command::new("open")
         .arg("-a")
@@ -147,13 +232,7 @@ fn restart_steam_macos() -> Result<()> {
         .arg("--args")
         .arg("-cef-enable-debugging")
         .spawn()
-        .map_err(|e| {
-            tracing::error!(error = %e, "启动 Steam 失败");
-            anyhow!(
-                "无法启动 Steam: {}\n\n手动操作：\n1. 打开终端（Terminal）\n2. 执行命令：open -a Steam --args -cef-enable-debugging",
-                e
-            )
-        })?;
+        .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
     // 等待进程启动
     if !wait_for_steam_startup(30) {
@@ -167,55 +246,35 @@ fn restart_steam_macos() -> Result<()> {
 }
 
 #[cfg(target_os = "windows")]
-fn restart_steam_windows() -> Result<()> {
-    // 检测 Steam 是否运行
-    if is_steam_running() {
-        tracing::info!("正在关闭 Windows 上的 Steam 进程...");
+fn close_steam_windows() -> Result<()> {
+    tracing::info!("正在关闭 Windows 上的 Steam 进程...");
+    Command::new("taskkill")
+        .args(["/F", "/IM", "steam.exe"])
+        .status()
+        .ok();
 
-        // 关闭现有 Steam
-        Command::new("taskkill")
-            .args(["/F", "/IM", "steam.exe"])
-            .status()
-            .ok();
-
-        // 等待进程关闭
-        if !wait_for_steam_shutdown(10) {
-            return Err(anyhow!(
-                "Steam 进程关闭超时，请手动关闭 Steam 后重试\n\n手动操作：\n1. 右键 Steam 快捷方式 -> 属性\n2. 在目标栏末尾添加：-cef-enable-debugging\n3. 点击确定并启动 Steam"
-            ));
-        }
-    } else {
-        tracing::info!("Steam 未运行，直接启动...");
+    if !wait_for_steam_shutdown(5) {
+        return Err(anyhow!("MANUAL_OPERATION_REQUIRED"));
     }
+    Ok(())
+}
 
-    // 找到并启动 Steam
-    tracing::info!("正在查找 Steam 安装路径...");
+#[cfg(target_os = "windows")]
+fn start_steam_windows() -> Result<()> {
     let steam_dir = crate::vdf_parser::VdfParser::find_steam_path()?;
     let steam_exe = steam_dir.join("steam.exe");
 
     if !steam_exe.exists() {
-        tracing::error!(path = ?steam_exe, "找不到 steam.exe");
-        return Err(anyhow!(
-            "找不到 steam.exe，路径: {:?}\n\n请确认 Steam 已正确安装",
-            steam_exe
-        ));
+        return Err(anyhow!("找不到 steam.exe"));
     }
 
     tracing::info!(path = ?steam_exe, "正在启动 Steam，添加参数: -cef-enable-debugging");
-
-    // 使用 cmd /C start 来启动
     Command::new("cmd")
         .args(["/C", "start", ""])
         .arg(&steam_exe)
         .arg("-cef-enable-debugging")
         .spawn()
-        .map_err(|e| {
-            tracing::error!(error = %e, "启动 Steam 失败");
-            anyhow!(
-                "无法启动 Steam: {}\n\n手动操作：\n1. 右键 Steam 快捷方式 -> 属性\n2. 在目标栏末尾添加：-cef-enable-debugging\n3. 点击确定并启动 Steam",
-                e
-            )
-        })?;
+        .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
     // 等待进程启动
     if !wait_for_steam_startup(30) {
@@ -229,55 +288,23 @@ fn restart_steam_windows() -> Result<()> {
 }
 
 #[cfg(target_os = "linux")]
-fn restart_steam_linux() -> Result<()> {
-    // 检测 Steam 是否运行
-    if is_steam_running() {
-        tracing::info!("正在关闭 Linux 上的 Steam 进程...");
+fn close_steam_linux() -> Result<()> {
+    tracing::info!("正在关闭 Linux 上的 Steam 进程...");
+    Command::new("pkill").arg("-x").arg("steam").status().ok();
 
-        Command::new("pkill").arg("-x").arg("steam").status().ok();
-
-        // 等待进程关闭
-        if !wait_for_steam_shutdown(10) {
-            return Err(anyhow!(
-                "Steam 进程关闭超时，请手动关闭 Steam 后重试\n\n手动操作：\n1. 在终端执行：pkill steam\n2. 然后执行：steam -cef-enable-debugging"
-            ));
-        }
-    } else {
-        tracing::info!("Steam 未运行，直接启动...");
+    if !wait_for_steam_shutdown(5) {
+        return Err(anyhow!("MANUAL_OPERATION_REQUIRED"));
     }
+    Ok(())
+}
 
+#[cfg(target_os = "linux")]
+fn start_steam_linux() -> Result<()> {
     tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
-
-    // 尝试从 PATH 启动
-    let spawn_result = Command::new("steam").arg("-cef-enable-debugging").spawn();
-
-    if spawn_result.is_err() {
-        tracing::warn!("PATH 中找不到 steam 命令，尝试其他路径...");
-
-        // 尝试常见路径
-        let common_paths = ["/usr/bin/steam", "/usr/games/steam", "/usr/local/bin/steam"];
-
-        let mut found = false;
-        for path in &common_paths {
-            if std::path::Path::new(path).exists() {
-                tracing::info!("在 {} 找到 steam", path);
-                if Command::new(path)
-                    .arg("-cef-enable-debugging")
-                    .spawn()
-                    .is_ok()
-                {
-                    found = true;
-                    break;
-                }
-            }
-        }
-
-        if !found {
-            return Err(anyhow!(
-                "无法启动 Steam，请手动在终端执行：\nsteam -cef-enable-debugging\n\n或者尝试：\n/usr/bin/steam -cef-enable-debugging"
-            ));
-        }
-    }
+    Command::new("steam")
+        .arg("-cef-enable-debugging")
+        .spawn()
+        .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
     // 等待进程启动
     if !wait_for_steam_startup(30) {
@@ -288,31 +315,4 @@ fn restart_steam_linux() -> Result<()> {
 
     tracing::info!("Steam 已成功启动");
     Ok(())
-}
-
-// 处理 Steam 重启操作
-pub fn handle_steam_restart_async<F>(on_complete: F)
-where
-    F: Fn() + Send + 'static,
-{
-    std::thread::spawn(move || {
-        match restart_steam_with_debugging() {
-            Ok(_) => {
-                tracing::info!("Steam 重启成功，等待 5 秒后检测 CDP...");
-                std::thread::sleep(std::time::Duration::from_secs(5));
-
-                // 检测 CDP 是否可用
-                if crate::cdp_client::CdpClient::is_cdp_running() {
-                    tracing::info!("CDP 调试端口已可用");
-                } else {
-                    tracing::warn!("CDP 调试端口仍不可用，请稍后再试");
-                }
-                on_complete();
-            }
-            Err(e) => {
-                tracing::error!(error = %e, "Steam 重启失败");
-                on_complete();
-            }
-        }
-    });
 }

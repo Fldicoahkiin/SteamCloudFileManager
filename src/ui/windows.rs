@@ -196,8 +196,9 @@ pub fn draw_game_selector_window(
     show: &mut bool,
     games: &[CloudGameInfo],
     is_scanning: bool,
-) -> Option<u32> {
+) -> (Option<u32>, bool) {
     let mut selected_app_id = None;
+    let mut refresh_clicked = false;
 
     egui::Window::new("游戏库")
         .open(show)
@@ -209,7 +210,14 @@ pub fn draw_game_selector_window(
             } else if games.is_empty() {
                 ui.label("未发现云存档的游戏");
             } else {
-                ui.heading(format!("{} 个有云存档的游戏", games.len()));
+                ui.horizontal(|ui| {
+                    ui.heading(format!("{} 个有云存档的游戏", games.len()));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("刷新").clicked() {
+                            refresh_clicked = true;
+                        }
+                    });
+                });
                 ui.add_space(10.0);
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
@@ -223,7 +231,7 @@ pub fn draw_game_selector_window(
             }
         });
 
-    selected_app_id
+    (selected_app_id, refresh_clicked)
 }
 
 // 绘制单个游戏项

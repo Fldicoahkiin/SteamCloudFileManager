@@ -42,6 +42,8 @@ pub struct SteamCloudApp {
     show_about: bool,
     show_debug_warning: bool,
     about_icon_texture: Option<egui::TextureHandle>,
+    guide_dialog: Option<crate::ui::GuideDialog>,
+    restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
 }
 
 impl SteamCloudApp {
@@ -109,6 +111,8 @@ impl SteamCloudApp {
             show_about: false,
             show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
             about_icon_texture: None,
+            guide_dialog: None,
+            restart_rx: None,
         };
 
         // 启动时自动扫描游戏
@@ -405,13 +409,24 @@ impl SteamCloudApp {
             // 处理重启操作
             if restart_clicked {
                 tracing::info!("用户点击自动重启 Steam");
-                self.status_message = "正在重启 Steam，请稍候...".to_string();
 
-                // 在后台线程执行重启
+                // 显示进度对话框
+                self.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
+                    "正在关闭 Steam...".to_string(),
+                ));
+
+                // 启动异步重启
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.restart_rx = Some(rx);
+
                 let ctx = ui.ctx().clone();
-                crate::steam_process::handle_steam_restart_async(move || {
-                    ctx.request_repaint();
+                std::thread::spawn(move || {
+                    crate::steam_process::restart_steam_with_status(tx, move || {
+                        ctx.request_repaint();
+                    });
                 });
+
+                self.show_debug_warning = false;
             }
 
             // 处理忽略操作
@@ -736,7 +751,7 @@ impl eframe::App for SteamCloudApp {
         }
 
         if self.show_game_selector {
-            let selected_app_id = crate::ui::draw_game_selector_window(
+            let (selected_app_id, refresh_clicked) = crate::ui::draw_game_selector_window(
                 ctx,
                 &mut self.show_game_selector,
                 &self.cloud_games,
@@ -747,6 +762,72 @@ impl eframe::App for SteamCloudApp {
                 self.show_game_selector = false;
                 self.connect_to_steam();
             }
+            if refresh_clicked {
+                tracing::info!("用户点击刷新游戏库");
+                self.scan_cloud_games();
+            }
+        }
+
+        // 处理 Steam 重启状态更新
+        if let Some(rx) = &self.restart_rx {
+            if let Ok(status) = rx.try_recv() {
+                use crate::steam_process::RestartStatus;
+                match status {
+                    RestartStatus::Closing => {
+                        if let Some(dialog) = &mut self.guide_dialog {
+                            dialog.update_status("正在关闭 Steam...".to_string(), false, false);
+                        }
+                    }
+                    RestartStatus::Starting => {
+                        if let Some(dialog) = &mut self.guide_dialog {
+                            dialog.update_status("正在启动 Steam...".to_string(), false, false);
+                        }
+                    }
+                    RestartStatus::Success => {
+                        if let Some(dialog) = &mut self.guide_dialog {
+                            dialog.update_status("Steam 已成功重启！".to_string(), true, false);
+                        }
+                        self.restart_rx = None;
+                    }
+                    RestartStatus::Error(msg) => {
+                        tracing::error!("Steam 重启失败: {}", msg);
+                        self.restart_rx = None;
+
+                        // 显示手动操作引导
+                        #[cfg(target_os = "macos")]
+                        {
+                            self.guide_dialog = Some(crate::ui::create_macos_manual_guide());
+                        }
+                        #[cfg(target_os = "windows")]
+                        {
+                            self.guide_dialog = Some(crate::ui::create_windows_manual_guide());
+                        }
+                        #[cfg(target_os = "linux")]
+                        {
+                            self.guide_dialog = Some(crate::ui::create_linux_manual_guide());
+                        }
+                    }
+                }
+            }
+        }
+
+        // 绘制引导对话框
+        let mut close_dialog = false;
+        if let Some(dialog) = &mut self.guide_dialog {
+            let action = dialog.draw(ctx);
+            match action {
+                crate::ui::GuideDialogAction::Confirm => {
+                    tracing::info!("用户确认引导对话框");
+                    close_dialog = true;
+                }
+                crate::ui::GuideDialogAction::None => {}
+            }
+            if !dialog.show {
+                close_dialog = true;
+            }
+        }
+        if close_dialog {
+            self.guide_dialog = None;
         }
 
         if self.show_user_selector {
