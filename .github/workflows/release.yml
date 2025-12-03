@@ -163,9 +163,10 @@ jobs:
             # Windows: 打包成 zip
             cp SteamCloudFileManager.exe dist/
             # 复制 Steam API DLL
-            STEAM_DLL=$(find ../build/steamworks-sys-*/out -name "steam_api64.dll" -o -name "steam_api.dll" 2>/dev/null | head -n 1)
-            if [ -n "$STEAM_DLL" ]; then
-              cp "$STEAM_DLL" dist/
+            if [ -f steam_api64.dll ]; then
+              cp steam_api64.dll dist/
+            elif [ -f steam_api.dll ]; then
+              cp steam_api.dll dist/
             fi
             cd dist
             7z a -tzip ../../../../${{ matrix.asset_name }}.zip *
@@ -173,9 +174,8 @@ jobs:
             # Linux: 打包成 tar.gz
             cp SteamCloudFileManager dist/
             # 复制 Steam API SO
-            STEAM_SO=$(find ../build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
-            if [ -n "$STEAM_SO" ]; then
-              cp "$STEAM_SO" dist/
+            if [ -f libsteam_api.so ]; then
+              cp libsteam_api.so dist/
             fi
             cd dist
             tar czf ../../../../${{ matrix.asset_name }}.tar.gz *
