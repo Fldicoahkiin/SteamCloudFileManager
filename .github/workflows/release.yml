@@ -197,42 +197,10 @@ jobs:
         with:
           path: artifacts
       
-      - name: Get previous tag
-        id: previoustag
-        run: |
-          PREVIOUS_TAG=$(git tag --sort=-version:refname | sed -n '2p')
-          if [ -z "$PREVIOUS_TAG" ]; then
-            FIRST_COMMIT=$(git rev-list --max-parents=0 HEAD)
-            echo "previous_tag=$FIRST_COMMIT" >> $GITHUB_OUTPUT
-          else
-            echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
-          fi
-          
-      - name: Prepare Release Notes
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/}
-          PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
-          
-          # What's Changed
-          echo "" > release-notes.md
-          echo "" >> release-notes.md
-          
-          # Contributors
-          cat .github/release-template.md >> release-notes.md
-          echo "" >> release-notes.md
-          
-          # Full Changelog
-          echo "## Full Changelog" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "[\`${PREVIOUS_TAG}...${VERSION}\`](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION})" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
-          
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: artifacts/**/*
-          body_path: release-notes.md
           generate_release_notes: true
           draft: false
           prerelease: false
