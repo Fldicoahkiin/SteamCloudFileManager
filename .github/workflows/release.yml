@@ -30,12 +30,6 @@ jobs:
             use_bundle: false
             asset_name: steam-cloud-file-manager-windows-x64
             
-          - os: windows-latest
-            name: Windows-ARM64
-            target: aarch64-pc-windows-msvc
-            use_bundle: false
-            asset_name: steam-cloud-file-manager-windows-arm64
-            
           - os: macos-latest
             name: macOS-Intel
             target: x86_64-apple-darwin

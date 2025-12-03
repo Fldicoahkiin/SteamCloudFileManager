@@ -25,6 +25,17 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 - View actual file locations on local disk
 - Display cloud sync status
 
+## Platform Support
+
+| Platform | Architecture | Status | Notes |
+|----------|--------------|--------|-------|
+| Windows | x64 | ✅ Supported | |
+| Windows | ARM64 | ❌ Not Supported | Steam SDK does not provide ARM64 binaries |
+| macOS | Intel (x64) | ✅ Supported | |
+| macOS | Apple Silicon (ARM64) | ✅ Supported | |
+| Linux | x64 | ✅ Supported | |
+
+
 ## Installation
 
 Download precompiled binaries from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
