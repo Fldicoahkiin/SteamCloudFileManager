@@ -1,4 +1,5 @@
 # SteamCloudFileManager
+
 <p align="center">
   <img src="assets/steam_cloud-iOS-Default-1024x1024@1x.png" width="160" alt="steam_cloud" />
 </p>
@@ -44,18 +45,19 @@ cargo build --release
   - 安装：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
 - **C++ 编译工具链：**
-  - **Windows**: 
+  - **Windows**:
     - Visual Studio 2019 或更新版本（推荐安装 "Desktop development with C++" 工作负载）
     - 或 [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
-  - **macOS**: 
+  - **macOS**:
     - Xcode Command Line Tools: `xcode-select --install`
-  - **Linux**: 
+  - **Linux**:
     - gcc/g++ 或 clang
     - Ubuntu/Debian: `sudo apt install build-essential`
     - Fedora: `sudo dnf install gcc gcc-c++`
     - Arch: `sudo pacman -S base-devel`
 
 **运行依赖：**
+
 - Steam 客户端（必须以调试模式运行）
 
 ## 使用
@@ -65,26 +67,32 @@ cargo build --release
 本工具使用 CDP 协议与 Steam 通信，**必须**以调试模式启动 Steam。
 
 **Windows:**
+
 1. 右键点击 Steam 快捷方式，选择“属性”
 2. 在“目标”栏末尾添加：`-cef-enable-debugging`
 3. 点击“确定”并启动 Steam
 
 **macOS:**
+
 1. 退出 Steam
 2. 在终端执行：
+
    ```bash
    open -a Steam --args -cef-enable-debugging
    ```
 
 **Linux:**
+
 1. 关闭 Steam
 2. 在终端执行：
+
    ```bash
    steam -cef-enable-debugging &
    ```
+
    或者修改 Steam 快捷方式，在 Exec 行末尾添加 `-cef-enable-debugging`
 
-**注意：**本软件提供了“以调试模式重启 Steam”按钮，可以自动根据引导完成上述操作。
+**注意：** 本软件提供了“以调试模式重启 Steam”按钮，可以自动根据引导完成上述操作。
 
 ### 基本操作
 
@@ -96,21 +104,24 @@ cargo build --release
 4. 点击“连接”按钮
 5. 连接成功后即可下载/上传/删除文件
 
-App ID 可以在 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
+App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
 
 ## 技术架构
 
-### 1. VDF 解析
+### VDF 解析
+
 - 直接读取 `remotecache.vdf` 获取完整文件列表
 - 显示文件在本地磁盘的实际存储位置
 - 支持所有 Root 路径类型（0-12）
 
-### 2. CDP 协议
+### CDP 协议
+
 - 通过 Steam CEF 调试接口与客户端通信
 - 实时获取云端文件列表和下载链接
 - 自动合并云端状态到本地视图
 
-### 3. Steamworks API
+### Steamworks API
+
 - 使用 `ISteamRemoteStorage` API
 - 处理文件上传和删除操作
 
