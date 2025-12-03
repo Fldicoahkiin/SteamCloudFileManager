@@ -1,4 +1,5 @@
 # SteamCloudFileManager
+
 <p align="center">
   <img src="assets/steam_cloud-iOS-Default-1024x1024@1x.png" width="160" alt="steam_cloud" />
 </p>
@@ -44,18 +45,19 @@ cargo build --release
   - Install: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
 - **C++ Toolchain:**
-  - **Windows**: 
+  - **Windows**:
     - Visual Studio 2019 or newer (recommend installing "Desktop development with C++" workload)
     - Or [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
-  - **macOS**: 
+  - **macOS**:
     - Xcode Command Line Tools: `xcode-select --install`
-  - **Linux**: 
+  - **Linux**:
     - gcc/g++ or clang
     - Ubuntu/Debian: `sudo apt install build-essential`
     - Fedora: `sudo dnf install gcc gcc-c++`
     - Arch: `sudo pacman -S base-devel`
 
 **Runtime Dependencies:**
+
 - Steam client (must run in debug mode)
 
 ## Usage
@@ -65,23 +67,29 @@ cargo build --release
 This tool uses CDP protocol to communicate with Steam, which **requires** Steam to run in debug mode.
 
 **Windows:**
+
 1. Right-click Steam shortcut, select "Properties"
 2. Add to the end of "Target" field: `-cef-enable-debugging`
 3. Click "OK" and launch Steam
 
 **macOS:**
+
 1. Quit Steam
 2. Run in terminal:
+
    ```bash
    open -a Steam --args -cef-enable-debugging
    ```
 
 **Linux:**
+
 1. Close Steam
 2. Run in terminal:
+
    ```bash
    steam -cef-enable-debugging &
    ```
+
    Or modify Steam shortcut, add `-cef-enable-debugging` to the end of Exec line
 
 **Note:** This tool provides a "Restart Steam in Debug Mode" button that can automatically complete the above operations with guidance.
@@ -100,17 +108,20 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ## Technical Architecture
 
-### 1. VDF Parsing
+### VDF Parsing
+
 - Directly reads `remotecache.vdf` for complete file list
 - Shows actual file storage locations on local disk
 - Supports all Root path types (0-12)
 
-### 2. CDP Protocol
+### CDP Protocol
+
 - Communicates with client via Steam CEF debug interface
 - Retrieves cloud file list and download links in real-time
 - Automatically merges cloud status into local view
 
-### 3. Steamworks API
+### Steamworks API
+
 - Uses `ISteamRemoteStorage` API
 - Handles file upload and delete operations
 
