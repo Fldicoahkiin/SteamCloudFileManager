@@ -116,6 +116,7 @@ pub fn create_restart_progress_dialog(status: String) -> GuideDialog {
     })
 }
 
+#[cfg(target_os = "macos")]
 pub fn create_macos_manual_guide() -> GuideDialog {
     GuideDialog::new(GuideDialogType::ManualOperation {
         title: "手动重启 Steam (macOS)".to_string(),
