@@ -8,6 +8,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.90+-orange)](https://www.rust-lang.org)
+[![dependency status](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg)](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager)
 [![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey)](https://github.com/Fldicoahkiin/SteamCloudFileManager)
 
 > Cross-platform Steam Cloud file management utility built with Rust and egui.
@@ -138,11 +139,66 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ## TODO
 
-- [ ] Batch download
-- [ ] Batch upload
-- [ ] Drag-and-drop upload
-- [ ] Hierarchical folder management
-- [ ] Multi-language support
+### In Development
+
+#### Folder Tree Structure
+- [ ] Create `FileTreeNode` data structure (folder/file nodes)
+- [ ] Implement path parsing: filename after last `/`, path before it
+- [ ] Tree building algorithm: recursively build folder hierarchy
+- [ ] UI display: tree lines + indentation
+- [ ] Folder: 📁 icon + small arrow (▼/▶)
+- [ ] File: no icon, display filename only
+- [ ] Click arrow: expand/collapse folder
+- [ ] Click folder name: select folder and all files within
+- [ ] Click filename: select single file
+- [ ] Folder-first sorting (folders before files at same level)
+- [ ] Rename "Folder" column to "Root Folder"
+- [ ] Default to fully expanded
+
+#### Batch Download
+- [ ] Implement folder selection logic (click folder name to select all sub-files)
+- [ ] Folder download function (recursively download all files)
+- [ ] Create folder structure during download
+- [ ] Root folder naming: `GameName-RootType/`
+- [ ] Maintain subfolder hierarchy: `GameName-RootType/saves/manual/save1.sav`
+- [ ] Display download progress (current file/total files)
+
+#### Batch Upload
+- [ ] Select local folder function
+- [ ] Recursively scan all files in folder
+- [ ] Maintain relative path structure during upload
+- [ ] Display upload progress
+
+#### Search and Filtering
+- [ ] Filename search function
+- [ ] Auto-expand matching paths during search
+- [ ] Highlight matching results
+- [ ] Filter by folder
+
+#### ⚙️ Sorting and Display Options
+- [ ] Configurable sorting rules (name/size/time)
+- [ ] Remember folder expansion state
+- [ ] Customize column display/hide
+
+#### 🛠️ Other Improvements
+- [ ] Virtual scrolling for large folder performance
+- [ ] Folder context menu
+- [ ] Folder statistics (file count, total size)
+- [ ] Keyboard navigation support
+
+### Completed (v0.1.0-beta)
+
+- [x] Steam API integration
+- [x] CDP (Chrome DevTools Protocol) integration
+- [x] Basic file list display
+- [x] Single file download/upload
+- [x] File deletion and unsync
+- [x] Multi-select mode
+- [x] Game library scanning and switching
+- [x] Game library refresh button
+- [x] Steam restart guide dialog
+- [x] Real-time status progress display
+- [x] Cross-platform support (Windows/macOS/Linux)
 
 ## Contributing
 
