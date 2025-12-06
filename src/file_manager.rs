@@ -1,4 +1,6 @@
-use crate::path_resolver::{resolve_cloud_file_path, RootType};
+use crate::path_resolver::{
+    get_root_description, normalize_cdp_root_description, resolve_cloud_file_path,
+};
 use crate::steam_api::CloudFile;
 use crate::ui::panels::{SortColumn, SortOrder};
 use crate::vdf_parser::{VdfFileEntry, VdfParser};
@@ -106,16 +108,22 @@ impl FileService {
                     .map(|(i, f)| (f.name.clone(), i))
                     .collect();
 
-                for cdp_file in cdp_files {
+                for mut cdp_file in cdp_files {
                     if let Some(&idx) = file_map.get(&cdp_file.name) {
                         let f = &mut files[idx];
                         f.size = cdp_file.size;
                         f.timestamp = cdp_file.timestamp;
                         f.is_persisted = true;
-                        if cdp_file.root_description.starts_with("CDP:") {
-                            f.root_description = cdp_file.root_description;
+
+                        if f.root_description.is_empty()
+                            || f.root_description == "Steam云文件夹 (Remote)"
+                        {
+                            f.root_description =
+                                normalize_cdp_root_description(&cdp_file.root_description);
                         }
                     } else {
+                        cdp_file.root_description =
+                            normalize_cdp_root_description(&cdp_file.root_description);
                         files.push(cdp_file);
                     }
                 }
@@ -244,13 +252,6 @@ fn build_cloud_file_from_vdf(
         exists,
         conflict: false,
     }
-}
-
-// 获取 Root 类型的描述
-fn get_root_description(root: u32) -> String {
-    RootType::from_u32(root)
-        .map(|r| r.description().to_string())
-        .unwrap_or_else(|| format!("未知Root ({})", root))
 }
 
 // 文件操作结构体
