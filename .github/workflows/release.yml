@@ -224,7 +224,7 @@ jobs:
           PREVIOUS_SHORT=$(git rev-parse --short=7 $PREVIOUS_TAG)
           echo "## Full Changelog" >> release-notes.md
           echo "" >> release-notes.md
-          echo "[${PREVIOUS_SHORT}...${VERSION}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION})" >> release-notes.md
+          echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION}" >> release-notes.md
           echo "" >> release-notes.md
           echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
           
