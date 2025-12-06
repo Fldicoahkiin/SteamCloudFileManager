@@ -279,7 +279,7 @@ impl FileOperations {
                 .call()
                 .map_err(|e| anyhow!("HTTP 下载失败: {}", e))?;
 
-            let mut reader = resp.into_reader();
+            let mut reader = resp.into_body().into_reader();
             let mut data = Vec::new();
             std::io::Read::read_to_end(&mut reader, &mut data)
                 .map_err(|e| anyhow!("读取响应流失败: {}", e))?;

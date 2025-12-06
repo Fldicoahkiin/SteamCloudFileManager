@@ -47,7 +47,7 @@ impl CdpClient {
             .call()
             .map_err(|e| anyhow!("无法连接到 Steam 调试端口: {}", e))?;
 
-        let text = resp.into_string()?;
+        let text = resp.into_body().read_to_string()?;
         let targets: Vec<Target> = serde_json::from_str(&text)?;
 
         let target = targets
@@ -77,7 +77,7 @@ impl CdpClient {
         };
 
         let msg = serde_json::to_string(&command)?;
-        self.socket.send(tungstenite::Message::Text(msg))?;
+        self.socket.send(tungstenite::Message::Text(msg.into()))?;
 
         loop {
             let msg = self.socket.read()?;
