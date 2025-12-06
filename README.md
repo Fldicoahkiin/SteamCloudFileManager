@@ -8,6 +8,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.90+-orange)](https://www.rust-lang.org)
+[![dependency status](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg)](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager)
 [![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey)](https://github.com/Fldicoahkiin/SteamCloudFileManager)
 
 > 基于 Rust 和 egui 构建的跨平台 Steam 云存档管理工具
@@ -138,11 +139,66 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ## TODO
 
-- [ ] 批量下载
-- [ ] 批量上传
-- [ ] 拖拽上传
-- [ ] 文件夹分级管理
-- [ ] 多语言支持
+### 正在开发 
+
+#### 文件夹树状结构
+- [ ] 创建 `FileTreeNode` 数据结构（文件夹/文件节点）
+- [ ] 实现路径解析：最后一个 `/` 后面是文件名，前面是路径
+- [ ] 树构建算法：递归构建文件夹层级
+- [ ] UI 显示：树形线条 + 缩进
+- [ ] 文件夹：📁 图标 + 小箭头 (▼/▶)
+- [ ] 文件：不显示图标，只显示文件名
+- [ ] 点击小箭头：展开/折叠文件夹
+- [ ] 点击文件夹名：选中该文件夹和其下所有文件
+- [ ] 点击文件名：选中单个文件
+- [ ] 文件夹优先排序（同一级时文件夹在前）
+- [ ] 将 "文件夹" 列改名为 "根文件夹"
+- [ ] 默认全部展开
+
+#### 批量下载功能
+- [ ] 实现文件夹选择逻辑（点击文件夹名选中所有子文件）
+- [ ] 文件夹下载功能（递归下载所有文件）
+- [ ] 下载时创建文件夹结构
+- [ ] 下载根文件夹命名：`游戏名-根目录类型/`
+- [ ] 保持子文件夹层级：`游戏名-根目录类型/saves/manual/save1.sav`
+- [ ] 显示下载进度（当前文件/总文件数）
+
+#### 批量上传功能
+- [ ] 选择本地文件夹功能
+- [ ] 递归扫描文件夹下所有文件
+- [ ] 上传时保持相对路径结构
+- [ ] 显示上传进度
+
+#### 搜索和筛选
+- [ ] 文件名搜索功能
+- [ ] 搜索时自动展开匹配路径
+- [ ] 高亮匹配结果
+- [ ] 按文件夹筛选
+
+#### ⚙️ 排序和显示选项
+- [ ] 可配置排序规则（名称/大小/时间）
+- [ ] 记住文件夹展开状态
+- [ ] 自定义列显示/隐藏
+
+#### 🛠️ 其他优化
+- [ ] 虚拟滚动优化大文件夹性能
+- [ ] 文件夹右键菜单
+- [ ] 文件夹统计信息（文件数、总大小）
+- [ ] 键盘导航支持
+
+### 已完成 (v0.1.0-beta)
+
+- [x] Steam API 集成
+- [x] CDP (Chrome DevTools Protocol) 集成
+- [x] 基础文件列表显示
+- [x] 单文件下载/上传
+- [x] 文件删除和取消同步
+- [x] 多选模式
+- [x] 游戏库扫描和切换
+- [x] 游戏库刷新按钮
+- [x] Steam 重启引导对话框
+- [x] 实时状态进度显示
+- [x] 跨平台支持 (Windows/macOS/Linux)
 
 ## 贡献
 
