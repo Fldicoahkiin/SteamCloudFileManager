@@ -4,6 +4,58 @@ use egui;
 use egui_extras::{Column, TableBuilder};
 
 const INDENT_WIDTH: f32 = 20.0; // 每层缩进宽度
+const LINE_COLOR: egui::Color32 = egui::Color32::from_gray(100); // 线条颜色
+
+// 绘制树状线条
+fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_last: &[bool]) -> f32 {
+    if depth == 0 {
+        return 0.0;
+    }
+
+    let painter = ui.painter();
+    let rect = ui.available_rect_before_wrap();
+    let y_mid = rect.center().y; // 行的中心点
+    let base_x = rect.min.x;
+
+    // 绘制父级的垂直线
+    for (level, &parent_last) in parent_is_last.iter().enumerate() {
+        if !parent_last {
+            let x = base_x + (level as f32 + 0.5) * INDENT_WIDTH;
+            painter.line_segment(
+                [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
+                egui::Stroke::new(1.0, LINE_COLOR),
+            );
+        }
+    }
+
+    // 绘制当前节点的连接线
+    let current_level = depth - 1;
+    let x = base_x + (current_level as f32 + 0.5) * INDENT_WIDTH;
+
+    // 垂直线
+    if is_last {
+        // 最后一个节点
+        painter.line_segment(
+            [egui::pos2(x, rect.min.y), egui::pos2(x, y_mid)],
+            egui::Stroke::new(1.0, LINE_COLOR),
+        );
+    } else {
+        // 非最后节点
+        painter.line_segment(
+            [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
+            egui::Stroke::new(1.0, LINE_COLOR),
+        );
+    }
+
+    // 水平线
+    let h_end = base_x + depth as f32 * INDENT_WIDTH;
+    painter.line_segment(
+        [egui::pos2(x, y_mid), egui::pos2(h_end, y_mid)],
+        egui::Stroke::new(1.0, LINE_COLOR),
+    );
+
+    depth as f32 * INDENT_WIDTH
+}
 
 // 格式化根文件夹显示（处理 CDP 格式）
 fn format_root_description(root_description: &str) -> String {
@@ -87,7 +139,7 @@ fn render_tree_body(
     selected_files: &mut Vec<usize>,
     _indent_level: usize,
 ) {
-    render_tree_body_recursive(body, nodes, selected_files, 0);
+    render_tree_body_recursive(body, nodes, selected_files, 1, &[]);
 }
 
 // 递归渲染树节点
@@ -96,11 +148,12 @@ fn render_tree_body_recursive(
     nodes: &mut [FileTreeNode],
     selected_files: &mut Vec<usize>,
     depth: usize,
+    parent_is_last: &[bool],
 ) {
     let node_count = nodes.len();
 
     for (idx, node) in nodes.iter_mut().enumerate() {
-        let _is_last_node = idx == node_count - 1;
+        let is_last_node = idx == node_count - 1;
 
         // 收集索引
         let indices_for_folder = if node.is_folder() {
@@ -133,11 +186,12 @@ fn render_tree_body_recursive(
                         ui.label(display_folder).on_hover_text(&root_desc);
                     });
 
-                    // 文件名列（带树状结构）
+                    // 文件名列
                     row.col(|ui| {
                         ui.horizontal(|ui| {
-                            // 简单缩进
-                            ui.add_space(depth as f32 * INDENT_WIDTH);
+                            // 绘制树状线条
+                            let indent = draw_tree_lines(ui, depth, is_last_node, parent_is_last);
+                            ui.add_space(indent);
 
                             // 展开/折叠箭头按钮
                             let arrow = if expanded { "▾" } else { "▸" };
@@ -182,9 +236,16 @@ fn render_tree_body_recursive(
                     });
                 });
 
-                // 如果展开，递归渲染子节点
                 if *is_expanded && !children.is_empty() {
-                    render_tree_body_recursive(body, children, selected_files, depth + 1);
+                    let mut new_parent_is_last = parent_is_last.to_vec();
+                    new_parent_is_last.push(is_last_node);
+                    render_tree_body_recursive(
+                        body,
+                        children,
+                        selected_files,
+                        depth + 1,
+                        &new_parent_is_last,
+                    );
                 }
             }
             FileTreeNode::File {
@@ -203,11 +264,12 @@ fn render_tree_body_recursive(
                             .on_hover_text(&file.root_description);
                     });
 
-                    // 文件名列（带树状结构）
+                    // 文件名列
                     row.col(|ui| {
                         ui.horizontal(|ui| {
-                            // 缩进
-                            ui.add_space(depth as f32 * INDENT_WIDTH);
+                            // 绘制树状线条
+                            let indent = draw_tree_lines(ui, depth, is_last_node, parent_is_last);
+                            ui.add_space(indent);
 
                             // 箭头按钮
                             ui.add_space(
