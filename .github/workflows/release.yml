@@ -213,18 +213,18 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/}
           PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
           
-          # What's Changed
-          echo "" > release-notes.md
+          # What's Changed - 使用 git log 生成 commit 列表，带可点击链接
+          echo "## What's Changed" > release-notes.md
           echo "" >> release-notes.md
-          
-          # Contributors
-          cat .github/release-template.md >> release-notes.md
+          git log --pretty=format:"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )" $PREVIOUS_TAG..HEAD >> release-notes.md
+          echo "" >> release-notes.md
           echo "" >> release-notes.md
           
           # Full Changelog
+          PREVIOUS_SHORT=$(git rev-parse --short=7 $PREVIOUS_TAG)
           echo "## Full Changelog" >> release-notes.md
           echo "" >> release-notes.md
-          echo "[\`${PREVIOUS_TAG}...${VERSION}\`](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION})" >> release-notes.md
+          echo "[${PREVIOUS_SHORT}...${VERSION}](https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION})" >> release-notes.md
           echo "" >> release-notes.md
           echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
           
@@ -233,6 +233,6 @@ jobs:
         with:
           files: artifacts/**/*
           body_path: release-notes.md
-          generate_release_notes: true
+          generate_release_notes: false
           draft: false
           prerelease: false
