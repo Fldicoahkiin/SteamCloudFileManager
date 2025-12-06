@@ -108,7 +108,6 @@ impl FileService {
 
                 for cdp_file in cdp_files {
                     if let Some(&idx) = file_map.get(&cdp_file.name) {
-                        // 更新现有文件信息
                         let f = &mut files[idx];
                         f.size = cdp_file.size;
                         f.timestamp = cdp_file.timestamp;
@@ -117,7 +116,6 @@ impl FileService {
                             f.root_description = cdp_file.root_description;
                         }
                     } else {
-                        // 添加新文件
                         files.push(cdp_file);
                     }
                 }

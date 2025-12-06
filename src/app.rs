@@ -44,6 +44,9 @@ pub struct SteamCloudApp {
     about_icon_texture: Option<egui::TextureHandle>,
     guide_dialog: Option<crate::ui::GuideDialog>,
     restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
+    // 文件树状结构
+    file_tree: Option<crate::file_tree::FileTree>,
+    use_tree_view: bool,
 }
 
 impl SteamCloudApp {
@@ -113,6 +116,8 @@ impl SteamCloudApp {
             about_icon_texture: None,
             guide_dialog: None,
             restart_rx: None,
+            file_tree: None,
+            use_tree_view: false,
         };
 
         // 启动时自动扫描游戏
@@ -488,31 +493,61 @@ impl SteamCloudApp {
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        // 使用 ui 模块的完整函数，完全脱离 UI 绘制代码
-        let mut state = crate::ui::panels::FileListPanelState {
-            files: &self.files,
-            selected_files: &mut self.selected_files,
-            local_save_paths: &self.local_save_paths,
-            search_query: &mut self.search_query,
-            show_only_local: &mut self.show_only_local,
-            show_only_cloud: &mut self.show_only_cloud,
-            multi_select_mode: &mut self.multi_select_mode,
-            sort_column: self.file_sorter.sort_column(),
-            sort_order: self.file_sorter.sort_order(),
-            remote_ready: self.remote_ready,
-        };
-
-        let sort_action = crate::ui::draw_complete_file_list_with_sort(ui, &mut state, |path| {
-            crate::utils::open_folder(path)
+        // 视图切换按钮
+        ui.horizontal(|ui| {
+            if ui
+                .selectable_label(!self.use_tree_view, "列表视图")
+                .clicked()
+            {
+                self.use_tree_view = false;
+            }
+            if ui
+                .selectable_label(self.use_tree_view, "树状视图")
+                .clicked()
+            {
+                self.use_tree_view = true;
+            }
         });
 
-        // 处理排序动作
-        use crate::ui::SortAction;
-        match sort_action {
-            SortAction::SortByName => self.sort_files(SortColumn::Name),
-            SortAction::SortBySize => self.sort_files(SortColumn::Size),
-            SortAction::SortByTime => self.sort_files(SortColumn::Time),
-            SortAction::None => {}
+        ui.separator();
+
+        if self.use_tree_view {
+            // 树状视图
+            if let Some(tree) = &mut self.file_tree {
+                crate::ui::render_file_tree(ui, tree, &mut self.selected_files, &self.files);
+            } else {
+                ui.centered_and_justified(|ui| {
+                    ui.label("没有找到云文件");
+                });
+            }
+        } else {
+            // 列表视图
+            let mut state = crate::ui::panels::FileListPanelState {
+                files: &self.files,
+                selected_files: &mut self.selected_files,
+                local_save_paths: &self.local_save_paths,
+                search_query: &mut self.search_query,
+                show_only_local: &mut self.show_only_local,
+                show_only_cloud: &mut self.show_only_cloud,
+                multi_select_mode: &mut self.multi_select_mode,
+                sort_column: self.file_sorter.sort_column(),
+                sort_order: self.file_sorter.sort_order(),
+                remote_ready: self.remote_ready,
+            };
+
+            let sort_action =
+                crate::ui::draw_complete_file_list_with_sort(ui, &mut state, |path| {
+                    crate::utils::open_folder(path)
+                });
+
+            // 处理排序动作
+            use crate::ui::SortAction;
+            match sort_action {
+                SortAction::SortByName => self.sort_files(SortColumn::Name),
+                SortAction::SortBySize => self.sort_files(SortColumn::Size),
+                SortAction::SortByTime => self.sort_files(SortColumn::Time),
+                SortAction::None => {}
+            }
         }
     }
 
@@ -685,6 +720,9 @@ impl eframe::App for SteamCloudApp {
                     } else {
                         self.local_save_paths.clear();
                     }
+
+                    // 构建文件树
+                    self.file_tree = Some(crate::file_tree::FileTree::new(&self.files));
 
                     self.status_message = format!("已加载 {} 个文件", count);
                     self.is_refreshing = false;

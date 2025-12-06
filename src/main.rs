@@ -2,6 +2,7 @@ mod app;
 mod cdp_client;
 mod error;
 mod file_manager;
+mod file_tree;
 mod game_scanner;
 mod path_resolver;
 mod steam_api;
