@@ -1,7 +1,6 @@
 use crate::error::{AppError, AppResult};
 use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::{CloudFile, SteamCloudManager};
-use crate::ui::panels::SortColumn;
 use crate::vdf_parser::{UserInfo, VdfParser};
 use eframe::egui;
 use std::path::PathBuf;
@@ -26,12 +25,7 @@ pub struct SteamCloudApp {
     loader_rx: Option<Receiver<Result<Vec<CloudFile>, String>>>,
     connect_rx: Option<Receiver<Result<u32, String>>>,
     since_connected: Option<Instant>,
-    file_sorter: crate::file_manager::FileSorter,
     local_save_paths: Vec<(String, PathBuf)>,
-    search_query: String,
-    show_only_local: bool,
-    show_only_cloud: bool,
-    multi_select_mode: bool,
     cloud_games: Vec<CloudGameInfo>,
     show_game_selector: bool,
     is_scanning_games: bool,
@@ -46,7 +40,6 @@ pub struct SteamCloudApp {
     restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
     // 文件树状结构
     file_tree: Option<crate::file_tree::FileTree>,
-    use_tree_view: bool,
 }
 
 impl SteamCloudApp {
@@ -98,12 +91,7 @@ impl SteamCloudApp {
             loader_rx: None,
             connect_rx: None,
             since_connected: None,
-            file_sorter: crate::file_manager::FileSorter::new(),
             local_save_paths: Vec::new(),
-            search_query: String::new(),
-            show_only_local: false,
-            show_only_cloud: false,
-            multi_select_mode: false,
             cloud_games: Vec::new(),
             show_game_selector: false,
             is_scanning_games: false,
@@ -117,7 +105,6 @@ impl SteamCloudApp {
             guide_dialog: None,
             restart_rx: None,
             file_tree: None,
-            use_tree_view: false,
         };
 
         // 启动时自动扫描游戏
@@ -242,19 +229,6 @@ impl SteamCloudApp {
         }
     }
 
-    fn sort_files(&mut self, column: SortColumn) {
-        // 使用 FileSorter 处理排序逻辑
-        let need_refresh = self.file_sorter.toggle_sort(column);
-
-        if need_refresh {
-            // 无序状态，重新加载文件
-            self.refresh_files();
-        } else {
-            // 对当前文件列表排序
-            self.file_sorter.sort_files(&mut self.files);
-        }
-    }
-
     fn download_selected_file(&mut self) {
         use crate::file_manager::FileOperationResult;
 
@@ -369,10 +343,7 @@ impl SteamCloudApp {
         }
     }
 
-    fn handle_file_drop(&mut self, ctx: &egui::Context, ui: &mut egui::Ui) {
-        // 绘制拖放覆盖层
-        crate::ui::panels::draw_file_drop_overlay(ui, ctx);
-
+    fn handle_file_drop(&mut self, ctx: &egui::Context, _ui: &mut egui::Ui) {
         // 处理文件拖放
         ctx.input(|i| {
             if !i.raw.dropped_files.is_empty() {
@@ -493,61 +464,20 @@ impl SteamCloudApp {
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        // 视图切换按钮
-        ui.horizontal(|ui| {
-            if ui
-                .selectable_label(!self.use_tree_view, "列表视图")
-                .clicked()
-            {
-                self.use_tree_view = false;
-            }
-            if ui
-                .selectable_label(self.use_tree_view, "树状视图")
-                .clicked()
-            {
-                self.use_tree_view = true;
-            }
-        });
-
-        ui.separator();
-
-        if self.use_tree_view {
-            // 树状视图
-            if let Some(tree) = &mut self.file_tree {
-                crate::ui::render_file_tree(ui, tree, &mut self.selected_files, &self.files);
-            } else {
-                ui.centered_and_justified(|ui| {
-                    ui.label("没有找到云文件");
-                });
-            }
+        // 树状视图
+        if let Some(tree) = &mut self.file_tree {
+            crate::ui::render_file_tree(
+                ui,
+                tree,
+                &mut self.selected_files,
+                &self.files,
+                &self.local_save_paths,
+                self.remote_ready,
+            );
         } else {
-            // 列表视图
-            let mut state = crate::ui::panels::FileListPanelState {
-                files: &self.files,
-                selected_files: &mut self.selected_files,
-                local_save_paths: &self.local_save_paths,
-                search_query: &mut self.search_query,
-                show_only_local: &mut self.show_only_local,
-                show_only_cloud: &mut self.show_only_cloud,
-                multi_select_mode: &mut self.multi_select_mode,
-                sort_column: self.file_sorter.sort_column(),
-                sort_order: self.file_sorter.sort_order(),
-                remote_ready: self.remote_ready,
-            };
-
-            let sort_action =
-                crate::ui::draw_complete_file_list_with_sort(ui, &mut state, |path| {
-                    crate::utils::open_folder(path)
-                });
-
-            // 处理排序动作
-            use crate::ui::SortAction;
-            match sort_action {
-                SortAction::SortByName => self.sort_files(SortColumn::Name),
-                SortAction::SortBySize => self.sort_files(SortColumn::Size),
-                SortAction::SortByTime => self.sort_files(SortColumn::Time),
-                SortAction::None => {}
-            }
+            ui.centered_and_justified(|ui| {
+                ui.label("没有找到云文件");
+            });
         }
     }
 

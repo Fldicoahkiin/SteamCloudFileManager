@@ -2,7 +2,6 @@ use crate::path_resolver::{
     get_root_description, normalize_cdp_root_description, resolve_cloud_file_path,
 };
 use crate::steam_api::CloudFile;
-use crate::ui::panels::{SortColumn, SortOrder};
 use crate::vdf_parser::{VdfFileEntry, VdfParser};
 use anyhow::{anyhow, Result};
 use chrono::{Local, TimeZone};
@@ -137,84 +136,6 @@ impl FileService {
 impl Default for FileService {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-// 文件排序器
-pub struct FileSorter {
-    sort_column: Option<SortColumn>,
-    sort_order: SortOrder,
-}
-
-impl Default for FileSorter {
-    fn default() -> Self {
-        Self {
-            sort_column: None,
-            sort_order: SortOrder::None,
-        }
-    }
-}
-
-impl FileSorter {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    // 获取当前排序列
-    pub fn sort_column(&self) -> Option<SortColumn> {
-        self.sort_column
-    }
-
-    // 获取当前排序顺序
-    pub fn sort_order(&self) -> SortOrder {
-        self.sort_order
-    }
-
-    // 返回 true 表示需要刷新文件列表（无序状态）
-    pub fn toggle_sort(&mut self, column: SortColumn) -> bool {
-        if self.sort_column == Some(column) {
-            // 同一列：升序 -> 降序 -> 无序
-            self.sort_order = match self.sort_order {
-                SortOrder::Ascending => SortOrder::Descending,
-                SortOrder::Descending => SortOrder::None,
-                SortOrder::None => SortOrder::Ascending,
-            };
-        } else {
-            // 新列：直接升序
-            self.sort_column = Some(column);
-            self.sort_order = SortOrder::Ascending;
-        }
-
-        // 如果是无序状态，清除排序列
-        if self.sort_order == SortOrder::None {
-            self.sort_column = None;
-            return true; // 需要重新加载
-        }
-
-        false // 不需要重新加载
-    }
-
-    // 对文件列表进行排序
-    pub fn sort_files(&self, files: &mut [CloudFile]) {
-        if self.sort_order == SortOrder::None || self.sort_column.is_none() {
-            return;
-        }
-
-        let column = self.sort_column.unwrap();
-        let order = self.sort_order;
-
-        files.sort_by(|a, b| {
-            let result = match column {
-                SortColumn::Name => a.name.cmp(&b.name),
-                SortColumn::Size => a.size.cmp(&b.size),
-                SortColumn::Time => a.timestamp.cmp(&b.timestamp),
-            };
-            match order {
-                SortOrder::Ascending => result,
-                SortOrder::Descending => result.reverse(),
-                SortOrder::None => std::cmp::Ordering::Equal,
-            }
-        });
     }
 }
 
