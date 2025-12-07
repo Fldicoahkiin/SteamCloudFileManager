@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "SteamCloudFileManager"
-version = "0.1.5-beta"
+version = "0.1.6-beta"
 dependencies = [
  "anyhow",
  "byteorder",
