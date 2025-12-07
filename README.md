@@ -205,6 +205,7 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 - 直接读取 `remotecache.vdf` 获取完整文件列表
 - 显示文件在本地磁盘的实际存储位置
 - 支持所有 Root 路径类型（0-12）
+- 📝 **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 详细的路径映射规则和游戏案例
 
 ### CDP 协议
 

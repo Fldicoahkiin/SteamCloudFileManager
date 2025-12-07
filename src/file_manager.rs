@@ -108,22 +108,44 @@ impl FileService {
                 for cdp_file in cdp_files {
                     if let Some(&idx) = file_map.get(&cdp_file.name) {
                         let f = &mut files[idx];
+                        let vdf_root_desc = f.root_description.clone();
+                        
                         f.size = cdp_file.size;
                         f.timestamp = cdp_file.timestamp;
                         f.is_persisted = true;
 
                         if cdp_file.root_description.starts_with("CDP:") {
-                            f.root_description = cdp_file.root_description;
-                            tracing::debug!("合并 CDP 文件: {} -> CDP URL", f.name);
+                            // 提取 URL 和 CDP 文件夹名
+                            let content = &cdp_file.root_description[4..];
+                            let parts: Vec<&str> = content.split('|').collect();
+                            let url = parts.get(0).unwrap_or(&"");
+                            let cdp_folder = parts.get(1).unwrap_or(&"");
+                            
+                            f.root_description = cdp_file.root_description.clone();
+                            
+                            tracing::debug!(
+                                "合并 CDP 文件: {} | Root={} | VDF: {} | CDP: {} | URL: {}",
+                                f.name,
+                                f.root,
+                                vdf_root_desc,
+                                cdp_folder,
+                                url
+                            );
                         } else {
                             tracing::debug!(
-                                "合并 CDP 文件: {} -> 保留原 root_description: {}",
+                                "合并 CDP 文件: {} | Root={} | VDF: {} | 保留原 root_description",
                                 f.name,
+                                f.root,
                                 f.root_description
                             );
                         }
                     } else {
-                        tracing::debug!("新增 CDP 文件: {}", cdp_file.name);
+                        tracing::debug!(
+                            "新增 CDP 文件: {} | Root={} | {}",
+                            cdp_file.name,
+                            cdp_file.root,
+                            cdp_file.root_description
+                        );
                         files.push(cdp_file);
                     }
                 }

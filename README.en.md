@@ -202,9 +202,10 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ### VDF Parsing
 
-- Directly reads `remotecache.vdf` for complete file list
-- Shows actual file storage locations on local disk
+- Directly reads `remotecache.vdf` to get complete file list
+- Shows actual storage location of files on local disk
 - Supports all Root path types (0-12)
+- 📝 **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Detailed path mapping rules and game examples
 
 ### CDP Protocol
 
