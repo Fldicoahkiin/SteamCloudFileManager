@@ -343,14 +343,24 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     Ok(games)
 }
 
-// 获取并合并游戏列表（包括 CDP 数据）
-pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Vec<CloudGameInfo>> {
-    let mut games = scan_cloud_games(&steam_path, &user_id)?;
+// 扫描结果
+pub struct ScanResult {
+    pub games: Vec<CloudGameInfo>,
+    pub vdf_count: usize,
+    pub cdp_count: usize,
+}
 
+// 获取并合并游戏列表（包括 CDP 数据）
+pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<ScanResult> {
+    let mut games = scan_cloud_games(&steam_path, &user_id)?;
+    let vdf_count = games.len();
+
+    let mut cdp_count = 0;
     let mut cdp_order = std::collections::HashMap::new();
     if crate::cdp_client::CdpClient::is_cdp_running() {
         if let Ok(mut client) = crate::cdp_client::CdpClient::connect() {
             if let Ok(cdp_games) = client.fetch_game_list() {
+                cdp_count = cdp_games.len();
                 let map: std::collections::HashMap<u32, usize> = games
                     .iter()
                     .enumerate()
@@ -409,5 +419,9 @@ pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Vec
         }
     });
 
-    Ok(games)
+    Ok(ScanResult {
+        games,
+        vdf_count,
+        cdp_count,
+    })
 }

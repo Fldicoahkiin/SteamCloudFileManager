@@ -29,7 +29,7 @@ pub struct SteamCloudApp {
     cloud_games: Vec<CloudGameInfo>,
     show_game_selector: bool,
     is_scanning_games: bool,
-    scan_games_rx: Option<Receiver<Result<Vec<CloudGameInfo>, String>>>,
+    scan_games_rx: Option<Receiver<Result<crate::game_scanner::ScanResult, String>>>,
     vdf_parser: Option<VdfParser>,
     all_users: Vec<UserInfo>,
     show_user_selector: bool,
@@ -38,24 +38,19 @@ pub struct SteamCloudApp {
     about_icon_texture: Option<egui::TextureHandle>,
     guide_dialog: Option<crate::ui::GuideDialog>,
     restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
-    // 文件树状结构
     file_tree: Option<crate::file_tree::FileTree>,
-    // 搜索和筛选状态
     search_query: String,
     show_only_local: bool,
     show_only_cloud: bool,
-    // Shift 范围选择
     last_selected_index: Option<usize>,
 }
 
 impl SteamCloudApp {
-    // 错误处理辅助方法
     fn handle_error(&mut self, error: AppError) {
         tracing::error!(error = ?error, "操作失败");
         self.show_error(&error.to_string());
     }
 
-    // 获取或初始化 VdfParser
     fn ensure_vdf_parser(&mut self) -> Option<&VdfParser> {
         if self.vdf_parser.is_none() {
             self.vdf_parser = VdfParser::new().ok();
@@ -353,6 +348,24 @@ impl SteamCloudApp {
             .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
         if let Some((steam_path, user_id)) = parser_data {
+            // 在扫描前强制跳转到 Steam 云存储页面
+            let steam_url = "steam://openurl/https://store.steampowered.com/account/remotestorage";
+            #[cfg(target_os = "macos")]
+            let open_result = std::process::Command::new("open").arg(steam_url).spawn();
+            #[cfg(target_os = "windows")]
+            let open_result = std::process::Command::new("cmd")
+                .args(["/C", "start", "", steam_url])
+                .spawn();
+            #[cfg(target_os = "linux")]
+            let open_result = std::process::Command::new("xdg-open")
+                .arg(steam_url)
+                .spawn();
+
+            match open_result {
+                Ok(_) => tracing::info!("已请求 Steam 打开云存储页面"),
+                Err(e) => tracing::warn!("无法打开 Steam 云存储页面: {}", e),
+            }
+
             self.is_scanning_games = true;
             self.status_message = "正在扫描游戏库...".to_string();
             let (tx, rx) = std::sync::mpsc::channel();
@@ -706,10 +719,30 @@ impl eframe::App for SteamCloudApp {
 
         if let Some(rx) = &self.scan_games_rx {
             match rx.try_recv() {
-                Ok(Ok(games)) => {
-                    self.cloud_games = games;
-                    self.status_message =
-                        format!("发现 {} 个有云存档的游戏", self.cloud_games.len());
+                Ok(Ok(result)) => {
+                    self.cloud_games = result.games;
+
+                    // 构建详细的状态信息
+                    let mut status_parts = Vec::new();
+                    status_parts.push(format!("VDF: {} 个", result.vdf_count));
+                    if result.cdp_count > 0 {
+                        status_parts.push(format!("CDP: {} 个", result.cdp_count));
+                    }
+                    status_parts.push(format!("总计: {} 个游戏", self.cloud_games.len()));
+
+                    self.status_message = status_parts.join(" | ");
+
+                    // 如果 CDP 获取为 0，弹出警告
+                    if result.cdp_count == 0 && crate::cdp_client::CdpClient::is_cdp_running() {
+                        self.show_error(
+                            "CDP 未获取到游戏数据！\n\n可能原因：\n\
+                            1. Steam 客户端未响应跳转请求\n\
+                            2. 页面加载未完成\n\
+                            3. 未登录 Steam 网页\n\n\
+                        ",
+                        );
+                    }
+
                     self.is_scanning_games = false;
                     self.scan_games_rx = None;
                 }
@@ -785,7 +818,7 @@ impl eframe::App for SteamCloudApp {
                     }
                     RestartStatus::Success => {
                         if let Some(dialog) = &mut self.guide_dialog {
-                            dialog.update_status("Steam 已成功重启！".to_string(), true, false);
+                            dialog.update_status("Steam 已成功重启!".to_string(), true, false);
                         }
                         self.restart_rx = None;
                     }
