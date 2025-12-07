@@ -45,7 +45,7 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 | Windows | ARM64 | ❌ 不支持 | Steam SDK 不提供 ARM64 版本 |
 | macOS | Intel (x64) | ✅ 支持 | `.dmg` |
 | macOS | Apple Silicon (ARM64) | ✅ 支持 | `.dmg` |
-| Linux | x64 | ✅ 支持 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| Linux | x64 | ✅ 支持 | `.deb`, `.rpm`, `.AppImage`, `.tar.gz` |
 
 ## 安装
 
@@ -66,31 +66,6 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 3. 将应用拖入 Applications 文件夹
 
 ### Linux
-
-#### .tar.gz
-
-```bash
-# 下载并解压
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
-tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
-cd SteamCloudFileManager-linux-x86_64
-
-# 运行
-./steamcloudfilemanager
-```
-
-#### AppImage
-
-```bash
-# 下载 AppImage
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
-
-# 添加执行权限
-chmod +x SteamCloudFileManager-linux-x86_64.AppImage
-
-# 运行
-./SteamCloudFileManager-linux-x86_64.AppImage
-```
 
 #### Debian/Ubuntu
 
@@ -119,6 +94,45 @@ sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
 
 # 运行
 steamcloudfilemanager
+```
+
+#### AppImage（通用）
+
+```bash
+# 下载 AppImage
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+
+# 添加执行权限
+chmod +x SteamCloudFileManager-linux-x86_64.AppImage
+
+# 运行
+./SteamCloudFileManager-linux-x86_64.AppImage
+```
+
+#### Arch Linux (AUR)
+
+```bash
+# 下载 PKGBUILD
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64-aur.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
+
+# 使用 makepkg 构建并安装
+makepkg -si
+
+# 运行
+steamcloudfilemanager
+```
+
+#### .tar.gz（通用）
+
+```bash
+# 下载并解压
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
+cd SteamCloudFileManager-linux-x86_64
+
+# 运行
+./steamcloudfilemanager
 ```
 
 ### 从源码构建
@@ -222,15 +236,15 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ### 功能开发
 
-- [ ] 文件夹树状视图（进度 90%）
-- [ ] 批量下载/上传功能
+- [ ] 批量上传
+- [ ] 拖拽上传
 - [ ] 文件冲突检测与处理
 - [ ] 多语言支持
 - [ ] 云存档备份与恢复
 
 ### 包管理器支持
 
-- [ ] AUR (Arch User Repository)
+- [ ] AUR (Arch User Repository) - `pacman -S steamcloudfilemanager`
 - [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
 - [ ] APT 仓库 (Debian/Ubuntu) - `apt install steamcloudfilemanager`
 - [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steamcloudfilemanager`
@@ -271,10 +285,11 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ### 打包工具
 
-- [cargo-bundle](https://github.com/burtonageo/cargo-bundle)
-- [cargo-deb](https://github.com/kornelski/cargo-deb)
-- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm)
-- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .dmg
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm
+- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - 通用 AppImage
+- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD
 
 ### 参考项目
 

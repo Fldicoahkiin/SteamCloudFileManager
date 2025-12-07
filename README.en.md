@@ -45,7 +45,7 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 | Windows | ARM64 | ❌ Not Supported | Steam SDK does not provide ARM64 binaries |
 | macOS | Intel (x64) | ✅ Supported | `.dmg` |
 | macOS | Apple Silicon (ARM64) | ✅ Supported | `.dmg` |
-| Linux | x64 | ✅ Supported | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
+| Linux | x64 | ✅ Supported | `.deb`, `.rpm`, `.AppImage`, `.tar.gz` |
 
 ## Installation
 
@@ -66,31 +66,6 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 3. Drag the app to Applications folder
 
 ### Linux
-
-#### .tar.gz (Universal)
-
-```bash
-# Download and extract
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
-tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
-cd SteamCloudFileManager-linux-x86_64
-
-# Run
-./steamcloudfilemanager
-```
-
-#### AppImage (Universal)
-
-```bash
-# Download AppImage
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
-
-# Add execute permission
-chmod +x SteamCloudFileManager-linux-x86_64.AppImage
-
-# Run
-./SteamCloudFileManager-linux-x86_64.AppImage
-```
 
 #### Debian/Ubuntu
 
@@ -119,6 +94,45 @@ sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
 
 # Run
 steamcloudfilemanager
+```
+
+#### AppImage (Universal)
+
+```bash
+# Download AppImage
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+
+# Add execute permission
+chmod +x SteamCloudFileManager-linux-x86_64.AppImage
+
+# Run
+./SteamCloudFileManager-linux-x86_64.AppImage
+```
+
+#### Arch Linux (AUR)
+
+```bash
+# Download PKGBUILD
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64-aur.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
+
+# Build and install with makepkg
+makepkg -si
+
+# Run
+steamcloudfilemanager
+```
+
+#### .tar.gz (Universal)
+
+```bash
+# Download and extract
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
+cd SteamCloudFileManager-linux-x86_64
+
+# Run
+./steamcloudfilemanager
 ```
 
 ### Build from Source
@@ -222,15 +236,15 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ### Feature Development
 
-- [ ] Folder tree view (90% complete)
-- [ ] Batch download/upload functionality
+- [ ] Batch upload
+- [ ] Drag-and-drop upload
 - [ ] File conflict detection and handling
 - [ ] Multi-language support
 - [ ] Cloud save backup and restore
 
 ### Package Manager Support
 
-- [ ] AUR (Arch User Repository)
+- [ ] AUR (Arch User Repository) - `pacman -S steamcloudfilemanager`
 - [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
 - [ ] APT Repository (Debian/Ubuntu) - `apt install steamcloudfilemanager`
 - [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steamcloudfilemanager`
@@ -271,10 +285,11 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ### Packaging Tools
 
-- [cargo-bundle](https://github.com/burtonageo/cargo-bundle)
-- [cargo-deb](https://github.com/kornelski/cargo-deb)
-- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm)
-- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .dmg
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm
+- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - Universal AppImage
+- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD
 
 ### Reference Projects
 
