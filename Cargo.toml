@@ -15,12 +15,12 @@ egui_extras = { version = "0.33", features = ["all_loaders"] }
 steamworks = "0.12.2"
 steamworks-sys = "0.12.2"
 anyhow = "1.0"
-chrono = "0.4"
+chrono = "0.4.42"
 dirs = "6.0"
 log = "0.4"
 env_logger = "0.11.8"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 rfd = "0.16"
 image = "0.25"
 serde = "1.0"
