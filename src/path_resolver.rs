@@ -351,29 +351,32 @@ pub fn resolve_cloud_file_path(
 // - macOS: ~/Library/Application Support/{GameName}/
 fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
     let libraries = crate::game_scanner::discover_library_steamapps(steam_path);
-    
+
     for steamapps in libraries.iter() {
         let manifest_path = steamapps.join(format!("appmanifest_{}.acf", app_id));
 
         if manifest_path.exists() {
-
             match std::fs::read_to_string(&manifest_path) {
                 Ok(content) => {
                     let mut install_dir: Option<String> = None;
+
+                    #[cfg(target_os = "macos")]
                     let mut name: Option<String> = None;
-                    
+
                     for line in content.lines() {
                         if line.contains("\"installdir\"") {
                             if let Some(dir) = line.split('"').nth(3) {
                                 install_dir = Some(dir.to_string());
                             }
-                        } else if line.contains("\"name\"") {
+                        }
+                        #[cfg(target_os = "macos")]
+                        if line.contains("\"name\"") {
                             if let Some(n) = line.split('"').nth(3) {
                                 name = Some(n.to_string());
                             }
                         }
                     }
-                    
+
                     if let Some(dir) = install_dir {
                         #[cfg(target_os = "macos")]
                         {
@@ -383,7 +386,7 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
                                     .join("Library")
                                     .join("Application Support")
                                     .join(gname);
-                                
+
                                 if app_support_path.exists() {
                                     tracing::info!(
                                         "找到 macOS 存档目录: {}",
@@ -393,7 +396,7 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
                                 }
                             }
                         }
-                        
+
                         // 尝试游戏安装目录
                         let install_path = steamapps.join("common").join(&dir);
                         if install_path.exists() {
@@ -425,7 +428,7 @@ pub fn collect_local_save_paths(
     user_id: &str,
     app_id: u32,
 ) -> Vec<(String, PathBuf)> {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::HashMap;
 
     tracing::debug!(
         "开始收集本地存档路径: app_id={}, 文件数={}",
@@ -433,39 +436,27 @@ pub fn collect_local_save_paths(
         files.len()
     );
 
-    // 缓存游戏安装目录查找结果，避免重复调用
-    let mut game_install_dir_cache: Option<Result<PathBuf>> = None;
-    
     // 按父目录去重，而不是按 root 类型
     let mut path_map: HashMap<PathBuf, (String, PathBuf)> = HashMap::new();
     let mut failed_count = 0;
 
     for file in files {
         // 解析完整文件路径
-        let file_path_result = resolve_cloud_file_path(
-            file.root,
-            &file.name,
-            steam_path,
-            user_id,
-            app_id,
-        );
+        let file_path_result =
+            resolve_cloud_file_path(file.root, &file.name, steam_path, user_id, app_id);
 
         match file_path_result {
             Ok(file_path) => {
                 // 获取父目录（存档文件夹）
                 if let Some(parent) = file_path.parent() {
                     let parent_path = parent.to_path_buf();
-                    
+
                     // 检查父目录是否存在
                     if parent_path.exists() {
                         // 如果这个父目录还没有记录，添加它
                         path_map.entry(parent_path.clone()).or_insert_with(|| {
                             let desc = get_root_description(file.root);
-                            tracing::debug!(
-                                "✓ {}: {}",
-                                desc,
-                                parent_path.display()
-                            );
+                            tracing::debug!("✓ {}: {}", desc, parent_path.display());
                             (desc, parent_path.clone())
                         });
                     } else {
@@ -492,10 +483,7 @@ pub fn collect_local_save_paths(
 
     // 记录失败统计
     if failed_count > 0 {
-        tracing::debug!(
-            "有 {} 个文件路径解析失败",
-            failed_count
-        );
+        tracing::debug!("有 {} 个文件路径解析失败", failed_count);
     }
 
     let mut paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
