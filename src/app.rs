@@ -508,29 +508,25 @@ impl SteamCloudApp {
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
         if !self.is_connected && !self.is_connecting {
             // 未连接状态
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(20.0);
-                    ui.heading("请输入 App ID 并连接到 Steam");
-                    ui.add_space(10.0);
-                    ui.label("您可以：");
-                    ui.label("• 点击上方的 '游戏库' 按钮选择游戏");
-                    ui.label("• 或直接输入 App ID 并点击 '连接'");
-                });
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() / 2.0 - 80.0);
+                ui.heading("请输入 App ID 并连接到 Steam");
+                ui.add_space(20.0);
+                ui.label("您可以：");
+                ui.label("点击上方的 '游戏库' 按钮选择游戏");
+                ui.label("或直接输入 App ID 并点击 '连接'");
             });
         } else if self.is_connecting || (self.is_connected && !self.remote_ready) {
             // 连接中或加载中状态
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(20.0);
-                    ui.spinner();
-                    ui.add_space(10.0);
-                    if self.is_connecting {
-                        ui.label("正在连接到 Steam...");
-                    } else {
-                        ui.label("正在加载文件列表...");
-                    }
-                });
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() / 2.0 - 40.0);
+                ui.spinner();
+                ui.add_space(10.0);
+                if self.is_connecting {
+                    ui.label("正在连接到 Steam...");
+                } else {
+                    ui.label("正在加载文件列表...");
+                }
             });
         } else if let Some(tree) = &mut self.file_tree {
             // 已连接且有文件树
@@ -551,13 +547,11 @@ impl SteamCloudApp {
             );
         } else {
             // 已连接但没有文件
-            ui.centered_and_justified(|ui| {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(20.0);
-                    ui.heading("没有找到云文件");
-                    ui.add_space(10.0);
-                    ui.label("该游戏没有云存档文件");
-                });
+            ui.vertical_centered(|ui| {
+                ui.add_space(ui.available_height() / 2.0 - 50.0);
+                ui.heading("没有找到云文件");
+                ui.add_space(10.0);
+                ui.label("该游戏没有云存档文件");
             });
         }
     }
@@ -670,12 +664,15 @@ impl eframe::App for SteamCloudApp {
                 manager.run_callbacks();
             }
 
-            if !self.remote_ready && !self.is_refreshing {
+            // 检查超时（30秒）
+            if !self.remote_ready && self.is_refreshing {
                 if let Some(since) = self.since_connected {
-                    if since.elapsed() >= Duration::from_secs(2) {
-                        tracing::info!("Steam API已准备就绪");
-                        self.refresh_files();
+                    if since.elapsed() >= Duration::from_secs(30) {
+                        tracing::warn!("Steam API 加载超时，停止等待");
+                        self.is_refreshing = false;
                         self.remote_ready = true;
+                        self.loader_rx = None;
+                        self.status_message = "加载超时，请重试".to_string();
                     }
                 }
             }
@@ -686,10 +683,13 @@ impl eframe::App for SteamCloudApp {
                 Ok(Ok(app_id)) => {
                     self.is_connecting = false;
                     self.is_connected = true;
-                    self.status_message = format!("已连接到Steam (App ID: {})", app_id);
+                    self.status_message = format!("正在加载文件列表 (App ID: {})...", app_id);
                     self.since_connected = Some(Instant::now());
                     self.connect_rx = None;
                     tracing::info!("Steam连接成功");
+
+                    // 连接成功后立即开始刷新文件
+                    self.refresh_files();
                 }
                 Ok(Err(err)) => {
                     self.is_connecting = false;
