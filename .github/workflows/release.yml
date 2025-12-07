@@ -207,49 +207,54 @@ jobs:
         if: matrix.build_aur
         run: |
           set -euo pipefail
-          echo "安装 cargo-aur"
-          cargo install cargo-aur
+          set -x
 
-          echo "尝试用 cargo-aur 生成 PKGBUILD 和 tarball..."
-          # 有时 cargo-aur 可能返回非零但仍生成文件
+          export CARGO_TARGET_DIR=target/cargo
+
+          # 安装 cargo-aur（已安装会跳过，这里检查后再安装避免重复）
+          if ! command -v cargo-aur >/dev/null 2>&1; then
+            cargo install cargo-aur --locked
+          else
+            echo "cargo-aur already installed"
+          fi
+
+          echo "尝试用 cargo-aur 生成 PKGBUILD 和 tarball（容错）..."
+          # 有时 cargo-aur 可能返回非零但仍生成文件，容错继续
           cargo aur || true
 
-          echo "列出调试目录："
+          echo "列出调试目录（便于定位产物）:"
           pwd
           ls -la
           ls -la target || true
+          ls -la target/cargo* || true
 
-          # 查找任意位置的 PKGBUILD（用于调试/确认）
-          PKGBUILD_PATH=$(find . -type f -name PKGBUILD 2>/dev/null | head -n 1 || true)
-          if [ -n "$PKGBUILD_PATH" ]; then
-            echo "找到 PKGBUILD: $PKGBUILD_PATH"
-            dirname "$PKGBUILD_PATH"
-          else
-            echo "未找到 PKGBUILD 文件"
+          # 优先在 cargo-aur 特定输出目录查找
+          TARBALL=$(find target -type f -path "*/cargo-aur/*.tar.gz" -print -quit 2>/dev/null || true)
+
+          # 回退：全仓库查找任何 *.tar.gz（包括 target 子目录）
+          if [ -z "$TARBALL" ]; then
+            TARBALL=$(find . -type f -name "*.tar.gz" -print -quit 2>/dev/null || true)
           fi
-
-          # 全仓库查找任何 *.tar.gz（包括 target 子目录）
-          TARBALL=$(find . -type f -name "*.tar.gz" 2>/dev/null | head -n 1 || true)
 
           if [ -n "$TARBALL" ]; then
             echo "找到 tarball: $TARBALL"
-            mv "$TARBALL" "${{ matrix.asset_name }}-aur.tar.gz"
-            echo "生成 AUR PKGBUILD: ${{ matrix.asset_name }}-aur.tar.gz"
-            ls -lh "${{ matrix.asset_name }}-aur.tar.gz"
+            # 使用绝对路径移动到工作区根，确保 upload-artifact 能匹配到
+            DEST="${GITHUB_WORKSPACE}/${{ matrix.asset_name }}-aur.tar.gz"
+            mv "$TARBALL" "$DEST"
+            echo "生成 AUR tarball: $DEST"
+            ls -lh "$DEST"
             exit 0
           fi
 
           echo "未找到 tar.gz，尝试使用 cargo package 回退生成 .crate ..."
-          # 使用 cargo package 在 target/package 下生成 .crate（本质上是 tarball）
-          # 允许 dirty 以便 CI 构建路径含未提交文件时也能运行
           cargo package --allow-dirty --no-verify || true
-          CRATE=$(find target/package -type f -name "*.crate" 2>/dev/null | head -n 1 || true)
+          CRATE=$(find target -type f -name "*.crate" -print -quit 2>/dev/null || true)
           if [ -n "$CRATE" ]; then
             echo "找到 crate 文件: $CRATE"
-            # 将 .crate 拷贝并重命名为 AUR tar.gz（多数 AUR 工具接受）
-            cp "$CRATE" "./${{ matrix.asset_name }}-aur.tar.gz"
-            echo "生成 AUR tarball（来自 crate）: ${{ matrix.asset_name }}-aur.tar.gz"
-            ls -lh "${{ matrix.asset_name }}-aur.tar.gz"
+            DEST="${GITHUB_WORKSPACE}/${{ matrix.asset_name }}-aur.tar.gz"
+            cp "$CRATE" "$DEST"
+            echo "生成 AUR tarball（来自 crate）: $DEST"
+            ls -lh "$DEST"
             exit 0
           fi
 
@@ -308,18 +313,35 @@ jobs:
           echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION}" >> release-notes.md
           echo "" >> release-notes.md
           echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
+      - name: Prepare ordered release files list
+        id: prepare_files
+        run: |
+          set -euo pipefail
+
+          # 开始写多行输出到 GITHUB_OUTPUT（files）
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+
+          echo "artifacts/SteamCloudFileManager-windows-x86_64/SteamCloudFileManager-windows-x86_64.zip" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.tar.gz" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-macos-x86_64.dmg/SteamCloudFileManager-macos-x86_64.dmg" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-macos-aarch64.dmg/SteamCloudFileManager-macos-aarch64.dmg" >> $GITHUB_OUTPUT
+
+          find artifacts -path "*/debian/*.deb" -print | sort | while IFS= read -r deb; do
+            echo "$deb" >> $GITHUB_OUTPUT
+          done
+
+          find artifacts -path "*/generate-rpm/*.rpm" -print | sort | while IFS= read -r rpm; do
+            echo "$rpm" >> $GITHUB_OUTPUT
+          done
+
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.AppImage" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-aur.tar.gz" >> $GITHUB_OUTPUT
+
+          echo "EOF" >> $GITHUB_OUTPUT
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/SteamCloudFileManager-windows-x86_64/SteamCloudFileManager-windows-x86_64.zip
-            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.tar.gz
-            artifacts/SteamCloudFileManager-macos-x86_64.dmg/SteamCloudFileManager-macos-x86_64.dmg
-            artifacts/SteamCloudFileManager-macos-aarch64.dmg/SteamCloudFileManager-macos-aarch64.dmg
-            artifacts/SteamCloudFileManager-linux-x86_64/target/x86_64-unknown-linux-gnu/debian/*.deb
-            artifacts/SteamCloudFileManager-linux-x86_64/target/x86_64-unknown-linux-gnu/generate-rpm/*.rpm
-            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.AppImage
-            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-aur.tar.gz
+          files: ${{ steps.prepare_files.outputs.files }}
           body_path: release-notes.md
           generate_release_notes: false
           draft: false
