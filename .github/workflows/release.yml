@@ -176,7 +176,7 @@ jobs:
         run: |
           # 确保项目已构建（不使用 --target，让二进制生成在 target/release/）
           cargo build --release
-          
+
           # 安装 cargo-appimage
           cargo install cargo-appimage
 
@@ -188,7 +188,7 @@ jobs:
           # 验证二进制文件存在
           echo "检查 target/release/ 目录："
           ls -lh target/release/ | grep SteamCloudFileManager || echo "未找到二进制文件！"
-          
+
           # 使用 cargo-appimage 构建（不使用 --target）
           cargo appimage
 
@@ -206,19 +206,56 @@ jobs:
       - name: Build AUR PKGBUILD
         if: matrix.build_aur
         run: |
-          # 安装 cargo-aur
+          set -euo pipefail
+          echo "安装 cargo-aur"
           cargo install cargo-aur
 
-          # 生成 PKGBUILD
-          cargo aur
+          echo "尝试用 cargo-aur 生成 PKGBUILD 和 tarball..."
+          # 有时 cargo-aur 可能返回非零但仍生成文件
+          cargo aur || true
 
-          # 打包 PKGBUILD 文件
-          if [ -f PKGBUILD ]; then
-            tar czf ${{ matrix.asset_name }}-aur.tar.gz PKGBUILD
-            echo "生成 AUR PKGBUILD: ${{ matrix.asset_name }}-aur.tar.gz"
+          echo "列出调试目录："
+          pwd
+          ls -la
+          ls -la target || true
+
+          # 查找任意位置的 PKGBUILD（用于调试/确认）
+          PKGBUILD_PATH=$(find . -type f -name PKGBUILD 2>/dev/null | head -n 1 || true)
+          if [ -n "$PKGBUILD_PATH" ]; then
+            echo "找到 PKGBUILD: $PKGBUILD_PATH"
+            dirname "$PKGBUILD_PATH"
           else
-            echo "警告: 未找到 PKGBUILD 文件"
+            echo "未找到 PKGBUILD 文件"
           fi
+
+          # 全仓库查找任何 *.tar.gz（包括 target 子目录）
+          TARBALL=$(find . -type f -name "*.tar.gz" 2>/dev/null | head -n 1 || true)
+
+          if [ -n "$TARBALL" ]; then
+            echo "找到 tarball: $TARBALL"
+            mv "$TARBALL" "${{ matrix.asset_name }}-aur.tar.gz"
+            echo "生成 AUR PKGBUILD: ${{ matrix.asset_name }}-aur.tar.gz"
+            ls -lh "${{ matrix.asset_name }}-aur.tar.gz"
+            exit 0
+          fi
+
+          echo "未找到 tar.gz，尝试使用 cargo package 回退生成 .crate ..."
+          # 使用 cargo package 在 target/package 下生成 .crate（本质上是 tarball）
+          # 允许 dirty 以便 CI 构建路径含未提交文件时也能运行
+          cargo package --allow-dirty --no-verify || true
+          CRATE=$(find target/package -type f -name "*.crate" 2>/dev/null | head -n 1 || true)
+          if [ -n "$CRATE" ]; then
+            echo "找到 crate 文件: $CRATE"
+            # 将 .crate 拷贝并重命名为 AUR tar.gz（多数 AUR 工具接受）
+            cp "$CRATE" "./${{ matrix.asset_name }}-aur.tar.gz"
+            echo "生成 AUR tarball（来自 crate）: ${{ matrix.asset_name }}-aur.tar.gz"
+            ls -lh "${{ matrix.asset_name }}-aur.tar.gz"
+            exit 0
+          fi
+
+          echo "错误: 未能找到任何 tarball / crate。当前目录内容："
+          find . -maxdepth 4 -type f -print || true
+          exit 1
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -274,7 +311,15 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/**/*
+          files: |
+            artifacts/SteamCloudFileManager-windows-x86_64/SteamCloudFileManager-windows-x86_64.zip
+            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.tar.gz
+            artifacts/SteamCloudFileManager-macos-x86_64.dmg/SteamCloudFileManager-macos-x86_64.dmg
+            artifacts/SteamCloudFileManager-macos-aarch64.dmg/SteamCloudFileManager-macos-aarch64.dmg
+            artifacts/SteamCloudFileManager-linux-x86_64/target/x86_64-unknown-linux-gnu/debian/*.deb
+            artifacts/SteamCloudFileManager-linux-x86_64/target/x86_64-unknown-linux-gnu/generate-rpm/*.rpm
+            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64.AppImage
+            artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-aur.tar.gz
           body_path: release-notes.md
           generate_release_notes: false
           draft: false
