@@ -19,28 +19,31 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            name: Linux-x64
+            name: Linux-x86_64
             target: x86_64-unknown-linux-gnu
             use_bundle: false
-            asset_name: steam-cloud-file-manager-linux-x64
+            build_deb: true
+            build_rpm: true
+            build_appimage: true
+            asset_name: SteamCloudFileManager-linux-x86_64
             
           - os: windows-latest
-            name: Windows-x64
+            name: Windows-x86_64
             target: x86_64-pc-windows-msvc
             use_bundle: false
-            asset_name: steam-cloud-file-manager-windows-x64
+            asset_name: SteamCloudFileManager-windows-x86_64
             
           - os: macos-latest
-            name: macOS-Intel
+            name: macOS-x86_64
             target: x86_64-apple-darwin
             use_bundle: true
-            asset_name: steam-cloud-file-manager-macos-intel.dmg
+            asset_name: SteamCloudFileManager-macos-x86_64.dmg
             
           - os: macos-latest
-            name: macOS-ARM
+            name: macOS-aarch64
             target: aarch64-apple-darwin
             use_bundle: true
-            asset_name: steam-cloud-file-manager-macos-arm.dmg
+            asset_name: SteamCloudFileManager-macos-aarch64.dmg
 
     steps:
       - uses: actions/checkout@v4
@@ -166,7 +169,7 @@ jobs:
             7z a -tzip ../../../../${{ matrix.asset_name }}.zip *
           else
             # Linux: 打包成 tar.gz
-            cp SteamCloudFileManager dist/
+            cp SteamCloudFileManager dist/steamcloudfilemanager
             # 复制 Steam API SO
             if [ -f libsteam_api.so ]; then
               cp libsteam_api.so dist/
@@ -174,6 +177,55 @@ jobs:
             cd dist
             tar czf ../../../../${{ matrix.asset_name }}.tar.gz *
           fi
+
+      - name: Build .deb package
+        if: matrix.build_deb
+        run: |
+          cargo install cargo-deb
+          cargo deb --target ${{ matrix.target }} --no-build --no-strip
+          
+      - name: Build .rpm package
+        if: matrix.build_rpm
+        run: |
+          cargo install cargo-generate-rpm
+          cargo build --release --target ${{ matrix.target }}
+          strip -s target/${{ matrix.target }}/release/SteamCloudFileManager
+          cargo generate-rpm --target ${{ matrix.target }}
+
+      - name: Build AppImage
+        if: matrix.build_appimage
+        run: |
+          # 安装 AppImage 构建工具
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          
+          # 创建 AppDir 结构
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          
+          # 复制文件
+          cp target/${{ matrix.target }}/release/SteamCloudFileManager AppDir/usr/bin/steamcloudfilemanager
+          cp target/${{ matrix.target }}/release/libsteam_api.so AppDir/usr/bin/ || true
+          
+          # 创建 .desktop 文件
+          cat > AppDir/usr/share/applications/steamcloudfilemanager.desktop << 'EOF'
+          [Desktop Entry]
+          Name=Steam Cloud File Manager
+          Exec=steamcloudfilemanager
+          Icon=steamcloudfilemanager
+          Type=Application
+          Categories=Utility;Game;
+          EOF
+          
+          # 复制图标
+          cp assets/steam_cloud-macOS-Default-1024x1024@1x.png AppDir/usr/share/icons/hicolor/256x256/apps/steamcloudfilemanager.png
+          
+          # 构建 AppImage
+          ARCH=x86_64 ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
+          
+          # 重命名
+          mv Steam_Cloud_File_Manager-*.AppImage ${{ matrix.asset_name }}.AppImage || true
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -183,6 +235,9 @@ jobs:
             ${{ matrix.asset_name }}
             ${{ matrix.asset_name }}.zip
             ${{ matrix.asset_name }}.tar.gz
+            ${{ matrix.asset_name }}.AppImage
+            target/${{ matrix.target }}/debian/*.deb
+            target/${{ matrix.target }}/generate-rpm/*.rpm
 
   create-release:
     name: Create Release

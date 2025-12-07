@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Steam Cloud File Manager
+GenericName=Steam Cloud Manager
+Comment=Manage and view Steam cloud save files
+Exec=steamcloudfilemanager
+Icon=steamcloudfilemanager
+Terminal=false
+Type=Application
+Categories=Utility;Game;
+Keywords=steam;cloud;save;backup;
+StartupNotify=true
