@@ -186,6 +186,54 @@ pub fn draw_about_window(
                 );
             });
 
+            ui.add_space(16.0);
+            ui.separator();
+            ui.add_space(12.0);
+
+            // 日志管理区域
+            ui.vertical_centered(|ui| {
+                if crate::logger::is_log_config_changed() {
+                    let tip_text = if crate::logger::is_log_enabled() {
+                        " 日志存储已启用，重启后生效"
+                    } else {
+                        " 日志存储已禁用，重启后生效"
+                    };
+                    ui.label(
+                        egui::RichText::new(tip_text)
+                            .size(9.0)
+                            .color(egui::Color32::from_rgb(255, 165, 0)),
+                    );
+                    ui.add_space(8.0);
+                }
+
+                let mut log_enabled = crate::logger::is_log_enabled();
+                if ui.checkbox(&mut log_enabled, "启用日志存储").changed() {
+                    crate::logger::set_log_enabled(log_enabled);
+                    if log_enabled {
+                        tracing::info!("日志存储已启用，将在下次启动时生效");
+                    } else {
+                        tracing::info!("日志存储已禁用，将在下次启动时生效");
+                    }
+                }
+
+                ui.add_space(12.0);
+
+                if ui.button(" 打开日志目录").clicked() {
+                    if let Err(e) = crate::logger::open_log_directory() {
+                        tracing::error!("打开日志目录失败: {}", e);
+                    }
+                }
+
+                if let Ok(log_dir) = crate::logger::get_log_dir() {
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new(format!("日志位置: {}", log_dir.display()))
+                            .size(9.0)
+                            .color(text_subtle),
+                    );
+                }
+            });
+
             ui.add_space(10.0);
         });
 }
