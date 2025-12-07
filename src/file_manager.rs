@@ -124,26 +124,29 @@ impl FileService {
                             f.root_description = cdp_file.root_description.clone();
 
                             tracing::debug!(
-                                "合并 CDP 文件: {} | Root={} | VDF: {} | CDP: {} | URL: {}",
+                                "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",
                                 f.name,
                                 f.root,
+                                f.exists,
                                 vdf_root_desc,
                                 cdp_folder,
                                 url
                             );
                         } else {
                             tracing::debug!(
-                                "合并 CDP 文件: {} | Root={} | VDF: {} | 保留原 root_description",
+                                "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | 保留原 root_description",
                                 f.name,
                                 f.root,
+                                f.exists,
                                 f.root_description
                             );
                         }
                     } else {
                         tracing::debug!(
-                            "新增 CDP 文件: {} | Root={} | {}",
+                            "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
                             cdp_file.name,
                             cdp_file.root,
+                            cdp_file.exists,
                             cdp_file.root_description
                         );
                         files.push(cdp_file);
