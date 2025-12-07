@@ -18,7 +18,7 @@ pub enum RootType {
     Pictures = 5,
     // 6: 音乐文件夹
     Music = 6,
-    // 7: 视频文件夹 (Win/Linux: Videos, Mac: Movies)
+    // 7: 视频文件夹 (Win/Linux: Videos, Mac: Application Support)
     Videos = 7,
     // 8: 桌面文件夹
     Desktop = 8,
@@ -86,7 +86,7 @@ impl RootType {
             Self::Music => "音乐文件夹",
             Self::Videos => {
                 #[cfg(target_os = "macos")]
-                return "影片 (Movies)";
+                return "Application Support";
                 #[cfg(not(target_os = "macos"))]
                 return "视频 (Videos)";
             }
@@ -218,8 +218,12 @@ pub fn resolve_root_base_path(
             }
             #[cfg(target_os = "macos")]
             {
+                // Root=7 在 macOS 上实际映射到 Application Support，而不是 Movies
+                // 参考: Finding Paradise 游戏实际使用情况
                 let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Movies"))
+                Ok(PathBuf::from(home)
+                    .join("Library")
+                    .join("Application Support"))
             }
             #[cfg(target_os = "linux")]
             {
@@ -343,26 +347,75 @@ pub fn resolve_cloud_file_path(
 }
 
 // 获取游戏安装目录
+// - Windows/Linux: 游戏安装目录
+// - macOS: ~/Library/Application Support/{GameName}/
 fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
-    for steamapps in crate::game_scanner::discover_library_steamapps(steam_path) {
+    let libraries = crate::game_scanner::discover_library_steamapps(steam_path);
+    
+    for steamapps in libraries.iter() {
         let manifest_path = steamapps.join(format!("appmanifest_{}.acf", app_id));
+
         if manifest_path.exists() {
-            let content = std::fs::read_to_string(&manifest_path)?;
-            for line in content.lines() {
-                if line.contains("\"installdir\"") {
-                    if let Some(dir) = line.split('"').nth(3) {
-                        return Ok(steamapps.join("common").join(dir));
+
+            match std::fs::read_to_string(&manifest_path) {
+                Ok(content) => {
+                    let mut install_dir: Option<String> = None;
+                    let mut name: Option<String> = None;
+                    
+                    for line in content.lines() {
+                        if line.contains("\"installdir\"") {
+                            if let Some(dir) = line.split('"').nth(3) {
+                                install_dir = Some(dir.to_string());
+                            }
+                        } else if line.contains("\"name\"") {
+                            if let Some(n) = line.split('"').nth(3) {
+                                name = Some(n.to_string());
+                            }
+                        }
                     }
+                    
+                    if let Some(dir) = install_dir {
+                        #[cfg(target_os = "macos")]
+                        {
+                            if let Some(ref gname) = name {
+                                let home = std::env::var("HOME")?;
+                                let app_support_path = std::path::PathBuf::from(home)
+                                    .join("Library")
+                                    .join("Application Support")
+                                    .join(gname);
+                                
+                                if app_support_path.exists() {
+                                    tracing::info!(
+                                        "找到 macOS 存档目录: {}",
+                                        app_support_path.display()
+                                    );
+                                    return Ok(app_support_path);
+                                }
+                            }
+                        }
+                        
+                        // 尝试游戏安装目录
+                        let install_path = steamapps.join("common").join(&dir);
+                        if install_path.exists() {
+                            tracing::info!("找到游戏安装目录: {}", install_path.display());
+                            return Ok(install_path);
+                        } else {
+                            // 继续返回路径，即使目录不存在
+                            return Ok(install_path);
+                        }
+                    }
+                }
+                Err(_) => {
+                    // 静默失败，继续查找
                 }
             }
         }
     }
 
-    // 如果找不到，返回默认路径
-    Ok(steam_path
-        .join("steamapps")
-        .join("common")
-        .join(format!("Game_{}", app_id)))
+    // 如果找不到，返回错误而不是默认路径
+    let error_msg = format!("未找到游戏 {} 的安装目录，请确认游戏已安装", app_id);
+    tracing::warn!("{}", error_msg);
+    Err(anyhow!(error_msg))
 }
 
 // 收集本地存档路径
@@ -372,37 +425,92 @@ pub fn collect_local_save_paths(
     user_id: &str,
     app_id: u32,
 ) -> Vec<(String, PathBuf)> {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
-    let mut path_map: HashMap<String, PathBuf> = HashMap::new();
+    tracing::debug!(
+        "开始收集本地存档路径: app_id={}, 文件数={}",
+        app_id,
+        files.len()
+    );
+
+    // 缓存游戏安装目录查找结果，避免重复调用
+    let mut game_install_dir_cache: Option<Result<PathBuf>> = None;
+    
+    // 按父目录去重，而不是按 root 类型
+    let mut path_map: HashMap<PathBuf, (String, PathBuf)> = HashMap::new();
+    let mut failed_count = 0;
 
     for file in files {
-        if file.exists {
-            // 使用 path_resolver 模块解析路径
-            if let Ok(path) =
-                resolve_cloud_file_path(file.root, &file.name, steam_path, user_id, app_id)
-            {
-                if let Some(parent) = path.parent() {
+        // 解析完整文件路径
+        let file_path_result = resolve_cloud_file_path(
+            file.root,
+            &file.name,
+            steam_path,
+            user_id,
+            app_id,
+        );
+
+        match file_path_result {
+            Ok(file_path) => {
+                // 获取父目录（存档文件夹）
+                if let Some(parent) = file_path.parent() {
                     let parent_path = parent.to_path_buf();
+                    
+                    // 检查父目录是否存在
                     if parent_path.exists() {
-                        let key = format!("{} ({})", file.root_description, file.root);
-                        path_map.entry(key).or_insert(parent_path);
+                        // 如果这个父目录还没有记录，添加它
+                        path_map.entry(parent_path.clone()).or_insert_with(|| {
+                            let desc = get_root_description(file.root);
+                            tracing::debug!(
+                                "✓ {}: {}",
+                                desc,
+                                parent_path.display()
+                            );
+                            (desc, parent_path.clone())
+                        });
+                    } else {
+                        tracing::trace!(
+                            "父目录不存在: root={}, file={}, path={}",
+                            file.root,
+                            file.name,
+                            parent_path.display()
+                        );
                     }
                 }
+            }
+            Err(e) => {
+                failed_count += 1;
+                tracing::trace!(
+                    "解析路径失败: root={}, file={}, error={}",
+                    file.root,
+                    file.name,
+                    e
+                );
             }
         }
     }
 
-    let mut paths: Vec<(String, PathBuf)> = path_map.into_iter().collect();
+    // 记录失败统计
+    if failed_count > 0 {
+        tracing::debug!(
+            "有 {} 个文件路径解析失败",
+            failed_count
+        );
+    }
+
+    let mut paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
     paths.sort_by(|a, b| a.0.cmp(&b.0));
 
     if !paths.is_empty() {
-        tracing::info!("检测到 {} 个本地存档路径", paths.len());
+        tracing::info!("检测到 {} 个本地存档根目录", paths.len());
         for (desc, path) in &paths {
-            tracing::debug!("  - {}: {}", desc, path.display());
+            tracing::info!("  ✓ {}: {}", desc, path.display());
         }
     } else {
-        tracing::debug!("未找到本地存档路径");
+        tracing::warn!(
+            "未找到任何本地存档路径 (app_id={})，请检查游戏是否已安装",
+            app_id
+        );
     }
 
     paths
@@ -425,7 +533,7 @@ pub fn normalize_cdp_folder_name(folder: &str) -> String {
         "appdata local" | "local" => get_root_description(4),
         "pictures" => get_root_description(5),
         "music" => get_root_description(6),
-        "videos" | "movies" => get_root_description(7),
+        "videos" | "movies" | "macappsupport" => get_root_description(7),
         "desktop" => get_root_description(8),
         "saved games" => get_root_description(9),
         "downloads" => get_root_description(10),
