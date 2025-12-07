@@ -2,10 +2,25 @@ use crate::file_tree::{FileTree, FileTreeNode};
 use crate::steam_api::CloudFile;
 use egui;
 use egui_extras::{Column, TableBuilder};
+use regex::Regex;
 use std::path::PathBuf;
 
 const INDENT_WIDTH: f32 = 20.0; // 每层缩进宽度
 const LINE_COLOR: egui::Color32 = egui::Color32::from_gray(100); // 线条颜色
+
+// 树状视图状态
+pub struct TreeViewState<'a> {
+    pub search_query: &'a mut String,
+    pub show_only_local: &'a mut bool,
+    pub show_only_cloud: &'a mut bool,
+}
+
+// 树渲染上下文
+struct TreeRenderContext<'a> {
+    search_query: &'a str,
+    show_only_local: bool,
+    show_only_cloud: bool,
+}
 
 // 绘制树状线条
 fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_last: &[bool]) -> f32 {
@@ -86,6 +101,57 @@ fn collect_indices(node: &FileTreeNode, indices: &mut Vec<usize>) {
     }
 }
 
+// 检查节点是否匹配搜索条件
+fn matches_search(node: &FileTreeNode, search_query: &str) -> bool {
+    if search_query.is_empty() {
+        return true;
+    }
+
+    let name = node.name();
+
+    // 尝试作为正则表达式匹配
+    if let Ok(regex) = Regex::new(search_query) {
+        regex.is_match(name)
+    } else {
+        // 如果不是有效的正则表达式，使用普通字符串匹配（不区分大小写）
+        name.to_lowercase().contains(&search_query.to_lowercase())
+    }
+}
+
+// 检查节点或其子节点是否匹配搜索条件
+fn node_or_children_match(node: &FileTreeNode, search_query: &str) -> bool {
+    if search_query.is_empty() {
+        return true;
+    }
+
+    // 检查当前节点
+    if matches_search(node, search_query) {
+        return true;
+    }
+
+    // 检查子节点
+    if let FileTreeNode::Folder { children, .. } = node {
+        for child in children {
+            if node_or_children_match(child, search_query) {
+                return true;
+            }
+        }
+    }
+
+    false
+}
+
+// 检查文件是否匹配筛选条件
+fn matches_filter(file: &CloudFile, show_only_local: bool, show_only_cloud: bool) -> bool {
+    if show_only_local {
+        return file.exists;
+    }
+    if show_only_cloud {
+        return file.is_persisted && !file.exists;
+    }
+    true
+}
+
 // 渲染完整的文件树
 pub fn render_file_tree(
     ui: &mut egui::Ui,
@@ -94,6 +160,7 @@ pub fn render_file_tree(
     _files: &[CloudFile],
     local_save_paths: &[(String, PathBuf)],
     remote_ready: bool,
+    state: &mut TreeViewState,
 ) {
     // 本地存档路径
     if !local_save_paths.is_empty() {
@@ -118,6 +185,46 @@ pub fn render_file_tree(
         });
         ui.separator();
     }
+
+    // 搜索和筛选
+    ui.horizontal(|ui| {
+        ui.label("🔍");
+        ui.add(
+            egui::TextEdit::singleline(state.search_query)
+                .desired_width(200.0)
+                .hint_text("搜索文件或文件夹..."),
+        );
+
+        if ui.button("清除").clicked() {
+            state.search_query.clear();
+        }
+
+        ui.separator();
+
+        if ui
+            .selectable_label(*state.show_only_local, "仅本地")
+            .on_hover_text("只显示本地存在的文件")
+            .clicked()
+        {
+            *state.show_only_local = !*state.show_only_local;
+            if *state.show_only_local {
+                *state.show_only_cloud = false;
+            }
+        }
+
+        if ui
+            .selectable_label(*state.show_only_cloud, "仅云端")
+            .on_hover_text("只显示云端存在的文件")
+            .clicked()
+        {
+            *state.show_only_cloud = !*state.show_only_cloud;
+            if *state.show_only_cloud {
+                *state.show_only_local = false;
+            }
+        }
+    });
+
+    ui.separator();
 
     let available_height = ui.available_height();
 
@@ -154,7 +261,15 @@ pub fn render_file_tree(
         .body(|mut body| {
             let root = tree.root_mut();
             if let Some(children) = root.children_mut() {
-                render_tree_body(&mut body, children, selected_files, 0);
+                render_tree_body(
+                    &mut body,
+                    children,
+                    selected_files,
+                    0,
+                    state.search_query,
+                    *state.show_only_local,
+                    *state.show_only_cloud,
+                );
             }
         });
 }
@@ -165,8 +280,16 @@ fn render_tree_body(
     nodes: &mut [FileTreeNode],
     selected_files: &mut Vec<usize>,
     _indent_level: usize,
+    search_query: &str,
+    show_only_local: bool,
+    show_only_cloud: bool,
 ) {
-    render_tree_body_recursive(body, nodes, selected_files, 1, &[]);
+    let ctx = TreeRenderContext {
+        search_query,
+        show_only_local,
+        show_only_cloud,
+    };
+    render_tree_body_recursive(body, nodes, selected_files, 1, &[], &ctx);
 }
 
 // 递归渲染树节点
@@ -176,11 +299,17 @@ fn render_tree_body_recursive(
     selected_files: &mut Vec<usize>,
     depth: usize,
     parent_is_last: &[bool],
+    ctx: &TreeRenderContext,
 ) {
     let node_count = nodes.len();
 
     for (idx, node) in nodes.iter_mut().enumerate() {
         let is_last_node = idx == node_count - 1;
+
+        // 检查节点是否匹配搜索条件
+        if !node_or_children_match(node, ctx.search_query) {
+            continue;
+        }
 
         // 收集索引
         let indices_for_folder = if node.is_folder() {
@@ -272,12 +401,18 @@ fn render_tree_body_recursive(
                         selected_files,
                         depth + 1,
                         &new_parent_is_last,
+                        ctx,
                     );
                 }
             }
             FileTreeNode::File {
                 name, index, file, ..
             } => {
+                // 检查文件是否匙配筛选条件
+                if !matches_filter(file, ctx.show_only_local, ctx.show_only_cloud) {
+                    continue;
+                }
+
                 let is_selected = selected_files.contains(index);
                 let file_name = name.clone();
                 let file_index = *index;

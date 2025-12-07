@@ -31,6 +31,7 @@ ureq = "3.1"
 tungstenite = { version = "0.28", features = ["native-tls"] }
 url = "2.5"
 sysinfo = "0.37"
+regex = "1.11"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [

@@ -17,6 +17,7 @@ dependencies = [
  "image",
  "keyvalues-parser",
  "log",
+ "regex",
  "rfd",
  "serde",
  "serde_json",
