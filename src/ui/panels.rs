@@ -13,13 +13,22 @@ pub struct TreeViewState<'a> {
     pub search_query: &'a mut String,
     pub show_only_local: &'a mut bool,
     pub show_only_cloud: &'a mut bool,
+    pub last_selected_index: &'a mut Option<usize>,
 }
 
-// 树渲染上下文
+// 递归渲染时的只读上下文
 struct TreeRenderContext<'a> {
     search_query: &'a str,
     show_only_local: bool,
     show_only_cloud: bool,
+}
+
+// 树节点渲染的可变上下文
+struct TreeBodyContext<'a> {
+    search_query: &'a str,
+    show_only_local: bool,
+    show_only_cloud: bool,
+    last_selected_index: &'a mut Option<usize>,
 }
 
 // 绘制树状线条
@@ -261,15 +270,13 @@ pub fn render_file_tree(
         .body(|mut body| {
             let root = tree.root_mut();
             if let Some(children) = root.children_mut() {
-                render_tree_body(
-                    &mut body,
-                    children,
-                    selected_files,
-                    0,
-                    state.search_query,
-                    *state.show_only_local,
-                    *state.show_only_cloud,
-                );
+                let mut ctx = TreeBodyContext {
+                    search_query: state.search_query,
+                    show_only_local: *state.show_only_local,
+                    show_only_cloud: *state.show_only_cloud,
+                    last_selected_index: state.last_selected_index,
+                };
+                render_tree_body(&mut body, children, selected_files, &mut ctx);
             }
         });
 }
@@ -279,17 +286,22 @@ fn render_tree_body(
     body: &mut egui_extras::TableBody,
     nodes: &mut [FileTreeNode],
     selected_files: &mut Vec<usize>,
-    _indent_level: usize,
-    search_query: &str,
-    show_only_local: bool,
-    show_only_cloud: bool,
+    ctx: &mut TreeBodyContext,
 ) {
-    let ctx = TreeRenderContext {
-        search_query,
-        show_only_local,
-        show_only_cloud,
+    let render_ctx = TreeRenderContext {
+        search_query: ctx.search_query,
+        show_only_local: ctx.show_only_local,
+        show_only_cloud: ctx.show_only_cloud,
     };
-    render_tree_body_recursive(body, nodes, selected_files, 1, &[], &ctx);
+    render_tree_body_recursive(
+        body,
+        nodes,
+        selected_files,
+        1,
+        &[],
+        &render_ctx,
+        ctx.last_selected_index,
+    );
 }
 
 // 递归渲染树节点
@@ -300,6 +312,7 @@ fn render_tree_body_recursive(
     depth: usize,
     parent_is_last: &[bool],
     ctx: &TreeRenderContext,
+    last_selected_index: &mut Option<usize>,
 ) {
     let node_count = nodes.len();
 
@@ -402,6 +415,7 @@ fn render_tree_body_recursive(
                         depth + 1,
                         &new_parent_is_last,
                         ctx,
+                        last_selected_index,
                     );
                 }
             }
@@ -444,18 +458,32 @@ fn render_tree_body_recursive(
                             if response.clicked() {
                                 let modifiers = ui.ctx().input(|i| i.modifiers);
                                 let ctrl = modifiers.ctrl || modifiers.command;
+                                let shift = modifiers.shift;
 
-                                if ctrl {
+                                if shift && last_selected_index.is_some() {
+                                    // Shift 点击：范围选择
+                                    let last_idx = last_selected_index.unwrap();
+                                    let start = last_idx.min(file_index);
+                                    let end = last_idx.max(file_index);
+
+                                    // 清空当前选择，选中范围内所有文件
+                                    selected_files.clear();
+                                    for i in start..=end {
+                                        selected_files.push(i);
+                                    }
+                                } else if ctrl {
                                     // Ctrl 点击：切换选中状态
                                     if is_selected {
                                         selected_files.retain(|&x| x != file_index);
                                     } else {
                                         selected_files.push(file_index);
                                     }
+                                    *last_selected_index = Some(file_index);
                                 } else {
                                     // 普通点击：单选
                                     selected_files.clear();
                                     selected_files.push(file_index);
+                                    *last_selected_index = Some(file_index);
                                 }
                             }
                         });
