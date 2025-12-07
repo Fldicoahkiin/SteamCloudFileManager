@@ -8,6 +8,42 @@ license = "GPL-3.0"
 repository = "https://github.com/Fldicoahkiin/SteamCloudFileManager"
 build = "build.rs"
 
+[build-dependencies]
+chrono = "0.4.42"
+
+# macOS bundle configuration (cargo-bundle)
+[package.metadata.bundle]
+name = "Steam Cloud File Manager"
+identifier = "com.flacier.steamcloudfilemanager"
+icon = ["assets/AppIcon.icns"]
+copyright = "Copyright © 2025 Flacier. All rights reserved."
+category = "Utility"
+short_description = "Steam云文件管理器"
+long_description = "Steam Cloud File Manager - 管理和查看 Steam 云存档文件的实用工具。支持查看游戏云存档列表、文件详情、下载和上传云存档文件。"
+osx_minimum_system_version = "10.13"
+
+# Debian package configuration (cargo-deb)
+[package.metadata.deb]
+maintainer = "Flacier <https://github.com/Fldicoahkiin>"
+depends = "$auto"
+section = "utils"
+priority = "optional"
+assets = [
+    ["target/release/SteamCloudFileManager", "usr/bin/steamcloudfilemanager", "755"],
+    ["assets/steamcloudfilemanager.desktop", "usr/share/applications/", "644"],
+    ["assets/steam_cloud-macOS-Default-1024x1024@1x.png", "usr/share/icons/hicolor/512x512/apps/steamcloudfilemanager.png", "644"],
+    ["README.md", "usr/share/doc/steamcloudfilemanager/", "644"],
+]
+
+# RPM package configuration (cargo-generate-rpm)
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/SteamCloudFileManager", dest = "/usr/bin/steamcloudfilemanager", mode = "755" },
+    { source = "assets/steamcloudfilemanager.desktop", dest = "/usr/share/applications/steamcloudfilemanager.desktop", mode = "644" },
+    { source = "assets/steam_cloud-macOS-Default-1024x1024@1x.png", dest = "/usr/share/icons/hicolor/512x512/apps/steamcloudfilemanager.png", mode = "644" },
+    { source = "README.md", dest = "/usr/share/doc/steamcloudfilemanager/README.md", mode = "644", doc = true },
+]
+
 [dependencies]
 # UI Framework
 eframe = "0.33.2"
@@ -55,22 +91,6 @@ winapi = { version = "0.3", features = [
     "knownfolders",
 ] }
 
-[build-dependencies]
-chrono = "0.4.42"
-
-[package.metadata.bundle]
-name = "Steam Cloud File Manager"
-identifier = "com.flacier.steamcloudfilemanager"
-icon = ["assets/AppIcon.icns"]
-version = "0.0.4-beta"
-copyright = "Copyright © 2025 Flacier. All rights reserved."
-category = "Utility"
-short_description = "Steam云文件管理器"
-long_description = "Steam Cloud File Manager - 管理和查看 Steam 云存档文件的实用工具。支持查看游戏云存档列表、文件详情、下载和上传云存档文件。"
-
-# macOS specific
-osx_minimum_system_version = "10.13"
-osx_url_schemes = []
-
-# Windows specific  
-windows_subsystem = "windows"
+# Windows specific
+[target.'cfg(windows)'.build-dependencies]
+winres = "0.1"

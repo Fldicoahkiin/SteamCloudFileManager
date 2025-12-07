@@ -72,7 +72,10 @@ fn load_log_config() -> bool {
     true // 默认启用
 }
 
-// 获取日志目录路径（系统标准目录）
+// 获取日志目录路径
+// - Windows: 应用所在目录的 logs 文件夹
+// - macOS: ~/Library/Logs/SteamCloudFileManager
+// - Linux: ~/.local/share/SteamCloudFileManager/logs
 pub fn get_log_dir() -> Result<PathBuf> {
     let log_dir = if cfg!(target_os = "macos") {
         let home = std::env::var("HOME")?;
@@ -81,10 +84,24 @@ pub fn get_log_dir() -> Result<PathBuf> {
             .join("Logs")
             .join("SteamCloudFileManager")
     } else if cfg!(target_os = "windows") {
-        let appdata = std::env::var("LOCALAPPDATA")?;
-        PathBuf::from(appdata)
-            .join("SteamCloudFileManager")
-            .join("logs")
+        // Windows: 使用应用所在目录
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                exe_dir.join("logs")
+            } else {
+                // 降级到 LOCALAPPDATA
+                let appdata = std::env::var("LOCALAPPDATA")?;
+                PathBuf::from(appdata)
+                    .join("SteamCloudFileManager")
+                    .join("logs")
+            }
+        } else {
+            // 降级到 LOCALAPPDATA
+            let appdata = std::env::var("LOCALAPPDATA")?;
+            PathBuf::from(appdata)
+                .join("SteamCloudFileManager")
+                .join("logs")
+        }
     } else {
         // Linux
         let home = std::env::var("HOME")?;
