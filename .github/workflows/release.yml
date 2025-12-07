@@ -1,16 +1,12 @@
 name: Release
-
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
   contents: write
-
 env:
   CARGO_TERM_COLOR: always
-
 jobs:
   build-release:
     name: Build ${{ matrix.name }}
@@ -25,65 +21,55 @@ jobs:
             build_deb: true
             build_rpm: true
             build_appimage: true
+            build_aur: true
             asset_name: SteamCloudFileManager-linux-x86_64
-            
           - os: windows-latest
             name: Windows-x86_64
             target: x86_64-pc-windows-msvc
             use_bundle: false
             asset_name: SteamCloudFileManager-windows-x86_64
-            
           - os: macos-latest
             name: macOS-x86_64
             target: x86_64-apple-darwin
             use_bundle: true
             asset_name: SteamCloudFileManager-macos-x86_64.dmg
-            
           - os: macos-latest
             name: macOS-aarch64
             target: aarch64-apple-darwin
             use_bundle: true
             asset_name: SteamCloudFileManager-macos-aarch64.dmg
-
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整 git 历史以便 build.rs 能获取 commit hash
-
+          fetch-depth: 0 # 获取完整 git 历史以便 build.rs 能获取 commit hash
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
-      
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.target }}
-
       - name: Install Linux dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
-
       - name: Install cargo-bundle
         if: matrix.use_bundle
         run: cargo install cargo-bundle
-
       - name: Build
         run: |
           cargo build --release --target ${{ matrix.target }}
-
       - name: Copy Steam API library (Windows/Linux)
         if: "!matrix.use_bundle"
         shell: bash
         run: |
-          
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             # Windows: 查找 steam_api64.dll
             STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "steam_api64.dll" 2>/dev/null | head -n 1)
             if [ -z "$STEAM_LIB" ]; then
               STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "steam_api.dll" 2>/dev/null | head -n 1)
             fi
-            
+
             if [ -n "$STEAM_LIB" ]; then
               echo "Found Steam API library: $STEAM_LIB"
               cp "$STEAM_LIB" target/${{ matrix.target }}/release/
@@ -95,7 +81,7 @@ jobs:
           else
             # Linux: 查找 libsteam_api.so
             STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
-            
+
             if [ -n "$STEAM_LIB" ]; then
               echo "Found Steam API library: $STEAM_LIB"
               cp "$STEAM_LIB" target/${{ matrix.target }}/release/
@@ -105,37 +91,34 @@ jobs:
               ls -la target/${{ matrix.target }}/release/build/ || true
             fi
           fi
-
       - name: Bundle macOS app
         if: matrix.use_bundle
         run: |
           cargo bundle --release --target ${{ matrix.target }}
-
       - name: Install create-dmg
         if: matrix.use_bundle
         run: brew install create-dmg
-      
       - name: Create macOS DMG
         if: matrix.use_bundle
         run: |
           APP_PATH=$(find target/${{ matrix.target }}/release/bundle/osx -name "*.app" | head -n 1)
-          
+
           if [ -z "$APP_PATH" ]; then
             echo "Error: .app bundle not found"
             exit 1
           fi
-          
+
           echo "Found app at: $APP_PATH"
-          
+
           # 复制 Steam API 动态库
           STEAM_LIB=$(find target/${{ matrix.target }}/release/build/steamworks-sys-*/out -name "libsteam_api.dylib" 2>/dev/null | head -n 1)
-          
+
           if [ -n "$STEAM_LIB" ]; then
             echo "Found Steam API library: $STEAM_LIB"
             cp "$STEAM_LIB" "$APP_PATH/Contents/MacOS/"
             echo "Steam API library copied"
           fi
-          
+
           # 使用 create-dmg 创建 DMG
           create-dmg \
             --volname "Steam Cloud File Manager" \
@@ -148,14 +131,13 @@ jobs:
             "${{ matrix.asset_name }}" \
             "$APP_PATH" \
             || hdiutil create -volname "Steam Cloud File Manager" -srcfolder "$APP_PATH" -ov -format UDZO "${{ matrix.asset_name }}"
-
       - name: Prepare Windows/Linux artifact
         if: "!matrix.use_bundle"
         shell: bash
         run: |
           cd target/${{ matrix.target }}/release
           mkdir -p dist
-          
+
           if [ "${{ matrix.os }}" == "windows-latest" ]; then
             # Windows: 打包成 zip
             cp SteamCloudFileManager.exe dist/
@@ -177,13 +159,11 @@ jobs:
             cd dist
             tar czf ../../../../${{ matrix.asset_name }}.tar.gz *
           fi
-
       - name: Build .deb package
         if: matrix.build_deb
         run: |
           cargo install cargo-deb
           cargo deb --target ${{ matrix.target }} --no-build --no-strip
-          
       - name: Build .rpm package
         if: matrix.build_rpm
         run: |
@@ -191,42 +171,45 @@ jobs:
           cargo build --release --target ${{ matrix.target }}
           strip -s target/${{ matrix.target }}/release/SteamCloudFileManager
           cargo generate-rpm --target ${{ matrix.target }}
-
       - name: Build AppImage
         if: matrix.build_appimage
         run: |
-          # 安装 AppImage 构建工具
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
-          
-          # 创建 AppDir 结构
-          mkdir -p AppDir/usr/bin
-          mkdir -p AppDir/usr/share/applications
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          
-          # 复制文件
-          cp target/${{ matrix.target }}/release/SteamCloudFileManager AppDir/usr/bin/steamcloudfilemanager
-          cp target/${{ matrix.target }}/release/libsteam_api.so AppDir/usr/bin/ || true
-          
-          # 创建 .desktop 文件
-          cat > AppDir/usr/share/applications/steamcloudfilemanager.desktop << 'EOF'
-          [Desktop Entry]
-          Name=Steam Cloud File Manager
-          Exec=steamcloudfilemanager
-          Icon=steamcloudfilemanager
-          Type=Application
-          Categories=Utility;Game;
-          EOF
-          
-          # 复制图标
-          cp assets/steam_cloud-macOS-Default-1024x1024@1x.png AppDir/usr/share/icons/hicolor/256x256/apps/steamcloudfilemanager.png
-          
-          # 构建 AppImage
-          ARCH=x86_64 ./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage
-          
-          # 重命名
-          mv Steam_Cloud_File_Manager-*.AppImage ${{ matrix.asset_name }}.AppImage || true
+          # 安装 cargo-appimage
+          cargo install cargo-appimage
 
+          # 下载 appimagetool（cargo-appimage 需要）
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+
+          # 使用 cargo-appimage 构建（自动处理依赖）
+          cargo appimage --target ${{ matrix.target }}
+
+          # 查找生成的 AppImage
+          APPIMAGE_FILE=$(find target/${{ matrix.target }}/release -name "*.AppImage" | head -n 1)
+          if [ -n "$APPIMAGE_FILE" ]; then
+            mv "$APPIMAGE_FILE" ${{ matrix.asset_name }}.AppImage
+            echo "构建成功: ${{ matrix.asset_name }}.AppImage"
+          else
+            echo "错误: 未找到 AppImage 文件"
+            exit 1
+          fi
+      - name: Build AUR PKGBUILD
+        if: matrix.build_aur
+        run: |
+          # 安装 cargo-aur
+          cargo install cargo-aur
+
+          # 生成 PKGBUILD
+          cargo aur
+
+          # 打包 PKGBUILD 文件
+          if [ -f PKGBUILD ]; then
+            tar czf ${{ matrix.asset_name }}-aur.tar.gz PKGBUILD
+            echo "生成 AUR PKGBUILD: ${{ matrix.asset_name }}-aur.tar.gz"
+          else
+            echo "警告: 未找到 PKGBUILD 文件"
+          fi
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -235,10 +218,10 @@ jobs:
             ${{ matrix.asset_name }}
             ${{ matrix.asset_name }}.zip
             ${{ matrix.asset_name }}.tar.gz
-            ${{ matrix.asset_name }}.AppImage
             target/${{ matrix.target }}/debian/*.deb
             target/${{ matrix.target }}/generate-rpm/*.rpm
-
+            ${{ matrix.asset_name }}.AppImage
+            ${{ matrix.asset_name }}-aur.tar.gz
   create-release:
     name: Create Release
     needs: build-release
@@ -247,11 +230,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
       - name: Get previous tag
         id: previoustag
         run: |
@@ -262,19 +243,18 @@ jobs:
           else
             echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           fi
-          
       - name: Prepare Release Notes
         run: |
           VERSION=${GITHUB_REF#refs/tags/}
           PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
-          
+
           # What's Changed - 使用 git log 生成 commit 列表，带可点击链接
           echo "## What's Changed" > release-notes.md
           echo "" >> release-notes.md
           git log --pretty=format:"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )" $PREVIOUS_TAG..HEAD >> release-notes.md
           echo "" >> release-notes.md
           echo "" >> release-notes.md
-          
+
           # Full Changelog
           PREVIOUS_SHORT=$(git rev-parse --short=7 $PREVIOUS_TAG)
           echo "## Full Changelog" >> release-notes.md
@@ -282,7 +262,6 @@ jobs:
           echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION}" >> release-notes.md
           echo "" >> release-notes.md
           echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
-          
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
