@@ -254,15 +254,32 @@ pub fn draw_game_selector_window(
         .default_size([600.0, 500.0])
         .show(ctx, |ui| {
             if is_scanning && games.is_empty() {
-                ui.label("正在扫描游戏库...");
+                // 扫描中且没有游戏，显示居中的加载提示
+                ui.vertical_centered(|ui| {
+                    ui.add_space(ui.available_height() / 2.0 - 40.0);
+                    ui.spinner();
+                    ui.add_space(10.0);
+                    ui.label("正在扫描游戏库...");
+                });
             } else if games.is_empty() {
-                ui.label("未发现云存档的游戏");
+                ui.vertical_centered(|ui| {
+                    ui.add_space(ui.available_height() / 2.0 - 30.0);
+                    ui.label("未发现云存档的游戏");
+                });
             } else {
                 ui.horizontal(|ui| {
                     ui.heading(format!("{} 个有云存档的游戏", games.len()));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("刷新").clicked() {
+                        // 刷新按钮
+                        if ui
+                            .add_enabled(!is_scanning, egui::Button::new("刷新"))
+                            .clicked()
+                        {
                             refresh_clicked = true;
+                        }
+                        // 扫描中显示 spinner
+                        if is_scanning {
+                            ui.spinner();
                         }
                     });
                 });
