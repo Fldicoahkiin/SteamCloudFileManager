@@ -240,20 +240,35 @@ impl SteamCloudApp {
     }
 
     fn download_selected_file(&mut self) {
-        use crate::file_manager::FileOperationResult;
+        if self.selected_files.is_empty() {
+            self.show_error("请选择要下载的文件");
+            return;
+        }
 
-        let result = crate::file_manager::download_selected_file_coordinated(
+        // 使用批量下载，保持文件夹结构
+        match crate::file_manager::batch_download_files_with_dialog(
             &self.files,
             &self.selected_files,
             self.steam_manager.clone(),
-        );
-
-        match result {
-            FileOperationResult::Success(msg) | FileOperationResult::SuccessWithRefresh(msg) => {
-                self.status_message = msg;
+        ) {
+            Ok(Some((success_count, failed_files))) => {
+                if failed_files.is_empty() {
+                    self.status_message = format!("成功下载 {} 个文件", success_count);
+                } else {
+                    let error_msg = format!(
+                        "下载完成：成功 {} 个，失败 {} 个\n失败文件：{}",
+                        success_count,
+                        failed_files.len(),
+                        failed_files.join(", ")
+                    );
+                    self.show_error(&error_msg);
+                }
             }
-            FileOperationResult::Error(msg) => {
-                self.show_error(&msg);
+            Ok(None) => {
+                // 用户取消
+            }
+            Err(e) => {
+                self.show_error(&format!("下载失败: {}", e));
             }
         }
     }
