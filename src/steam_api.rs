@@ -222,7 +222,7 @@ impl SteamCloudManager {
             is_persisted: file_handle.is_persisted(),
             exists: file_handle.exists(),
             root: 0,
-            root_description: "Steam云文件夹 (Remote)".to_string(),
+            root_description: crate::path_resolver::get_root_description(0),
             conflict: false,
         }
     }

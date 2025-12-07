@@ -52,51 +52,6 @@ impl RootType {
             _ => None,
         }
     }
-
-    // 获取描述文本
-    pub fn description(&self) -> &'static str {
-        match self {
-            Self::SteamRemote => "Steam云文件夹 (Remote)",
-            Self::GameInstallDir => "游戏安装目录",
-            Self::Documents => {
-                #[cfg(target_os = "windows")]
-                return "我的文档 (Documents)";
-                #[cfg(target_os = "macos")]
-                return "文稿 (Documents)";
-                #[cfg(target_os = "linux")]
-                return "文档 (Documents)";
-            }
-            Self::AppDataRoaming => {
-                #[cfg(target_os = "windows")]
-                return "AppData Roaming";
-                #[cfg(target_os = "macos")]
-                return "Application Support";
-                #[cfg(target_os = "linux")]
-                return ".config";
-            }
-            Self::AppDataLocal => {
-                #[cfg(target_os = "windows")]
-                return "AppData Local";
-                #[cfg(target_os = "macos")]
-                return "Caches";
-                #[cfg(target_os = "linux")]
-                return ".local/share";
-            }
-            Self::Pictures => "图片文件夹",
-            Self::Music => "音乐文件夹",
-            Self::Videos => {
-                #[cfg(target_os = "macos")]
-                return "Application Support";
-                #[cfg(not(target_os = "macos"))]
-                return "视频 (Videos)";
-            }
-            Self::Desktop => "桌面文件夹",
-            Self::SavedGames => "Windows Saved Games",
-            Self::Downloads => "下载文件夹",
-            Self::PublicShared => "公共共享目录",
-            Self::AppDataLocalLow => "Windows LocalLow",
-        }
-    }
 }
 
 use anyhow::{anyhow, Result};
@@ -359,7 +314,6 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
             match std::fs::read_to_string(&manifest_path) {
                 Ok(content) => {
                     let mut install_dir: Option<String> = None;
-
                     #[cfg(target_os = "macos")]
                     let mut name: Option<String> = None;
 
@@ -504,11 +458,35 @@ pub fn collect_local_save_paths(
     paths
 }
 
-// 获取 Root 类型的描述文本
+// 获取 Root 类型的描述文本，格式：CDP文件夹名 (Root编号)
 pub fn get_root_description(root: u32) -> String {
-    RootType::from_u32(root)
-        .map(|r| r.description().to_string())
-        .unwrap_or_else(|| format!("未知Root ({})", root))
+    let cdp_name = get_cdp_folder_name(root);
+    format!("{} ({})", cdp_name, root)
+}
+
+// 获取 CDP 文件夹名称
+pub fn get_cdp_folder_name(root: u32) -> &'static str {
+    match root {
+        0 => "Steam Cloud",
+        1 => "GameInstall",
+        2 => "Documents",
+        3 => "AppData Roaming",
+        4 => "AppData Local",
+        5 => "Pictures",
+        6 => "Music",
+        7 => {
+            #[cfg(target_os = "macos")]
+            return "MacAppSupport";
+            #[cfg(not(target_os = "macos"))]
+            return "Videos";
+        }
+        8 => "Desktop",
+        9 => "Saved Games",
+        10 => "Downloads",
+        11 => "Public",
+        12 => "AppData LocalLow",
+        _ => "Unknown",
+    }
 }
 
 // CDP 网页上的 folder 名称需要映射到标准描述
