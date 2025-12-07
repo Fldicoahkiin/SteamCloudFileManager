@@ -32,9 +32,6 @@ AppIcon.iconset/
 Thumbs.db
 desktop.ini
 
-/VDF*
-/CDP*
-/ERROR*
-/TREE*
+/docs
 /build.sh
 /archlinux*
