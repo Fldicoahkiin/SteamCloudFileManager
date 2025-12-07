@@ -40,6 +40,10 @@ pub struct SteamCloudApp {
     restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
     // 文件树状结构
     file_tree: Option<crate::file_tree::FileTree>,
+    // 搜索和筛选状态
+    search_query: String,
+    show_only_local: bool,
+    show_only_cloud: bool,
 }
 
 impl SteamCloudApp {
@@ -105,6 +109,9 @@ impl SteamCloudApp {
             guide_dialog: None,
             restart_rx: None,
             file_tree: None,
+            search_query: String::new(),
+            show_only_local: false,
+            show_only_cloud: false,
         };
 
         // 启动时自动扫描游戏
@@ -466,6 +473,11 @@ impl SteamCloudApp {
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
         // 树状视图
         if let Some(tree) = &mut self.file_tree {
+            let mut state = crate::ui::TreeViewState {
+                search_query: &mut self.search_query,
+                show_only_local: &mut self.show_only_local,
+                show_only_cloud: &mut self.show_only_cloud,
+            };
             crate::ui::render_file_tree(
                 ui,
                 tree,
@@ -473,6 +485,7 @@ impl SteamCloudApp {
                 &self.files,
                 &self.local_save_paths,
                 self.remote_ready,
+                &mut state,
             );
         } else {
             ui.centered_and_justified(|ui| {

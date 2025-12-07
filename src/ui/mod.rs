@@ -13,4 +13,4 @@ pub use helpers::*;
 pub use selectors::*;
 pub use windows::*;
 
-pub use panels::render_file_tree;
+pub use panels::{render_file_tree, TreeViewState};
