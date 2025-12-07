@@ -44,6 +44,8 @@ pub struct SteamCloudApp {
     search_query: String,
     show_only_local: bool,
     show_only_cloud: bool,
+    // Shift 范围选择
+    last_selected_index: Option<usize>,
 }
 
 impl SteamCloudApp {
@@ -112,6 +114,7 @@ impl SteamCloudApp {
             search_query: String::new(),
             show_only_local: false,
             show_only_cloud: false,
+            last_selected_index: None,
         };
 
         // 启动时自动扫描游戏
@@ -477,6 +480,7 @@ impl SteamCloudApp {
                 search_query: &mut self.search_query,
                 show_only_local: &mut self.show_only_local,
                 show_only_cloud: &mut self.show_only_cloud,
+                last_selected_index: &mut self.last_selected_index,
             };
             crate::ui::render_file_tree(
                 ui,
