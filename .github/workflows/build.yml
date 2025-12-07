@@ -42,19 +42,23 @@ jobs:
         run: cargo test --all-features
 
   build:
-    name: Build ${{ matrix.target }}
+    name: Build ${{ matrix.name }}
     needs: check
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
           - os: ubuntu-latest
+            name: Linux-x86_64
             target: x86_64-unknown-linux-gnu
           - os: windows-latest
+            name: Windows-x86_64
             target: x86_64-pc-windows-msvc
           - os: macos-latest
+            name: macOS-x86_64
             target: x86_64-apple-darwin
           - os: macos-latest
+            name: macOS-aarch64
             target: aarch64-apple-darwin
 
     steps:
