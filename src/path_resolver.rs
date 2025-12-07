@@ -282,6 +282,30 @@ pub fn resolve_cloud_file_path(
     user_id: &str,
     app_id: u32,
 ) -> Result<PathBuf> {
+    let root_type = RootType::from_u32(root).unwrap_or_else(|| {
+        log::debug!("未知的 root 值: {}，使用 SteamRemote", root);
+        RootType::SteamRemote
+    });
+
+    // GameInstallDir 需要查找游戏安装目录
+    if root_type == RootType::GameInstallDir {
+        let install_dir = get_game_install_dir(steam_path, app_id)?;
+        return Ok(install_dir.join(filename));
+    }
+
+    let base_path = resolve_root_base_path(root_type, steam_path, user_id, app_id)?;
+    Ok(base_path.join(filename))
+}
+
+// 解析云文件的完整路径
+fn resolve_cloud_file_path_cached(
+    root: u32,
+    filename: &str,
+    steam_path: &Path,
+    user_id: &str,
+    app_id: u32,
+    game_install_dir_cache: Option<&PathBuf>,
+) -> Result<PathBuf> {
     // 尝试解析 Root 类型
     let root_type = match RootType::from_u32(root) {
         Some(rt) => rt,
@@ -291,10 +315,13 @@ pub fn resolve_cloud_file_path(
         }
     };
 
-    // GameInstallDir 需要查找游戏安装目录
+    // GameInstallDir 使用缓存的目录
     if root_type == RootType::GameInstallDir {
-        let install_dir = get_game_install_dir(steam_path, app_id)?;
-        return Ok(install_dir.join(filename));
+        if let Some(install_dir) = game_install_dir_cache {
+            return Ok(install_dir.join(filename));
+        } else {
+            return Err(anyhow!("未找到游戏 {} 的安装目录", app_id));
+        }
     }
 
     let base_path = resolve_root_base_path(root_type, steam_path, user_id, app_id)?;
@@ -390,14 +417,27 @@ pub fn collect_local_save_paths(
         files.len()
     );
 
+    // 预先缓存 game_install_dir，避免重复查找
+    let game_install_dir_cache = get_game_install_dir(steam_path, app_id).ok();
+    if let Some(ref dir) = game_install_dir_cache {
+        tracing::info!("找到游戏安装目录: {}", dir.display());
+    }
+
     // 按父目录去重，而不是按 root 类型
     let mut path_map: HashMap<PathBuf, (String, PathBuf)> = HashMap::new();
     let mut failed_count = 0;
+    let mut game_install_dir_failed = false;
 
     for file in files {
-        // 解析完整文件路径
-        let file_path_result =
-            resolve_cloud_file_path(file.root, &file.name, steam_path, user_id, app_id);
+        // 解析完整文件路径，使用缓存的 game_install_dir
+        let file_path_result = resolve_cloud_file_path_cached(
+            file.root,
+            &file.name,
+            steam_path,
+            user_id,
+            app_id,
+            game_install_dir_cache.as_ref(),
+        );
 
         match file_path_result {
             Ok(file_path) => {
@@ -425,12 +465,17 @@ pub fn collect_local_save_paths(
             }
             Err(e) => {
                 failed_count += 1;
-                tracing::trace!(
-                    "解析路径失败: root={}, file={}, error={}",
-                    file.root,
-                    file.name,
-                    e
-                );
+                if file.root == 1 && !game_install_dir_failed {
+                    game_install_dir_failed = true;
+                    tracing::warn!("解析路径失败: root={}, error={}", file.root, e);
+                } else {
+                    tracing::trace!(
+                        "解析路径失败: root={}, file={}, error={}",
+                        file.root,
+                        file.name,
+                        e
+                    );
+                }
             }
         }
     }

@@ -13,6 +13,7 @@ struct Target {
     websocket_debugger_url: Option<String>,
     #[serde(rename = "type")]
     target_type: String,
+    url: Option<String>,
 }
 
 pub struct CdpClient {
@@ -52,9 +53,37 @@ impl CdpClient {
 
         let target = targets
             .iter()
-            .find(|t| t.websocket_debugger_url.is_some() && t.target_type == "page")
+            .find(|t| {
+                t.websocket_debugger_url.is_some()
+                    && t.target_type == "page"
+                    && t.url
+                        .as_ref()
+                        .is_some_and(|url| url.contains("remotestorage"))
+            })
+            .or_else(|| {
+                // 如果没有 remotestorage 页面，尝试查找 store.steampowered.com 页面
+                targets.iter().find(|t| {
+                    t.websocket_debugger_url.is_some()
+                        && t.target_type == "page"
+                        && t.url
+                            .as_ref()
+                            .is_some_and(|url| url.contains("store.steampowered.com"))
+                })
+            })
+            .or_else(|| {
+                // 最后才选择任意 page 类型
+                targets
+                    .iter()
+                    .find(|t| t.websocket_debugger_url.is_some() && t.target_type == "page")
+            })
             .or_else(|| targets.iter().find(|t| t.websocket_debugger_url.is_some()))
             .ok_or_else(|| anyhow!("未找到可用的调试目标"))?;
+
+        tracing::debug!(
+            "CDP 连接到目标: type={}, url={:?}",
+            target.target_type,
+            target.url
+        );
 
         let ws_url = target.websocket_debugger_url.as_ref().unwrap();
         let (socket, _) = tungstenite::connect(ws_url)?;
@@ -126,8 +155,29 @@ impl CdpClient {
     }
 
     pub fn fetch_game_list(&mut self) -> Result<Vec<CloudGameInfo>> {
-        tracing::info!("正在导航到 Steam 云存储页面...");
-        self.navigate("https://store.steampowered.com/account/remotestorage")?;
+        tracing::info!("正在读取 Steam 云存储页面...");
+        // 不要自己导航，假设 steam://openurl 已经打开了页面
+        // self.navigate("https://store.steampowered.com/account/remotestorage")?;
+
+        // 等待一下让页面加载完成
+        std::thread::sleep(std::time::Duration::from_secs(2));
+
+        // 调试：检查页面内容
+        let debug_script = r#"
+            (function() {
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    bodyLength: document.body ? document.body.innerHTML.length : 0,
+                    hasAccountTable: document.querySelector('.accountTable') !== null,
+                    accountTableCount: document.querySelectorAll('.accountTable').length,
+                    allTables: document.querySelectorAll('table').length,
+                    bodyPreview: document.body ? document.body.innerText.substring(0, 500) : 'no body'
+                };
+            })()
+        "#;
+        let debug_info = self.evaluate(debug_script)?;
+        tracing::warn!("CDP 页面调试信息: {:?}", debug_info);
 
         let script = r#"
             (function() {
