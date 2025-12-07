@@ -264,12 +264,14 @@ impl CdpClient {
                     let size_str = item["size_str"].as_str().unwrap_or("");
                     let time_str = item["time_str"].as_str().unwrap_or("");
 
-                    // 存储 URL 到 root_description，格式: CDP:<URL>|<FOLDER>
+                    // 存储 URL 到 root_description，格式: CDP:<URL>|<标准化后的FOLDER>
                     let url = item["url"].as_str().unwrap_or("");
+                    let normalized_folder =
+                        crate::path_resolver::normalize_cdp_folder_name(&folder);
                     let root_description = if !url.is_empty() {
-                        format!("CDP:{}|{}", url, folder)
+                        format!("CDP:{}|{}", url, normalized_folder)
                     } else {
-                        folder.clone()
+                        normalized_folder
                     };
 
                     let timestamp = parse_steam_time(time_str).unwrap_or_else(Local::now);

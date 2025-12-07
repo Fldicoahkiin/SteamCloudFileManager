@@ -415,30 +415,22 @@ pub fn get_root_description(root: u32) -> String {
         .unwrap_or_else(|| format!("未知Root ({})", root))
 }
 
-// 标准化 CDP 的 root_description 为 VDF 格式
-// CDP 格式：CDP:<url>|<folder>
-pub fn normalize_cdp_root_description(cdp_desc: &str) -> String {
-    if cdp_desc.starts_with("CDP:") {
-        if let Some(folder_part) = cdp_desc.split('|').nth(1) {
-            match folder_part.to_lowercase().as_str() {
-                "steam cloud" | "steamcloud" | "" => get_root_description(0),
-                "documents" | "my documents" => get_root_description(2),
-                "appdata roaming" | "roaming" => get_root_description(3),
-                "appdata local" | "local" => get_root_description(4),
-                "pictures" => get_root_description(5),
-                "music" => get_root_description(6),
-                "videos" | "movies" => get_root_description(7),
-                "desktop" => get_root_description(8),
-                "saved games" => get_root_description(9),
-                "downloads" => get_root_description(10),
-                "public" | "shared" => get_root_description(11),
-                "appdata locallow" | "locallow" => get_root_description(12),
-                _ => folder_part.to_string(),
-            }
-        } else {
-            get_root_description(0)
-        }
-    } else {
-        cdp_desc.to_string()
+// CDP 网页上的 folder 名称需要映射到标准描述
+pub fn normalize_cdp_folder_name(folder: &str) -> String {
+    match folder.to_lowercase().as_str() {
+        "steam cloud" | "steamcloud" | "" => get_root_description(0),
+        "gameinstall" | "game install" => get_root_description(1),
+        "documents" | "my documents" => get_root_description(2),
+        "appdata roaming" | "roaming" => get_root_description(3),
+        "appdata local" | "local" => get_root_description(4),
+        "pictures" => get_root_description(5),
+        "music" => get_root_description(6),
+        "videos" | "movies" => get_root_description(7),
+        "desktop" => get_root_description(8),
+        "saved games" => get_root_description(9),
+        "downloads" => get_root_description(10),
+        "public" | "shared" => get_root_description(11),
+        "appdata locallow" | "locallow" => get_root_description(12),
+        _ => folder.to_string(),
     }
 }
