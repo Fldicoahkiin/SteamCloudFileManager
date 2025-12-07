@@ -24,6 +24,7 @@ osx_minimum_system_version = "10.13"
 
 # Debian package configuration (cargo-deb)
 [package.metadata.deb]
+name = "SteamCloudFileManager"
 maintainer = "Flacier <https://github.com/Fldicoahkiin>"
 depends = "$auto"
 section = "utils"
