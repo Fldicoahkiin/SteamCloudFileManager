@@ -144,6 +144,8 @@ impl SteamCloudApp {
         self.files.clear();
         self.selected_files.clear();
         self.quota_info = None;
+        self.file_tree = None;
+        self.local_save_paths.clear();
         self.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
 
         let steam_manager = self.steam_manager.clone();
@@ -176,6 +178,8 @@ impl SteamCloudApp {
         self.files.clear();
         self.selected_files.clear();
         self.quota_info = None;
+        self.file_tree = None; // 清空文件树
+        self.local_save_paths.clear();
         self.since_connected = None;
         self.status_message = "已断开连接".to_string();
     }
@@ -502,8 +506,34 @@ impl SteamCloudApp {
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        // 树状视图
-        if let Some(tree) = &mut self.file_tree {
+        if !self.is_connected && !self.is_connecting {
+            // 未连接状态
+            ui.centered_and_justified(|ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.heading("请输入 App ID 并连接到 Steam");
+                    ui.add_space(10.0);
+                    ui.label("您可以：");
+                    ui.label("• 点击上方的 '游戏库' 按钮选择游戏");
+                    ui.label("• 或直接输入 App ID 并点击 '连接'");
+                });
+            });
+        } else if self.is_connecting || (self.is_connected && !self.remote_ready) {
+            // 连接中或加载中状态
+            ui.centered_and_justified(|ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.spinner();
+                    ui.add_space(10.0);
+                    if self.is_connecting {
+                        ui.label("正在连接到 Steam...");
+                    } else {
+                        ui.label("正在加载文件列表...");
+                    }
+                });
+            });
+        } else if let Some(tree) = &mut self.file_tree {
+            // 已连接且有文件树
             let mut state = crate::ui::TreeViewState {
                 search_query: &mut self.search_query,
                 show_only_local: &mut self.show_only_local,
@@ -520,8 +550,14 @@ impl SteamCloudApp {
                 &mut state,
             );
         } else {
+            // 已连接但没有文件
             ui.centered_and_justified(|ui| {
-                ui.label("没有找到云文件");
+                ui.vertical_centered(|ui| {
+                    ui.add_space(20.0);
+                    ui.heading("没有找到云文件");
+                    ui.add_space(10.0);
+                    ui.label("该游戏没有云存档文件");
+                });
             });
         }
     }
