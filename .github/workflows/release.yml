@@ -52,7 +52,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev libfuse2
       - name: Install cargo-bundle
         if: matrix.use_bundle
         run: cargo install cargo-bundle
@@ -174,6 +174,9 @@ jobs:
       - name: Build AppImage
         if: matrix.build_appimage
         run: |
+          # 确保项目已构建（不使用 --target，让二进制生成在 target/release/）
+          cargo build --release
+          
           # 安装 cargo-appimage
           cargo install cargo-appimage
 
@@ -182,16 +185,22 @@ jobs:
           chmod +x appimagetool-x86_64.AppImage
           sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
 
-          # 使用 cargo-appimage 构建（自动处理依赖）
-          cargo appimage --target ${{ matrix.target }}
+          # 验证二进制文件存在
+          echo "检查 target/release/ 目录："
+          ls -lh target/release/ | grep SteamCloudFileManager || echo "未找到二进制文件！"
+          
+          # 使用 cargo-appimage 构建（不使用 --target）
+          cargo appimage
 
-          # 查找生成的 AppImage
-          APPIMAGE_FILE=$(find target/${{ matrix.target }}/release -name "*.AppImage" | head -n 1)
+          # 查找生成的 AppImage（cargo-appimage 生成在 target/appimage/ 目录）
+          APPIMAGE_FILE=$(find target/appimage -name "*.AppImage" | head -n 1)
           if [ -n "$APPIMAGE_FILE" ]; then
             mv "$APPIMAGE_FILE" ${{ matrix.asset_name }}.AppImage
             echo "构建成功: ${{ matrix.asset_name }}.AppImage"
           else
             echo "错误: 未找到 AppImage 文件"
+            echo "调试信息 - 查找所有 AppImage 文件："
+            find target -name "*.AppImage" || echo "未找到任何 AppImage 文件"
             exit 1
           fi
       - name: Build AUR PKGBUILD
