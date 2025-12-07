@@ -133,7 +133,11 @@ pub fn open_log_directory() -> Result<()> {
         let mut success = false;
 
         for manager in &managers {
-            if let Ok(_) = std::process::Command::new(manager).arg(&log_dir).spawn() {
+            if std::process::Command::new(manager)
+                .arg(&log_dir)
+                .spawn()
+                .is_ok()
+            {
                 success = true;
                 break;
             }
