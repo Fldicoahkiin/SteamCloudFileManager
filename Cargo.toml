@@ -63,9 +63,9 @@ auto_link_exclude_list = [
 depends = ["gtk3", "webkit2gtk"]
 optdepends = ["steam: Steam client integration"]
 files = [
-    ["target/release/SteamCloudFileManager", "usr/bin/steamcloudfilemanager", "755"],
-    ["assets/steamcloudfilemanager.desktop", "usr/share/applications/", "644"],
-    ["assets/steam_cloud-macOS-Default-1024x1024@1x.png", "usr/share/icons/hicolor/512x512/apps/steamcloudfilemanager.png", "644"],
+    ["target/release/SteamCloudFileManager", "/usr/bin/steamcloudfilemanager", "755"],
+    ["assets/steamcloudfilemanager.desktop", "/usr/share/applications/", "644"],
+    ["assets/steam_cloud-macOS-Default-1024x1024@1x.png", "/usr/share/icons/hicolor/512x512/apps/steamcloudfilemanager.png", "644"],
 ]
 
 [dependencies]
