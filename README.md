@@ -7,6 +7,9 @@
 [English](README.en.md) | **简体中文**
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![GitHub release](https://img.shields.io/github/v/release/Fldicoahkiin/SteamCloudFileManager?include_prereleases)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/Fldicoahkiin/SteamCloudFileManager/total)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+[![CI](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions)
 [![Rust](https://img.shields.io/badge/rust-1.90+-orange)](https://www.rust-lang.org)
 [![dependency status](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg)](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager)
 [![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey)](https://github.com/Fldicoahkiin/SteamCloudFileManager)
@@ -28,20 +31,89 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 
 ## 平台支持
 
-| 平台 | 架构 | 支持状态 | 说明 |
-|------|------|----------|------|
-| Windows | x64 | ✅ 支持 | |
+| 平台 | 架构 | 支持状态 | 打包格式 |
+|------|------|----------|----------|
+| Windows | x64 | ✅ 支持 | `.zip` |
 | Windows | ARM64 | ❌ 不支持 | Steam SDK 不提供 ARM64 版本 |
-| macOS | Intel (x64) | ✅ 支持 | |
-| macOS | Apple Silicon (ARM64) | ✅ 支持 | |
-| Linux | x64 | ✅ 支持 | |
-
+| macOS | Intel (x64) | ✅ 支持 | `.dmg` |
+| macOS | Apple Silicon (ARM64) | ✅ 支持 | `.dmg` |
+| Linux | x64 | ✅ 支持 | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
 
 ## 安装
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载预编译版本
+### Windows
 
-或者自己构建：
+1. 从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `SteamCloudFileManager-windows-x86_64.zip`
+2. 解压到任意位置
+3. 双击 `SteamCloudFileManager.exe` 运行
+
+**注意：** Windows 版本为便携模式，日志保存在应用所在目录的 `logs/` 文件夹。
+
+### macOS
+
+1. 从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载对应版本：
+   - Intel 芯片：`SteamCloudFileManager-macos-x86_64.dmg`
+   - Apple Silicon：`SteamCloudFileManager-macos-aarch64.dmg`
+2. 打开 DMG 文件
+3. 将应用拖入 Applications 文件夹
+
+### Linux
+
+#### .tar.gz
+
+```bash
+# 下载并解压
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
+cd SteamCloudFileManager-linux-x86_64
+
+# 运行
+./steamcloudfilemanager
+```
+
+#### AppImage
+
+```bash
+# 下载 AppImage
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+
+# 添加执行权限
+chmod +x SteamCloudFileManager-linux-x86_64.AppImage
+
+# 运行
+./SteamCloudFileManager-linux-x86_64.AppImage
+```
+
+#### Debian/Ubuntu
+
+```bash
+# 下载 .deb 包
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager_0.1.7-beta_amd64.deb
+
+# 安装
+sudo dpkg -i steamcloudfilemanager_0.1.7-beta_amd64.deb
+sudo apt-get install -f
+
+# 运行
+steamcloudfilemanager
+```
+
+#### Fedora/RHEL/openSUSE
+
+```bash
+# 下载 .rpm 包
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager-0.1.7-1.x86_64.rpm
+
+# 安装
+sudo dnf install ./steamcloudfilemanager-0.1.7-1.x86_64.rpm
+# 或
+sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
+
+# 运行
+steamcloudfilemanager
+```
+
+### 从源码构建
 
 ```bash
 git clone https://github.com/Fldicoahkiin/SteamCloudFileManager.git
@@ -139,66 +211,22 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ## TODO
 
-### 正在开发 
+### 功能开发
 
-#### 文件夹树状结构
-- [ ] 创建 `FileTreeNode` 数据结构（文件夹/文件节点）
-- [ ] 实现路径解析：最后一个 `/` 后面是文件名，前面是路径
-- [ ] 树构建算法：递归构建文件夹层级
-- [ ] UI 显示：树形线条 + 缩进
-- [ ] 文件夹：📁 图标 + 小箭头 (▼/▶)
-- [ ] 文件：不显示图标，只显示文件名
-- [ ] 点击小箭头：展开/折叠文件夹
-- [ ] 点击文件夹名：选中该文件夹和其下所有文件
-- [ ] 点击文件名：选中单个文件
-- [ ] 文件夹优先排序（同一级时文件夹在前）
-- [ ] 将 "文件夹" 列改名为 "根文件夹"
-- [ ] 默认全部展开
+- [ ] 文件夹树状视图（进度 90%）
+- [ ] 批量下载/上传功能
+- [ ] 文件冲突检测与处理
+- [ ] 多语言支持
+- [ ] 云存档备份与恢复
 
-#### 批量下载功能
-- [ ] 实现文件夹选择逻辑（点击文件夹名选中所有子文件）
-- [ ] 文件夹下载功能（递归下载所有文件）
-- [ ] 下载时创建文件夹结构
-- [ ] 下载根文件夹命名：`游戏名-根目录类型/`
-- [ ] 保持子文件夹层级：`游戏名-根目录类型/saves/manual/save1.sav`
-- [ ] 显示下载进度（当前文件/总文件数）
+### 包管理器支持
 
-#### 批量上传功能
-- [ ] 选择本地文件夹功能
-- [ ] 递归扫描文件夹下所有文件
-- [ ] 上传时保持相对路径结构
-- [ ] 显示上传进度
-
-#### 搜索和筛选
-- [ ] 文件名搜索功能
-- [ ] 搜索时自动展开匹配路径
-- [ ] 高亮匹配结果
-- [ ] 按文件夹筛选
-
-#### ⚙️ 排序和显示选项
-- [ ] 可配置排序规则（名称/大小/时间）
-- [ ] 记住文件夹展开状态
-- [ ] 自定义列显示/隐藏
-
-#### 🛠️ 其他优化
-- [ ] 虚拟滚动优化大文件夹性能
-- [ ] 文件夹右键菜单
-- [ ] 文件夹统计信息（文件数、总大小）
-- [ ] 键盘导航支持
-
-### 已完成 (v0.1.0-beta)
-
-- [x] Steam API 集成
-- [x] CDP (Chrome DevTools Protocol) 集成
-- [x] 基础文件列表显示
-- [x] 单文件下载/上传
-- [x] 文件删除和取消同步
-- [x] 多选模式
-- [x] 游戏库扫描和切换
-- [x] 游戏库刷新按钮
-- [x] Steam 重启引导对话框
-- [x] 实时状态进度显示
-- [x] 跨平台支持 (Windows/macOS/Linux)
+- [ ] AUR (Arch User Repository)
+- [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
+- [ ] APT 仓库 (Debian/Ubuntu) - `apt install steamcloudfilemanager`
+- [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steamcloudfilemanager`
+- [ ] Flatpak - `flatpak install steamcloudfilemanager`
+- [ ] Snap - `snap install steamcloudfilemanager`
 
 ## 贡献
 
@@ -216,19 +244,39 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ## 致谢
 
-- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
+### 核心依赖
+
 - [steamworks-rs](https://github.com/Thinkofname/steamworks-rs)
 - [egui](https://github.com/emilk/egui)
 - [eframe](https://github.com/emilk/egui/tree/master/crates/eframe)
 - [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs)
 - [tungstenite](https://github.com/snapview/tungstenite-rs)
+
+### 工具库
+
 - [rfd](https://github.com/PolyMeilex/rfd)
 - [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
 - [ureq](https://github.com/algesten/ureq)
+- [anyhow](https://github.com/dtolnay/anyhow)
+- [tracing](https://github.com/tokio-rs/tracing)
+
+### 打包工具
+
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle)
+- [cargo-deb](https://github.com/kornelski/cargo-deb)
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm)
+- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)
+
+### 参考项目
+
+- [SteamCloudFileManagerLite](<https://github.com/GMMan/SteamCloudFileManagerLite>)
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
+
+### 文档资料
+
 - [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api)
 - [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud)
 - [VDF Parser (Python)](https://github.com/ValvePython/vdf)
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
 - [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
 - [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
 

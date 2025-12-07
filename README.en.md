@@ -7,6 +7,9 @@
 **English** | [简体中文](README.md)
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![GitHub release](https://img.shields.io/github/v/release/Fldicoahkiin/SteamCloudFileManager?include_prereleases)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/Fldicoahkiin/SteamCloudFileManager/total)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+[![CI](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions)
 [![Rust](https://img.shields.io/badge/rust-1.90+-orange)](https://www.rust-lang.org)
 [![dependency status](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg)](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager)
 [![Platform](https://img.shields.io/badge/platform-Windows%20|%20macOS%20|%20Linux-lightgrey)](https://github.com/Fldicoahkiin/SteamCloudFileManager)
@@ -28,20 +31,89 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 
 ## Platform Support
 
-| Platform | Architecture | Status | Notes |
-|----------|--------------|--------|-------|
-| Windows | x64 | ✅ Supported | |
+| Platform | Architecture | Status | Package Format |
+|----------|--------------|--------|----------------|
+| Windows | x64 | ✅ Supported | `.zip` |
 | Windows | ARM64 | ❌ Not Supported | Steam SDK does not provide ARM64 binaries |
-| macOS | Intel (x64) | ✅ Supported | |
-| macOS | Apple Silicon (ARM64) | ✅ Supported | |
-| Linux | x64 | ✅ Supported | |
-
+| macOS | Intel (x64) | ✅ Supported | `.dmg` |
+| macOS | Apple Silicon (ARM64) | ✅ Supported | `.dmg` |
+| Linux | x64 | ✅ Supported | `.tar.gz`, `.deb`, `.rpm`, `.AppImage` |
 
 ## Installation
 
-Download precompiled binaries from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+### Windows
 
-Or build from source:
+1. Download `SteamCloudFileManager-windows-x86_64.zip` from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+2. Extract to any location
+3. Double-click `SteamCloudFileManager.exe` to run
+
+**Note:** Windows version is portable, logs are saved in the `logs/` folder in the application directory.
+
+### macOS
+
+1. Download from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases):
+   - Intel: `SteamCloudFileManager-macos-x86_64.dmg`
+   - Apple Silicon: `SteamCloudFileManager-macos-aarch64.dmg`
+2. Open the DMG file
+3. Drag the app to Applications folder
+
+### Linux
+
+#### .tar.gz (Universal)
+
+```bash
+# Download and extract
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
+cd SteamCloudFileManager-linux-x86_64
+
+# Run
+./steamcloudfilemanager
+```
+
+#### AppImage (Universal)
+
+```bash
+# Download AppImage
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+
+# Add execute permission
+chmod +x SteamCloudFileManager-linux-x86_64.AppImage
+
+# Run
+./SteamCloudFileManager-linux-x86_64.AppImage
+```
+
+#### Debian/Ubuntu
+
+```bash
+# Download .deb package
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager_0.1.7-beta_amd64.deb
+
+# Install
+sudo dpkg -i steamcloudfilemanager_0.1.7-beta_amd64.deb
+sudo apt-get install -f
+
+# Run
+steamcloudfilemanager
+```
+
+#### Fedora/RHEL/openSUSE
+
+```bash
+# Download .rpm package
+wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager-0.1.7-1.x86_64.rpm
+
+# Install
+sudo dnf install ./steamcloudfilemanager-0.1.7-1.x86_64.rpm
+# or
+sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
+
+# Run
+steamcloudfilemanager
+```
+
+### Build from Source
 
 ```bash
 git clone https://github.com/Fldicoahkiin/SteamCloudFileManager.git
@@ -139,66 +211,22 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ## TODO
 
-### In Development
+### Feature Development
 
-#### Folder Tree Structure
-- [ ] Create `FileTreeNode` data structure (folder/file nodes)
-- [ ] Implement path parsing: filename after last `/`, path before it
-- [ ] Tree building algorithm: recursively build folder hierarchy
-- [ ] UI display: tree lines + indentation
-- [ ] Folder: 📁 icon + small arrow (▼/▶)
-- [ ] File: no icon, display filename only
-- [ ] Click arrow: expand/collapse folder
-- [ ] Click folder name: select folder and all files within
-- [ ] Click filename: select single file
-- [ ] Folder-first sorting (folders before files at same level)
-- [ ] Rename "Folder" column to "Root Folder"
-- [ ] Default to fully expanded
+- [ ] Folder tree view (90% complete)
+- [ ] Batch download/upload functionality
+- [ ] File conflict detection and handling
+- [ ] Multi-language support
+- [ ] Cloud save backup and restore
 
-#### Batch Download
-- [ ] Implement folder selection logic (click folder name to select all sub-files)
-- [ ] Folder download function (recursively download all files)
-- [ ] Create folder structure during download
-- [ ] Root folder naming: `GameName-RootType/`
-- [ ] Maintain subfolder hierarchy: `GameName-RootType/saves/manual/save1.sav`
-- [ ] Display download progress (current file/total files)
+### Package Manager Support
 
-#### Batch Upload
-- [ ] Select local folder function
-- [ ] Recursively scan all files in folder
-- [ ] Maintain relative path structure during upload
-- [ ] Display upload progress
-
-#### Search and Filtering
-- [ ] Filename search function
-- [ ] Auto-expand matching paths during search
-- [ ] Highlight matching results
-- [ ] Filter by folder
-
-#### ⚙️ Sorting and Display Options
-- [ ] Configurable sorting rules (name/size/time)
-- [ ] Remember folder expansion state
-- [ ] Customize column display/hide
-
-#### 🛠️ Other Improvements
-- [ ] Virtual scrolling for large folder performance
-- [ ] Folder context menu
-- [ ] Folder statistics (file count, total size)
-- [ ] Keyboard navigation support
-
-### Completed (v0.1.0-beta)
-
-- [x] Steam API integration
-- [x] CDP (Chrome DevTools Protocol) integration
-- [x] Basic file list display
-- [x] Single file download/upload
-- [x] File deletion and unsync
-- [x] Multi-select mode
-- [x] Game library scanning and switching
-- [x] Game library refresh button
-- [x] Steam restart guide dialog
-- [x] Real-time status progress display
-- [x] Cross-platform support (Windows/macOS/Linux)
+- [ ] AUR (Arch User Repository)
+- [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
+- [ ] APT Repository (Debian/Ubuntu) - `apt install steamcloudfilemanager`
+- [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steamcloudfilemanager`
+- [ ] Flatpak - `flatpak install steamcloudfilemanager`
+- [ ] Snap - `snap install steamcloudfilemanager`
 
 ## Contributing
 
@@ -216,19 +244,39 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
 
-- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
+### Core Dependencies
+
 - [steamworks-rs](https://github.com/Thinkofname/steamworks-rs)
 - [egui](https://github.com/emilk/egui)
 - [eframe](https://github.com/emilk/egui/tree/master/crates/eframe)
 - [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs)
 - [tungstenite](https://github.com/snapview/tungstenite-rs)
+
+### Utility Libraries
+
 - [rfd](https://github.com/PolyMeilex/rfd)
 - [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
 - [ureq](https://github.com/algesten/ureq)
+- [anyhow](https://github.com/dtolnay/anyhow)
+- [tracing](https://github.com/tokio-rs/tracing)
+
+### Packaging Tools
+
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle)
+- [cargo-deb](https://github.com/kornelski/cargo-deb)
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm)
+- [linuxdeploy](https://github.com/linuxdeploy/linuxdeploy)
+
+### Reference Projects
+
+- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
+
+### Documentation
+
 - [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api)
 - [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud)
 - [VDF Parser (Python)](https://github.com/ValvePython/vdf)
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
 - [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
 - [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
 
