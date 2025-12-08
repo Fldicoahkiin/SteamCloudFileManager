@@ -7,7 +7,7 @@ pub enum FileAction {
     InvertSelection,
     ClearSelection,
     DownloadSelected,
-    UploadFile,
+    Upload,
     DeleteSelected,
     ForgetSelected,
 }
@@ -41,21 +41,22 @@ pub fn draw_file_action_buttons(
 
         // 文件操作
         if ui
-            .add_enabled(can_operate && has_selection, egui::Button::new("下载选中"))
+            .add_enabled(can_operate && has_selection, egui::Button::new("下载"))
             .clicked()
         {
             action = FileAction::DownloadSelected;
         }
 
         if ui
-            .add_enabled(can_operate, egui::Button::new("上传文件"))
+            .add_enabled(can_operate, egui::Button::new("上传"))
+            .on_hover_text("选择文件或文件夹进行上传")
             .clicked()
         {
-            action = FileAction::UploadFile;
+            action = FileAction::Upload;
         }
 
         if ui
-            .add_enabled(can_operate && has_selection, egui::Button::new("删除选中"))
+            .add_enabled(can_operate && has_selection, egui::Button::new("删除"))
             .clicked()
         {
             action = FileAction::DeleteSelected;

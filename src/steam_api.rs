@@ -362,6 +362,32 @@ impl SteamCloudManager {
             }
         }
     }
+
+    // 同步云文件
+    pub fn sync_cloud_files(&self) -> Result<()> {
+        let client = self.client.lock().unwrap();
+        let client = client
+            .as_ref()
+            .ok_or_else(|| anyhow!("Steam客户端未连接"))?;
+
+        let remote_storage = client.remote_storage();
+
+        // 检查云同步是否启用
+        if !remote_storage.is_cloud_enabled_for_account() {
+            return Err(anyhow!("账户未启用云同步"));
+        }
+
+        if !remote_storage.is_cloud_enabled_for_app() {
+            return Err(anyhow!("应用未启用云同步"));
+        }
+
+        // 调用 run_callbacks 来触发同步
+        // Steam API 会在后台自动同步文件
+        client.run_callbacks();
+
+        tracing::info!("已触发 Steam 云文件同步");
+        Ok(())
+    }
 }
 
 impl Drop for SteamCloudManager {

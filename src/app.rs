@@ -43,6 +43,12 @@ pub struct SteamCloudApp {
     show_only_local: bool,
     show_only_cloud: bool,
     last_selected_index: Option<usize>,
+    show_upload_type_selector: bool,
+    upload_preview: Option<crate::ui::UploadPreviewDialog>,
+    upload_progress: Option<crate::ui::UploadProgressDialog>,
+    upload_complete: Option<crate::ui::UploadCompleteDialog>,
+    upload_rx: Option<Receiver<Result<String, String>>>,
+    upload_progress_rx: Option<Receiver<(usize, usize, String)>>,
 }
 
 impl SteamCloudApp {
@@ -110,6 +116,12 @@ impl SteamCloudApp {
             show_only_local: false,
             show_only_cloud: false,
             last_selected_index: None,
+            show_upload_type_selector: false,
+            upload_preview: None,
+            upload_progress: None,
+            upload_complete: None,
+            upload_rx: None,
+            upload_progress_rx: None,
         };
 
         // 启动时自动扫描游戏
@@ -244,7 +256,6 @@ impl SteamCloudApp {
             return;
         }
 
-        // 使用批量下载，保持文件夹结构
         match crate::file_manager::batch_download_files_with_dialog(
             &self.files,
             &self.selected_files,
@@ -272,26 +283,54 @@ impl SteamCloudApp {
         }
     }
 
-    fn upload_file(&mut self) {
-        use crate::file_manager::FileOperationResult;
-
-        let result = crate::file_manager::upload_file_coordinated(
-            self.is_connected,
-            self.steam_manager.clone(),
-        );
-
-        match result {
-            FileOperationResult::Success(msg) => {
-                self.status_message = msg;
-            }
-            FileOperationResult::SuccessWithRefresh(msg) => {
-                self.status_message = msg;
-                self.refresh_files();
-            }
-            FileOperationResult::Error(msg) => {
-                self.show_error(&msg);
-            }
+    // 上传
+    fn upload(&mut self) {
+        if !self.is_connected {
+            self.show_error("未连接到 Steam");
+            return;
         }
+
+        // 显示选择对话框
+        self.show_upload_type_selector = true;
+    }
+
+    // 开始上传
+    fn start_upload(&mut self, mut queue: crate::file_manager::UploadQueue) {
+        let total_files = queue.total_files();
+
+        // 显示进度对话框
+        self.upload_progress = Some(crate::ui::UploadProgressDialog::new(total_files));
+
+        // 在后台线程执行上传
+        let steam_manager = self.steam_manager.clone();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        self.upload_rx = Some(rx);
+        self.upload_progress_rx = Some(progress_rx);
+
+        std::thread::spawn(move || {
+            let executor = crate::file_manager::UploadExecutor::new(steam_manager)
+                .with_progress_callback(move |current, total, filename| {
+                    let _ = progress_tx.send((current, total, filename.to_string()));
+                });
+
+            match executor.execute(&mut queue) {
+                Ok(result) => {
+                    // 使用 JSON 传递完整结果
+                    let result_json = serde_json::json!({
+                        "success_count": result.success_count,
+                        "failed_count": result.failed_count,
+                        "total_size": result.total_size,
+                        "elapsed_secs": result.elapsed_secs,
+                        "failed_files": result.failed_files,
+                    });
+                    let _ = tx.send(Ok(result_json.to_string()));
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string()));
+                }
+            }
+        });
     }
 
     fn forget_selected_files(&mut self) {
@@ -304,9 +343,6 @@ impl SteamCloudApp {
         );
 
         match result {
-            FileOperationResult::Success(msg) => {
-                self.status_message = msg;
-            }
             FileOperationResult::SuccessWithRefresh(msg) => {
                 self.status_message = msg;
                 self.refresh_files();
@@ -327,9 +363,6 @@ impl SteamCloudApp {
         );
 
         match result {
-            FileOperationResult::Success(msg) => {
-                self.status_message = msg;
-            }
             FileOperationResult::SuccessWithRefresh(msg) => {
                 self.status_message = msg;
                 self.refresh_files();
@@ -399,24 +432,32 @@ impl SteamCloudApp {
     }
 
     fn upload_file_from_path(&mut self, path: &std::path::Path) {
-        use crate::file_manager::FileOperationResult;
+        if !self.is_connected {
+            self.show_error("未连接到 Steam");
+            return;
+        }
 
-        let result = crate::file_manager::upload_file_from_path_coordinated(
-            path,
-            self.steam_manager.clone(),
-        );
+        // 使用新的上传系统
+        let mut queue = crate::file_manager::UploadQueue::new();
 
-        match result {
-            FileOperationResult::Success(msg) => {
-                self.status_message = msg;
+        if path.is_file() {
+            if let Err(e) = queue.add_file(path.to_path_buf()) {
+                self.show_error(&format!("添加文件失败: {}", e));
+                return;
             }
-            FileOperationResult::SuccessWithRefresh(msg) => {
-                self.status_message = msg;
-                self.refresh_files();
+        } else if path.is_dir() {
+            if let Err(e) = queue.add_folder(path) {
+                self.show_error(&format!("添加文件夹失败: {}", e));
+                return;
             }
-            FileOperationResult::Error(msg) => {
-                self.show_error(&msg);
-            }
+        } else {
+            self.show_error("无效的文件路径");
+            return;
+        }
+
+        if queue.total_files() > 0 {
+            // 直接开始上传，不显示预览
+            self.start_upload(queue);
         }
     }
 
@@ -499,6 +540,9 @@ impl SteamCloudApp {
                 }
                 crate::ui::ConnectionAction::Disconnect => {
                     self.disconnect_from_steam();
+                }
+                crate::ui::ConnectionAction::Refresh => {
+                    self.refresh_files();
                 }
                 crate::ui::ConnectionAction::None => {}
             }
@@ -596,8 +640,8 @@ impl SteamCloudApp {
             crate::ui::FileAction::DownloadSelected => {
                 self.download_selected_file();
             }
-            crate::ui::FileAction::UploadFile => {
-                self.upload_file();
+            crate::ui::FileAction::Upload => {
+                self.upload();
             }
             crate::ui::FileAction::DeleteSelected => {
                 self.delete_selected_files();
@@ -795,6 +839,76 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
+        // 处理批量上传进度更新
+        if let Some(rx) = &self.upload_progress_rx {
+            match rx.try_recv() {
+                Ok((current, total, filename)) => {
+                    if let Some(progress) = &mut self.upload_progress {
+                        progress.current_index = current;
+                        progress.total_files = total;
+                        progress.current_file = filename.clone();
+                        progress.progress = current as f32 / total as f32;
+
+                        // 添加到已完成列表
+                        if current > progress.completed_files.len() {
+                            progress.completed_files.push(filename);
+                        }
+                    }
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.upload_progress_rx = None;
+                }
+            }
+        }
+
+        // 处理批量上传结果
+        if let Some(rx) = &self.upload_rx {
+            match rx.try_recv() {
+                Ok(Ok(msg)) => {
+                    // 解析 JSON 结果
+                    if let Ok(result) = serde_json::from_str::<serde_json::Value>(&msg) {
+                        let success_count = result["success_count"].as_u64().unwrap_or(0) as usize;
+                        let failed_count = result["failed_count"].as_u64().unwrap_or(0) as usize;
+                        let total_size = result["total_size"].as_u64().unwrap_or(0);
+                        let elapsed_secs = result["elapsed_secs"].as_u64().unwrap_or(0);
+
+                        let failed_files: Vec<(String, String)> = result["failed_files"]
+                            .as_array()
+                            .map(|arr| {
+                                arr.iter()
+                                    .filter_map(|item| {
+                                        let filename = item[0].as_str()?.to_string();
+                                        let error = item[1].as_str()?.to_string();
+                                        Some((filename, error))
+                                    })
+                                    .collect()
+                            })
+                            .unwrap_or_default();
+
+                        self.upload_progress = None;
+                        self.upload_complete = Some(crate::ui::UploadCompleteDialog::new(
+                            success_count,
+                            failed_count,
+                            total_size,
+                            elapsed_secs,
+                            failed_files,
+                        ));
+                    }
+                    self.upload_rx = None;
+                }
+                Ok(Err(err)) => {
+                    self.upload_progress = None;
+                    self.show_error(&format!("上传失败: {}", err));
+                    self.upload_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.upload_rx = None;
+                }
+            }
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.heading("Steam 云文件管理器");
             self.draw_connection_panel(ui);
@@ -914,6 +1028,95 @@ impl eframe::App for SteamCloudApp {
                     self.scan_cloud_games();
                 }
                 self.show_user_selector = false;
+            }
+        }
+
+        // 上传类型选择器
+        if self.show_upload_type_selector {
+            egui::Window::new("📎 选择上传类型")
+                .resizable(false)
+                .collapsible(false)
+                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+                .show(ctx, |ui| {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(10.0);
+                        ui.label("请选择要上传的类型：");
+                        ui.add_space(20.0);
+
+                        if ui.button("📄 上传文件（可多选）").clicked() {
+                            self.show_upload_type_selector = false;
+                            match crate::file_manager::upload_files_with_dialog(
+                                self.steam_manager.clone(),
+                            ) {
+                                Ok(Some(queue)) => {
+                                    self.upload_preview =
+                                        Some(crate::ui::UploadPreviewDialog::new(queue));
+                                }
+                                Ok(None) => {}
+                                Err(e) => {
+                                    self.show_error(&format!("选择文件失败: {}", e));
+                                }
+                            }
+                        }
+
+                        ui.add_space(10.0);
+
+                        if ui.button("📂 上传文件夹（递归）").clicked() {
+                            self.show_upload_type_selector = false;
+                            match crate::file_manager::upload_folder_with_dialog(
+                                self.steam_manager.clone(),
+                            ) {
+                                Ok(Some(queue)) => {
+                                    self.upload_preview =
+                                        Some(crate::ui::UploadPreviewDialog::new(queue));
+                                }
+                                Ok(None) => {}
+                                Err(e) => {
+                                    self.show_error(&format!("选择文件夹失败: {}", e));
+                                }
+                            }
+                        }
+
+                        ui.add_space(10.0);
+
+                        if ui.button("✖ 取消").clicked() {
+                            self.show_upload_type_selector = false;
+                        }
+
+                        ui.add_space(10.0);
+                    });
+                });
+        }
+
+        // 上传预览对话框
+        if let Some(preview) = &mut self.upload_preview {
+            match preview.draw(ctx) {
+                crate::ui::UploadAction::Confirm => {
+                    // 开始上传
+                    if let Some(preview) = self.upload_preview.take() {
+                        self.start_upload(preview.queue);
+                    }
+                }
+                crate::ui::UploadAction::Cancel => {
+                    self.upload_preview = None;
+                }
+                crate::ui::UploadAction::None => {}
+            }
+        }
+
+        // 上传进度对话框
+        if let Some(progress) = &mut self.upload_progress {
+            progress.draw(ctx);
+            if !progress.show {
+                self.upload_progress = None;
+            }
+        }
+
+        // 上传完成对话框
+        if let Some(complete) = &mut self.upload_complete {
+            if complete.draw(ctx) {
+                self.upload_complete = None;
+                self.refresh_files();
             }
         }
 

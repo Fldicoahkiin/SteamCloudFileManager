@@ -1,6 +1,6 @@
 [package]
 name = "SteamCloudFileManager"
-version = "0.1.7-beta"
+version = "0.6.6-beta"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
@@ -88,6 +88,7 @@ regex = "1.12.2"
 rfd = "0.16.0"
 sysinfo = "0.37.2"
 url = "2.5.7"
+walkdir = "2.5"
 
 # Serialization
 keyvalues-parser = "0.2.1"

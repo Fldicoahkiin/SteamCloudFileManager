@@ -4,6 +4,7 @@ pub mod guide_dialog;
 pub mod helpers;
 pub mod panels;
 pub mod selectors;
+pub mod upload_dialog;
 pub mod windows;
 
 pub use action_buttons::*;
@@ -11,6 +12,7 @@ pub use font_loader::setup_fonts;
 pub use guide_dialog::*;
 pub use helpers::*;
 pub use selectors::*;
+pub use upload_dialog::*;
 pub use windows::*;
 
 pub use panels::{render_file_tree, TreeViewState};
