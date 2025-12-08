@@ -110,6 +110,51 @@ fn collect_indices(node: &FileTreeNode, indices: &mut Vec<usize>) {
     }
 }
 
+// 收集当前可见的所有文件索引（用于 Shift 选择）
+fn collect_visible_file_indices(
+    nodes: &[FileTreeNode],
+    show_only_local: bool,
+    show_only_cloud: bool,
+) -> Vec<usize> {
+    let mut indices = Vec::new();
+    collect_visible_indices_recursive(nodes, show_only_local, show_only_cloud, &mut indices);
+    indices.sort_unstable();
+    indices
+}
+
+fn collect_visible_indices_recursive(
+    nodes: &[FileTreeNode],
+    show_only_local: bool,
+    show_only_cloud: bool,
+    indices: &mut Vec<usize>,
+) {
+    for node in nodes {
+        match node {
+            FileTreeNode::Folder {
+                children,
+                is_expanded,
+                ..
+            } => {
+                // 只有展开的文件夹才递归处理
+                if *is_expanded {
+                    collect_visible_indices_recursive(
+                        children,
+                        show_only_local,
+                        show_only_cloud,
+                        indices,
+                    );
+                }
+            }
+            FileTreeNode::File { index, file, .. } => {
+                // 检查文件是否匹配筛选条件
+                if matches_filter(file, show_only_local, show_only_cloud) {
+                    indices.push(*index);
+                }
+            }
+        }
+    }
+}
+
 // 检查节点是否匹配搜索条件
 fn matches_search(node: &FileTreeNode, search_query: &str) -> bool {
     if search_query.is_empty() {
@@ -288,6 +333,10 @@ fn render_tree_body(
     selected_files: &mut Vec<usize>,
     ctx: &mut TreeBodyContext,
 ) {
+    // 先收集当前可见的所有文件索引
+    let visible_indices =
+        collect_visible_file_indices(nodes, ctx.show_only_local, ctx.show_only_cloud);
+
     let render_ctx = TreeRenderContext {
         search_query: ctx.search_query,
         show_only_local: ctx.show_only_local,
@@ -297,14 +346,16 @@ fn render_tree_body(
         body,
         nodes,
         selected_files,
-        1,
+        0,
         &[],
         &render_ctx,
         ctx.last_selected_index,
+        &visible_indices,
     );
 }
 
 // 递归渲染树节点
+#[allow(clippy::too_many_arguments)]
 fn render_tree_body_recursive(
     body: &mut egui_extras::TableBody,
     nodes: &mut [FileTreeNode],
@@ -313,6 +364,7 @@ fn render_tree_body_recursive(
     parent_is_last: &[bool],
     ctx: &TreeRenderContext,
     last_selected_index: &mut Option<usize>,
+    visible_indices: &[usize],
 ) {
     let node_count = nodes.len();
 
@@ -416,6 +468,7 @@ fn render_tree_body_recursive(
                         &new_parent_is_last,
                         ctx,
                         last_selected_index,
+                        visible_indices,
                     );
                 }
             }
@@ -466,10 +519,12 @@ fn render_tree_body_recursive(
                                     let start = last_idx.min(file_index);
                                     let end = last_idx.max(file_index);
 
-                                    // 清空当前选择，选中范围内所有文件
+                                    // 清空当前选择，只选中范围内且可见的文件
                                     selected_files.clear();
-                                    for i in start..=end {
-                                        selected_files.push(i);
+                                    for &idx in visible_indices {
+                                        if idx >= start && idx <= end {
+                                            selected_files.push(idx);
+                                        }
                                     }
                                 } else if ctrl {
                                     // Ctrl 点击：切换选中状态
