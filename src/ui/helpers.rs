@@ -189,6 +189,10 @@ pub fn draw_connection_controls(
         if ui.button("断开").clicked() {
             action = ConnectionAction::Disconnect;
         }
+
+        if ui.button("刷新").clicked() {
+            action = ConnectionAction::Refresh;
+        }
     } else if ui.button("连接").clicked() {
         action = ConnectionAction::Connect;
     }
@@ -206,6 +210,7 @@ pub enum ConnectionAction {
     InputChanged,
     Connect,
     Disconnect,
+    Refresh,
 }
 
 // 绘制云存储状态信息
