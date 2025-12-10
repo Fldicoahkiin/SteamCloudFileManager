@@ -159,8 +159,8 @@ impl CdpClient {
         // 不要自己导航，假设 steam://openurl 已经打开了页面
         // self.navigate("https://store.steampowered.com/account/remotestorage")?;
 
-        // 等待一下让页面加载完成
-        std::thread::sleep(std::time::Duration::from_secs(2));
+        // 等待页面加载完成
+        std::thread::sleep(std::time::Duration::from_secs(5));
 
         // 调试：检查页面内容
         let debug_script = r#"
