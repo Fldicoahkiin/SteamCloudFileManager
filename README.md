@@ -28,14 +28,14 @@
 
 一个图形界面的 Steam 云存档管理工具，无需启动游戏就能直接操作云端文件。
 
-Steam 客户端自带的云存档管理功能比较简陋，这个工具提供了更完整的文件列表和批量操作支持：
-
-- 查看完整的云存档文件列表（包括文件夹结构）
-- 批量下载/上传文件
+- 查看完整的云存档文件列表（树状视图）
+- 批量下载/上传文件（支持拖拽）
 - 删除或取消同步指定文件
-- 快速切换不同游戏
+- 文件搜索和过滤（本地/云端）
+- 快速切换不同游戏（自动扫描游戏库）
 - 查看文件在本地磁盘的实际位置
-- 显示云端同步状态
+- 显示云端同步状态和配额
+- 多用户支持
 
 ## 平台支持
 
@@ -55,7 +55,11 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 2. 解压到任意位置
 3. 双击 `SteamCloudFileManager.exe` 运行
 
-**注意：** Windows 版本为便携模式，日志保存在应用所在目录的 `logs/` 文件夹。
+> **注意**：
+>
+> - Windows 版本日志保存在应用所在目录的 `logs/` 文件夹。
+> - macOS 版本日志保存在 `~/Library/Logs/SteamCloudFileManager/` 目录。
+> - Linux 版本日志保存在 `~/.local/share/SteamCloudFileManager/logs/` 目录。
 
 ### macOS
 
@@ -69,12 +73,11 @@ Steam 客户端自带的云存档管理功能比较简陋，这个工具提供�
 
 #### Debian/Ubuntu
 
-```bash
-# 下载 .deb 包
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager_0.1.7-beta_amd64.deb
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.deb` 包，然后安装：
 
+```bash
 # 安装
-sudo dpkg -i steamcloudfilemanager_0.1.7-beta_amd64.deb
+sudo dpkg -i steamcloudfilemanager_*.deb
 sudo apt-get install -f
 
 # 运行
@@ -83,14 +86,13 @@ steamcloudfilemanager
 
 #### Fedora/RHEL/openSUSE
 
-```bash
-# 下载 .rpm 包
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager-0.1.7-1.x86_64.rpm
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.rpm` 包，然后安装：
 
+```bash
 # 安装
-sudo dnf install ./steamcloudfilemanager-0.1.7-1.x86_64.rpm
+sudo dnf install ./steamcloudfilemanager-*.rpm
 # 或
-sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
+sudo rpm -i steamcloudfilemanager-*.rpm
 
 # 运行
 steamcloudfilemanager
@@ -98,10 +100,9 @@ steamcloudfilemanager
 
 #### AppImage（通用）
 
-```bash
-# 下载 AppImage
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.AppImage` 文件，然后运行：
 
+```bash
 # 添加执行权限
 chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
@@ -111,10 +112,12 @@ chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
 #### Arch Linux (AUR)
 
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 AUR 包，然后构建安装：
+
 ```bash
-# 下载 PKGBUILD
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64-aur.tar.gz
+# 解压 AUR 包
 tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
+cd SteamCloudFileManager-linux-x86_64-aur
 
 # 使用 makepkg 构建并安装
 makepkg -si
@@ -125,9 +128,10 @@ steamcloudfilemanager
 
 #### .tar.gz（通用）
 
+从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.tar.gz` 包，然后解压运行：
+
 ```bash
-# 下载并解压
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+# 解压
 tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
 cd SteamCloudFileManager-linux-x86_64
 
@@ -172,6 +176,12 @@ cargo build --release
 
 本工具使用 CDP 协议与 Steam 通信，**必须**以调试模式启动 Steam。
 
+**为什么需要调试模式？**
+
+- CDP（Chrome DevTools Protocol）是 Steam 内置浏览器的调试接口
+- 我们通过这个接口获取云端文件列表和下载链接
+- 只有开启调试模式，CDP 端口才会启用
+
 **Windows:**
 
 1. 右键点击 Steam 快捷方式，选择“属性”
@@ -212,14 +222,70 @@ cargo build --release
 
 App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
 
+### 注意事项
+
+> ⚠️ **重要提示**
+
+**删除操作风险**：
+
+- 删除云存档文件是 **不可逆** 的操作
+- 删除后文件会从所有设备上同步删除
+- 请确保在删除前已经备份重要文件
+
+**备份建议**：
+
+- 在进行任何删除或修改操作前，先下载备份
+- 定期备份重要游戏的云存档
+- 使用“批量下载”功能快速备份整个游戏的存档
+
+**云同步说明**：
+
+- 上传/删除后，请等待 Steam 完成同步（通常在断开连接后）
+- 同步过程中不要关闭 Steam 或关机
+
 ## 技术架构
+
+### 云同步机制
+
+Steam 云同步采用三层架构：
+
+```
+Steam 云端服务器
+        ↕ (后台异步同步)
+Steam 客户端本地缓存
+        ↕ (Steam API)
+本软件
+```
+
+**重要说明**：
+
+- 上传/删除操作会立即写入**本地缓存**
+- 实际同步到云端是 **后台异步**进行的
+- **断开连接后** Steam 会自动触发同步，这是 Steam 的安全机制
 
 ### VDF 解析
 
 - 直接读取 `remotecache.vdf` 获取完整文件列表
 - 显示文件在本地磁盘的实际存储位置
 - 支持所有 Root 路径类型（0-12）
-- 📝 **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 详细的路径映射规则和游戏案例
+
+**什么是 Root 路径？**
+
+Root 路径是 Steam 云存档系统中的文件存储位置类型。不同的游戏可能将存档保存在不同的目录：
+
+- **Root 0** - Steam Cloud 默认目录（`userdata/{user_id}/{app_id}/remote/`）
+- **Root 1** - 游戏安装目录（`steamapps/common/{GameDir}/`）
+- **Root 2** - 文档文件夹（Windows: `Documents/`, macOS: `~/Documents/`）
+- **Root 3** - AppData Roaming（Windows: `%APPDATA%`, macOS: `~/Library/Application Support/`）
+- **Root 7** - macOS Application Support / Windows Videos
+- **Root 12** - Windows LocalLow / macOS Caches
+- **其他** - 图片、音乐、视频、桌面等系统文件夹
+
+我们的软件会自动识别并显示每个文件的实际存储位置。
+
+> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。（我还没测试完🥺👉👈
+
+- **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的路径映射规则
 
 ### CDP 协议
 
@@ -236,11 +302,13 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ### 功能开发
 
-- [ ] 批量上传
-- [ ] 拖拽上传
 - [ ] 文件冲突检测与处理
-- [ ] 多语言支持
+- [ ] 多语言支持（i18n）
 - [ ] 云存档备份与恢复
+- [ ] 文件对比功能（本地 vs 云端）
+- [ ] 自动备份计划
+- [ ] 版本更新检测
+- [ ] 软链接同步支持（实验性）
 
 ### 包管理器支持
 
@@ -282,6 +350,8 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 - [ureq](https://github.com/algesten/ureq)
 - [anyhow](https://github.com/dtolnay/anyhow)
 - [tracing](https://github.com/tokio-rs/tracing)
+- [serde](https://github.com/serde-rs/serde)
+- [image](https://github.com/image-rs/image)
 
 ### 打包工具
 
