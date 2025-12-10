@@ -369,8 +369,21 @@ pub fn batch_forget_files(
     filenames: &[String],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
 ) -> (usize, Vec<String>) {
-    let file_ops = FileOperations::new(steam_manager);
-    file_ops.batch_operation(filenames, |filename| file_ops.forget_file(filename))
+    let file_ops = FileOperations::new(steam_manager.clone());
+    let (success_count, failed_files) =
+        file_ops.batch_operation(filenames, |filename| file_ops.forget_file(filename));
+
+    // 取消云同步后，触发云同步
+    if success_count > 0 {
+        tracing::info!("取消云同步完成，触发云同步...");
+        if let Ok(manager) = steam_manager.lock() {
+            if let Err(e) = manager.sync_cloud_files() {
+                tracing::warn!("触发云同步失败: {}", e);
+            }
+        }
+    }
+
+    (success_count, failed_files)
 }
 
 // 批量删除文件
@@ -378,8 +391,21 @@ pub fn batch_delete_files(
     filenames: &[String],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
 ) -> (usize, Vec<String>) {
-    let file_ops = FileOperations::new(steam_manager);
-    file_ops.batch_operation(filenames, |filename| file_ops.delete_file(filename))
+    let file_ops = FileOperations::new(steam_manager.clone());
+    let (success_count, failed_files) =
+        file_ops.batch_operation(filenames, |filename| file_ops.delete_file(filename));
+
+    // 删除完成后，触发云同步
+    if success_count > 0 {
+        tracing::info!("删除完成，触发云同步...");
+        if let Ok(manager) = steam_manager.lock() {
+            if let Err(e) = manager.sync_cloud_files() {
+                tracing::warn!("触发云同步失败: {}", e);
+            }
+        }
+    }
+
+    (success_count, failed_files)
 }
 
 // 取消云同步选中的文件
@@ -720,11 +746,9 @@ impl UploadExecutor {
 
         // 上传完成后，触发云同步
         if success_count > 0 {
-            tracing::info!("上传完成，开始同步云文件...");
+            tracing::info!("上传完成，触发云同步...");
             if let Err(e) = self.sync_cloud_files() {
-                tracing::warn!("云同步失败: {}", e);
-            } else {
-                tracing::info!("云同步已触发，Steam 将在后台同步文件");
+                tracing::warn!("触发云同步失败: {}", e);
             }
         }
 
@@ -796,7 +820,7 @@ impl UploadExecutor {
         Ok(())
     }
 
-    // 同步云文件
+    // 触发云同步
     fn sync_cloud_files(&self) -> Result<()> {
         let manager = self
             .steam_manager

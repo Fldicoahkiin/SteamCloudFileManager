@@ -201,6 +201,19 @@ pub fn draw_connection_controls(
         ui.spinner();
     }
 
+    // 添加云同步提示
+    if is_connected {
+        ui.separator();
+        ui.label(
+            egui::RichText::new("云同步提示：断开连接后 Steam 将自动同步修改到云端")
+                .color(egui::Color32::from_rgb(100, 150, 255))
+                .size(12.0),
+        )
+        .on_hover_text(
+            "上传、删除等操作会先写入本地缓存，\n断开连接时 Steam 会自动将所有修改同步到云端。\n这是 Steam 的安全机制，确保数据不丢失。",
+        );
+    }
+
     action
 }
 
