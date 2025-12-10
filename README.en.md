@@ -30,12 +30,14 @@ A GUI tool for managing Steam Cloud saves, allowing direct cloud file operations
 
 Steam's built-in cloud save management is quite basic. This tool provides more complete file listings and batch operation support:
 
-- View complete cloud save file list (including folder structure)
-- Batch download/upload files
+- View complete cloud save file list (tree view)
+- Batch download/upload files (drag & drop support)
 - Delete or unsync specific files
-- Quickly switch between different games
+- File search and filtering (local/cloud)
+- Quickly switch between games (auto-scan game library)
 - View actual file locations on local disk
-- Display cloud sync status
+- Display cloud sync status and quota
+- Multi-user support
 
 ## Platform Support
 
@@ -55,7 +57,11 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 2. Extract to any location
 3. Double-click `SteamCloudFileManager.exe` to run
 
-**Note:** Windows version is portable, logs are saved in the `logs/` folder in the application directory.
+> **Note**:
+>
+> - Windows: Logs are saved in the `logs/` folder in the application directory.
+> - macOS: Logs are saved in `~/Library/Logs/SteamCloudFileManager/` directory.
+> - Linux: Logs are saved in `~/.local/share/SteamCloudFileManager/logs/` directory.
 
 ### macOS
 
@@ -69,12 +75,11 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 
 #### Debian/Ubuntu
 
-```bash
-# Download .deb package
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager_0.1.7-beta_amd64.deb
+Download the `.deb` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then install:
 
+```bash
 # Install
-sudo dpkg -i steamcloudfilemanager_0.1.7-beta_amd64.deb
+sudo dpkg -i steamcloudfilemanager_*.deb
 sudo apt-get install -f
 
 # Run
@@ -83,14 +88,13 @@ steamcloudfilemanager
 
 #### Fedora/RHEL/openSUSE
 
-```bash
-# Download .rpm package
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/steamcloudfilemanager-0.1.7-1.x86_64.rpm
+Download the `.rpm` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then install:
 
+```bash
 # Install
-sudo dnf install ./steamcloudfilemanager-0.1.7-1.x86_64.rpm
+sudo dnf install ./steamcloudfilemanager-*.rpm
 # or
-sudo rpm -i steamcloudfilemanager-0.1.7-1.x86_64.rpm
+sudo rpm -i steamcloudfilemanager-*.rpm
 
 # Run
 steamcloudfilemanager
@@ -98,10 +102,9 @@ steamcloudfilemanager
 
 #### AppImage (Universal)
 
-```bash
-# Download AppImage
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.AppImage
+Download the `.AppImage` file from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then run:
 
+```bash
 # Add execute permission
 chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
@@ -111,10 +114,12 @@ chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
 #### Arch Linux (AUR)
 
+Download the AUR package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then build and install:
+
 ```bash
-# Download PKGBUILD
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64-aur.tar.gz
+# Extract AUR package
 tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
+cd SteamCloudFileManager-linux-x86_64-aur
 
 # Build and install with makepkg
 makepkg -si
@@ -125,9 +130,10 @@ steamcloudfilemanager
 
 #### .tar.gz (Universal)
 
+Download the `.tar.gz` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then extract and run:
+
 ```bash
-# Download and extract
-wget https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v0.1.7-beta/SteamCloudFileManager-linux-x86_64.tar.gz
+# Extract
 tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
 cd SteamCloudFileManager-linux-x86_64
 
@@ -172,6 +178,12 @@ cargo build --release
 
 This tool uses CDP protocol to communicate with Steam, which **requires** Steam to run in debug mode.
 
+**Why debug mode is required?**
+
+- CDP (Chrome DevTools Protocol) is the debugging interface for Steam's built-in browser
+- We use this interface to retrieve cloud file lists and download links
+- CDP port is only enabled when debug mode is activated
+
 **Windows:**
 
 1. Right-click Steam shortcut, select "Properties"
@@ -212,14 +224,71 @@ This tool uses CDP protocol to communicate with Steam, which **requires** Steam 
 
 App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
+### Important Notes
+
+> ⚠️ **Important**
+
+**Deletion Risks**:
+
+- Deleting cloud save files is **irreversible**
+- Deleted files will be synced and removed from all devices
+- Make sure to backup important files before deletion
+
+**Backup Recommendations**:
+
+- Download backups before any deletion or modification
+- Regularly backup important game saves
+- Use "Batch Download" feature to quickly backup entire game saves
+
+**Cloud Sync Notes**:
+
+- After upload/delete, wait for Steam to complete sync (usually after disconnect)
+- Do not close Steam or shutdown during sync
+
 ## Technical Architecture
+
+### Cloud Sync Mechanism
+
+Steam cloud sync uses a three-tier architecture:
+
+```
+Steam Cloud Server
+        ↕ (Async background sync)
+Steam Client Local Cache
+        ↕ (Steam API)
+Our Software
+```
+
+**Important Notes**:
+
+- Upload/delete operations write to **local cache** immediately
+- Actual sync to cloud is performed **asynchronously** in the background
+- **After disconnect**, Steam automatically triggers sync - this is Steam's safety mechanism
+- For details, see [CLOUD_SYNC_EXPLAINED.md](docs/CLOUD_SYNC_EXPLAINED.md)
 
 ### VDF Parsing
 
 - Directly reads `remotecache.vdf` to get complete file list
 - Shows actual storage location of files on local disk
 - Supports all Root path types (0-12)
-- 📝 **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Detailed path mapping rules and game examples
+
+**What is Root Path?**
+
+Root path is the file storage location type in Steam's cloud save system. Different games may save their files in different directories:
+
+- **Root 0** - Steam Cloud default directory (`userdata/{user_id}/{app_id}/remote/`)
+- **Root 1** - Game installation directory (`steamapps/common/{GameDir}/`)
+- **Root 2** - Documents folder (Windows: `Documents/`, macOS: `~/Documents/`)
+- **Root 3** - AppData Roaming (Windows: `%APPDATA%`, macOS: `~/Library/Application Support/`)
+- **Root 7** - macOS Application Support / Windows Videos
+- **Root 12** - Windows LocalLow / macOS Caches
+- **Others** - Pictures, Music, Videos, Desktop, and other system folders
+
+Our software automatically identifies and displays the actual storage location of each file.
+
+> **Note**: The Root path mapping table is still being updated. Different games may use different Root values, and cross-platform behavior may vary. (Not fully tested yet🥺👉👈
+
+- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete path mapping rules and game examples
 
 ### CDP Protocol
 
@@ -236,11 +305,15 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ### Feature Development
 
-- [ ] Batch upload
-- [ ] Drag-and-drop upload
 - [ ] File conflict detection and handling
-- [ ] Multi-language support
+- [ ] Multi-language support (i18n)
 - [ ] Cloud save backup and restore
+- [ ] File comparison (local vs cloud)
+- [ ] Automatic backup schedule
+- [ ] Version update detection
+- [ ] Batch file renaming
+- [ ] File version history management
+- [ ] Symlink sync support (experimental)
 
 ### Package Manager Support
 
