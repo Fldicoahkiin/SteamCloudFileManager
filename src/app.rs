@@ -43,7 +43,6 @@ pub struct SteamCloudApp {
     show_only_local: bool,
     show_only_cloud: bool,
     last_selected_index: Option<usize>,
-    show_upload_type_selector: bool,
     upload_preview: Option<crate::ui::UploadPreviewDialog>,
     upload_progress: Option<crate::ui::UploadProgressDialog>,
     upload_complete: Option<crate::ui::UploadCompleteDialog>,
@@ -116,7 +115,6 @@ impl SteamCloudApp {
             show_only_local: false,
             show_only_cloud: false,
             last_selected_index: None,
-            show_upload_type_selector: false,
             upload_preview: None,
             upload_progress: None,
             upload_complete: None,
@@ -250,13 +248,13 @@ impl SteamCloudApp {
         }
     }
 
-    fn download_selected_file(&mut self) {
+    fn download(&mut self) {
         if self.selected_files.is_empty() {
             self.show_error("请选择要下载的文件");
             return;
         }
 
-        match crate::file_manager::batch_download_files_with_dialog(
+        match crate::file_manager::download(
             &self.files,
             &self.selected_files,
             self.steam_manager.clone(),
@@ -290,12 +288,22 @@ impl SteamCloudApp {
             return;
         }
 
-        // 显示选择对话框
-        self.show_upload_type_selector = true;
+        // 直接调用上传，不显示选择对话框
+        match crate::file_manager::upload(self.steam_manager.clone()) {
+            Ok(Some(queue)) => {
+                self.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
+            }
+            Ok(None) => {
+                // 用户取消
+            }
+            Err(e) => {
+                self.show_error(&format!("选择文件失败: {}", e));
+            }
+        }
     }
 
     // 开始上传
-    fn start_upload(&mut self, mut queue: crate::file_manager::UploadQueue) {
+    fn upload_start(&mut self, mut queue: crate::file_manager::UploadQueue) {
         let total_files = queue.total_files();
 
         // 显示进度对话框
@@ -333,10 +341,10 @@ impl SteamCloudApp {
         });
     }
 
-    fn forget_selected_files(&mut self) {
+    fn forget(&mut self) {
         use crate::file_manager::FileOperationResult;
 
-        let result = crate::file_manager::forget_selected_files_coordinated(
+        let result = crate::file_manager::forget_selected(
             &self.files,
             &self.selected_files,
             self.steam_manager.clone(),
@@ -353,10 +361,10 @@ impl SteamCloudApp {
         }
     }
 
-    fn delete_selected_files(&mut self) {
+    fn delete(&mut self) {
         use crate::file_manager::FileOperationResult;
 
-        let result = crate::file_manager::delete_selected_files_coordinated(
+        let result = crate::file_manager::delete_selected(
             &self.files,
             &self.selected_files,
             self.steam_manager.clone(),
@@ -457,7 +465,7 @@ impl SteamCloudApp {
 
         if queue.total_files() > 0 {
             // 直接开始上传，不显示预览
-            self.start_upload(queue);
+            self.upload_start(queue);
         }
     }
 
@@ -638,16 +646,16 @@ impl SteamCloudApp {
                 self.selected_files = crate::ui::clear_file_selection();
             }
             crate::ui::FileAction::DownloadSelected => {
-                self.download_selected_file();
+                self.download();
             }
             crate::ui::FileAction::Upload => {
                 self.upload();
             }
             crate::ui::FileAction::DeleteSelected => {
-                self.delete_selected_files();
+                self.delete();
             }
             crate::ui::FileAction::ForgetSelected => {
-                self.forget_selected_files();
+                self.forget();
             }
             crate::ui::FileAction::None => {}
         }
@@ -1031,70 +1039,13 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        // 上传类型选择器
-        if self.show_upload_type_selector {
-            egui::Window::new("📎 选择上传类型")
-                .resizable(false)
-                .collapsible(false)
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ctx, |ui| {
-                    ui.vertical_centered(|ui| {
-                        ui.add_space(10.0);
-                        ui.label("请选择要上传的类型：");
-                        ui.add_space(20.0);
-
-                        if ui.button("📄 上传文件（可多选）").clicked() {
-                            self.show_upload_type_selector = false;
-                            match crate::file_manager::upload_files_with_dialog(
-                                self.steam_manager.clone(),
-                            ) {
-                                Ok(Some(queue)) => {
-                                    self.upload_preview =
-                                        Some(crate::ui::UploadPreviewDialog::new(queue));
-                                }
-                                Ok(None) => {}
-                                Err(e) => {
-                                    self.show_error(&format!("选择文件失败: {}", e));
-                                }
-                            }
-                        }
-
-                        ui.add_space(10.0);
-
-                        if ui.button("📂 上传文件夹（递归）").clicked() {
-                            self.show_upload_type_selector = false;
-                            match crate::file_manager::upload_folder_with_dialog(
-                                self.steam_manager.clone(),
-                            ) {
-                                Ok(Some(queue)) => {
-                                    self.upload_preview =
-                                        Some(crate::ui::UploadPreviewDialog::new(queue));
-                                }
-                                Ok(None) => {}
-                                Err(e) => {
-                                    self.show_error(&format!("选择文件夹失败: {}", e));
-                                }
-                            }
-                        }
-
-                        ui.add_space(10.0);
-
-                        if ui.button("✖ 取消").clicked() {
-                            self.show_upload_type_selector = false;
-                        }
-
-                        ui.add_space(10.0);
-                    });
-                });
-        }
-
         // 上传预览对话框
         if let Some(preview) = &mut self.upload_preview {
             match preview.draw(ctx) {
                 crate::ui::UploadAction::Confirm => {
                     // 开始上传
                     if let Some(preview) = self.upload_preview.take() {
-                        self.start_upload(preview.queue);
+                        self.upload_start(preview.queue);
                     }
                 }
                 crate::ui::UploadAction::Cancel => {

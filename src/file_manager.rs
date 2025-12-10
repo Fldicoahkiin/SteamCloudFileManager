@@ -319,8 +319,8 @@ impl FileOperations {
     }
 }
 
-// 批量下载文件（保持文件夹结构）
-pub fn batch_download_files_with_dialog(
+// 下载文件
+pub fn download(
     files: &[CloudFile],
     selected_indices: &[usize],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
@@ -364,8 +364,8 @@ pub enum FileOperationResult {
     SuccessWithRefresh(String), // 成功消息 + 需要刷新
 }
 
-// 批量取消云同步
-pub fn batch_forget_files(
+// 取消云同步
+pub fn forget(
     filenames: &[String],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
 ) -> (usize, Vec<String>) {
@@ -386,8 +386,8 @@ pub fn batch_forget_files(
     (success_count, failed_files)
 }
 
-// 批量删除文件
-pub fn batch_delete_files(
+// 删除文件
+pub fn delete(
     filenames: &[String],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
 ) -> (usize, Vec<String>) {
@@ -409,7 +409,7 @@ pub fn batch_delete_files(
 }
 
 // 取消云同步选中的文件
-pub fn forget_selected_files_coordinated(
+pub fn forget_selected(
     files: &[CloudFile],
     selected_files: &[usize],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
@@ -423,7 +423,7 @@ pub fn forget_selected_files_coordinated(
         .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
         .collect();
 
-    let (forgotten_count, failed_files) = batch_forget_files(&filenames, steam_manager);
+    let (forgotten_count, failed_files) = forget(&filenames, steam_manager);
 
     if !failed_files.is_empty() {
         return FileOperationResult::Error(format!(
@@ -440,7 +440,7 @@ pub fn forget_selected_files_coordinated(
 }
 
 // 删除选中的文件
-pub fn delete_selected_files_coordinated(
+pub fn delete_selected(
     files: &[CloudFile],
     selected_files: &[usize],
     steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
@@ -454,7 +454,7 @@ pub fn delete_selected_files_coordinated(
         .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
         .collect();
 
-    let (deleted_count, failed_files) = batch_delete_files(&filenames, steam_manager);
+    let (deleted_count, failed_files) = delete(&filenames, steam_manager);
 
     if !failed_files.is_empty() {
         return FileOperationResult::Error(format!(
@@ -470,51 +470,45 @@ pub fn delete_selected_files_coordinated(
     }
 }
 
-// 上传文件
-pub fn upload_files_with_dialog(
+// 上传文件（支持文件和文件夹混合）
+pub fn upload(
     _steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
 ) -> Result<Option<UploadQueue>> {
     use rfd::FileDialog;
 
-    // 多选文件
-    if let Some(paths) = FileDialog::new()
+    // 先选择文件
+    let files = FileDialog::new()
         .add_filter("所有文件", &["*"])
-        .pick_files()
-    {
-        let mut queue = UploadQueue::new();
+        .pick_files();
 
+    // 再选择文件夹
+    let folder = FileDialog::new().pick_folder();
+
+    // 如果两者都没选，返回 None
+    if files.is_none() && folder.is_none() {
+        return Ok(None);
+    }
+
+    let mut queue = UploadQueue::new();
+
+    // 添加文件
+    if let Some(paths) = files {
         for path in paths {
             if let Err(e) = queue.add_file(path.clone()) {
                 tracing::warn!("跳过文件 {}: {}", path.display(), e);
             }
         }
-
-        if queue.total_files() > 0 {
-            Ok(Some(queue))
-        } else {
-            Ok(None)
-        }
-    } else {
-        Ok(None)
     }
-}
 
-// 上传文件夹
-pub fn upload_folder_with_dialog(
-    _steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> Result<Option<UploadQueue>> {
-    use rfd::FileDialog;
-
-    // 选择文件夹
-    if let Some(folder) = FileDialog::new().pick_folder() {
-        let mut queue = UploadQueue::new();
-        queue.add_folder(&folder)?;
-
-        if queue.total_files() > 0 {
-            Ok(Some(queue))
-        } else {
-            Err(anyhow!("文件夹中没有可上传的文件"))
+    // 添加文件夹
+    if let Some(folder_path) = folder {
+        if let Err(e) = queue.add_folder(&folder_path) {
+            tracing::warn!("添加文件夹失败 {}: {}", folder_path.display(), e);
         }
+    }
+
+    if queue.total_files() > 0 {
+        Ok(Some(queue))
     } else {
         Ok(None)
     }
