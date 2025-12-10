@@ -485,22 +485,62 @@ pub fn collect_local_save_paths(
         tracing::debug!("有 {} 个文件路径解析失败", failed_count);
     }
 
-    let mut paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
-    paths.sort_by(|a, b| a.0.cmp(&b.0));
+    // 如果没有找到任何路径，但有 root=0 的文件，尝试添加 remote 目录
+    if path_map.is_empty() && files.iter().any(|f| f.root == 0) {
+        let remote_path = steam_path
+            .join("userdata")
+            .join(user_id)
+            .join(app_id.to_string())
+            .join("remote");
 
-    if !paths.is_empty() {
-        tracing::info!("检测到 {} 个本地存档根目录", paths.len());
-        for (desc, path) in &paths {
+        if remote_path.exists() {
+            let desc = get_root_description(0);
+            tracing::info!("添加 Steam Cloud remote 目录: {}", remote_path.display());
+            path_map.insert(remote_path.clone(), (desc, remote_path));
+        }
+    }
+
+    let mut paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
+    // 按路径长度排序，确保父路径在前
+    paths.sort_by(|a, b| a.1.as_os_str().len().cmp(&b.1.as_os_str().len()));
+
+    // 过滤掉被其他路径包含的子路径（去重）
+    let filtered_paths = filter_subpaths(paths);
+
+    if !filtered_paths.is_empty() {
+        tracing::info!("检测到 {} 个本地存档根目录", filtered_paths.len());
+        for (desc, path) in &filtered_paths {
             tracing::info!("  ✓ {}: {}", desc, path.display());
         }
     } else {
-        tracing::warn!(
-            "未找到任何本地存档路径 (app_id={})，请检查游戏是否已安装",
-            app_id
-        );
+        tracing::warn!("未找到任何本地存档路径 (app_id={})", app_id);
     }
 
-    paths
+    filtered_paths
+}
+
+// 过滤掉被其他路径包含的子路径
+fn filter_subpaths(paths: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)> {
+    let mut filtered_paths = Vec::new();
+    for (desc, path) in &paths {
+        let mut is_subpath = false;
+        for (_, other_path) in &paths {
+            if path != other_path && path.starts_with(other_path) {
+                // 这个路径是另一个路径的子路径，跳过
+                is_subpath = true;
+                tracing::debug!(
+                    "跳过子路径: {} (包含在 {} 中)",
+                    path.display(),
+                    other_path.display()
+                );
+                break;
+            }
+        }
+        if !is_subpath {
+            filtered_paths.push((desc.clone(), path.clone()));
+        }
+    }
+    filtered_paths
 }
 
 // 获取 Root 类型的描述文本，格式：CDP文件夹名 (Root编号)

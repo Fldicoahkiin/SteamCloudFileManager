@@ -363,7 +363,7 @@ impl SteamCloudManager {
         }
     }
 
-    // 同步云文件
+    // 触发云同步
     pub fn sync_cloud_files(&self) -> Result<()> {
         let client = self.client.lock().unwrap();
         let client = client
