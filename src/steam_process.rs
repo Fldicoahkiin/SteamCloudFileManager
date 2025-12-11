@@ -301,18 +301,50 @@ fn close_steam_linux() -> Result<()> {
 #[cfg(target_os = "linux")]
 fn start_steam_linux() -> Result<()> {
     tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
-    Command::new("steam")
-        .arg("-cef-enable-debugging")
-        .spawn()
-        .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
-    // 等待进程启动
-    if !wait_for_steam_startup(30) {
-        return Err(anyhow!(
-            "Steam 启动超时，请检查 Steam 是否正常运行\n\n如果 Steam 未启动，请手动在终端执行：\nsteam -cef-enable-debugging"
-        ));
+    // 使用 sh -c 在后台启动 Steam，避免阻塞和闪退
+    let result = Command::new("sh")
+        .arg("-c")
+        .arg("nohup steam -cef-enable-debugging >/dev/null 2>&1 &")
+        .spawn();
+
+    match result {
+        Ok(_) => {
+            // 给 Steam 一点时间启动
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            // 等待进程启动
+            if !wait_for_steam_startup(30) {
+                return Err(anyhow!(
+                    "Steam 启动超时，请检查 Steam 是否正常运行\n\n如果 Steam 未启动，请手动在终端执行：\nsteam -cef-enable-debugging"
+                ));
+            }
+
+            tracing::info!("Steam 已成功启动");
+            Ok(())
+        }
+        Err(e) => {
+            tracing::warn!("使用 nohup 启动失败，尝试直接启动: {}", e);
+
+            // 降级方案：直接启动但分离进程
+            Command::new("steam")
+                .arg("-cef-enable-debugging")
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
+
+            std::thread::sleep(std::time::Duration::from_secs(2));
+
+            if !wait_for_steam_startup(30) {
+                return Err(anyhow!(
+                    "Steam 启动超时，请检查 Steam 是否正常运行\n\n如果 Steam 未启动，请手动在终端执行：\nsteam -cef-enable-debugging"
+                ));
+            }
+
+            tracing::info!("Steam 已成功启动");
+            Ok(())
+        }
     }
-
-    tracing::info!("Steam 已成功启动");
-    Ok(())
 }
