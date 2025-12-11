@@ -1,5 +1,6 @@
 use egui;
 use std::path::PathBuf;
+use walkdir::WalkDir;
 
 // 设置应用字体
 pub fn setup_fonts(ctx: &egui::Context) {
@@ -102,6 +103,7 @@ fn load_cjk_fonts(fonts: &mut egui::FontDefinitions) {
 
     for path in font_paths {
         if let Ok(data) = std::fs::read(&path) {
+            tracing::info!("成功加载字体: {:?}", path);
             fonts.font_data.insert(
                 "system_cjk".to_owned(),
                 egui::FontData::from_owned(data).into(),
@@ -116,9 +118,10 @@ fn load_cjk_fonts(fonts: &mut egui::FontDefinitions) {
                 .entry(egui::FontFamily::Monospace)
                 .or_default()
                 .push("system_cjk".to_owned());
-            break;
+            return;
         }
     }
+    tracing::warn!("未找到可用的 CJK 字体");
 }
 
 pub fn find_system_fonts() -> Vec<PathBuf> {
@@ -183,7 +186,6 @@ pub fn find_system_fonts() -> Vec<PathBuf> {
         let mut font_dirs = Vec::new();
         font_dirs.push("/usr/share/fonts".to_string());
         font_dirs.push("/usr/local/share/fonts".to_string());
-        font_dirs.push("/usr/share/fonts/truetype".to_string());
 
         if let Ok(home) = std::env::var("HOME") {
             font_dirs.push(format!("{}/.fonts", home));
@@ -191,20 +193,19 @@ pub fn find_system_fonts() -> Vec<PathBuf> {
         }
 
         for dir in font_dirs {
-            if let Ok(walker) = std::fs::read_dir(&dir) {
-                for entry in walker.flatten() {
-                    let path = entry.path();
-                    if path.is_dir() {
-                        if let Ok(sub_entries) = std::fs::read_dir(&path) {
-                            for sub_entry in sub_entries.flatten() {
-                                let sub_path = sub_entry.path();
-                                if sub_path.extension().and_then(|s| s.to_str()) == Some("ttf") {
-                                    font_paths.push(sub_path);
-                                }
-                            }
+            for entry in WalkDir::new(&dir)
+                .follow_links(true)
+                .max_depth(10)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                let path = entry.path();
+                if path.is_file() {
+                    if let Some(ext) = path.extension() {
+                        let ext_str = ext.to_str().unwrap_or("").to_lowercase();
+                        if ext_str == "ttf" || ext_str == "ttc" || ext_str == "otf" {
+                            font_paths.push(path.to_path_buf());
                         }
-                    } else if path.extension().and_then(|s| s.to_str()) == Some("ttf") {
-                        font_paths.push(path);
                     }
                 }
             }
@@ -239,20 +240,28 @@ pub fn find_system_fonts() -> Vec<PathBuf> {
 
         #[cfg(not(target_os = "windows"))]
         {
-            if name.contains("msyh") || name.contains("microsoft yahei") {
+            if name.contains("noto")
+                && (name.contains("cjk") || name.contains("sans") && name.contains("sc"))
+            {
                 0
-            } else if name.contains("simhei") || name.contains("heiti") {
+            } else if name.contains("sarasa") || name.contains("更纱") {
                 1
-            } else if name.contains("arial") {
-                2
-            } else if name.contains("noto") && name.contains("cjk") {
-                3
-            } else if name.contains("sarasa") {
-                4
             } else if name.contains("source") && name.contains("han") {
+                2
+            } else if name.contains("msyh") || name.contains("microsoft yahei") {
+                3
+            } else if name.contains("simhei") || name.contains("heiti") || name.contains("黑体") {
+                4
+            } else if name.contains("wenquanyi") || name.contains("文泉驿") {
                 5
-            } else if name.contains("wenquanyi") {
-                10
+            } else if name.contains("droid") && name.contains("sans") && name.contains("fallback") {
+                6
+            } else if name.contains("dejavu") {
+                7
+            } else if name.contains("liberation") {
+                8
+            } else if name.contains("arial") {
+                9
             } else {
                 100
             }
