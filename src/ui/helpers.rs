@@ -1,9 +1,10 @@
 use egui;
 
 // 绘制调试警告横幅
-pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool) {
+pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
     let mut restart_clicked = false;
     let mut dismiss_clicked = false;
+    let mut show_manual = false;
 
     // 检测 Steam 运行状态
     let steam_running = crate::steam_process::is_steam_running();
@@ -77,7 +78,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool) {
                 .on_hover_text("显示如何手动添加启动参数")
                 .clicked()
             {
-                show_manual_guide();
+                show_manual = true;
             }
 
             ui.separator();
@@ -97,45 +98,24 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool) {
         });
     });
 
-    (restart_clicked, dismiss_clicked)
+    (restart_clicked, dismiss_clicked, show_manual)
 }
 
-// 显示手动操作指南
-fn show_manual_guide() {
+// 获取手动操作指南对话框
+pub fn get_manual_guide_dialog() -> crate::ui::GuideDialog {
     #[cfg(target_os = "macos")]
     {
-        let guide = "macOS 手动操作步骤：\n\n\
-            1. 完全退出 Steam（右键 Dock 图标 -> 退出）\n\
-            2. 打开终端（Terminal）\n\
-            3. 输入命令：open -a Steam --args -cef-enable-debugging\n\
-            4. 等待 Steam 启动完成\n\
-            5. 返回本应用重新连接";
-
-        tracing::info!("显示手动操作指南：\n{}", guide);
+        crate::ui::create_macos_manual_guide()
     }
 
     #[cfg(target_os = "windows")]
     {
-        let guide = "Windows 手动操作步骤：\n\n\
-            1. 完全退出 Steam\n\
-            2. 右键 Steam 快捷方式 -> 属性\n\
-            3. 在目标栏末尾添加：-cef-enable-debugging\n\
-            4. 点击确定并启动 Steam\n\
-            5. 返回本应用重新连接";
-
-        tracing::info!("显示手动操作指南：\n{}", guide);
+        crate::ui::create_windows_manual_guide()
     }
 
     #[cfg(target_os = "linux")]
     {
-        let guide = "Linux 手动操作步骤：\n\n\
-            1. 完全退出 Steam\n\
-            2. 打开终端\n\
-            3. 输入命令：steam -cef-enable-debugging\n\
-            4. 等待 Steam 启动完成\n\
-            5. 返回本应用重新连接";
-
-        tracing::info!("显示手动操作指南：\n{}", guide);
+        crate::ui::create_linux_manual_guide()
     }
 }
 

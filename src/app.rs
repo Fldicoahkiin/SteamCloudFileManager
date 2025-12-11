@@ -471,7 +471,13 @@ impl SteamCloudApp {
 
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
         if self.show_debug_warning {
-            let (restart_clicked, dismiss_clicked) = crate::ui::draw_debug_warning_ui(ui);
+            let (restart_clicked, dismiss_clicked, show_manual) =
+                crate::ui::draw_debug_warning_ui(ui);
+
+            // 处理手动指南
+            if show_manual {
+                self.guide_dialog = Some(crate::ui::get_manual_guide_dialog());
+            }
 
             // 处理重启操作
             if restart_clicked {
