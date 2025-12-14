@@ -1,5 +1,6 @@
 use egui;
 use std::path::PathBuf;
+#[cfg(target_os = "linux")]
 use walkdir::WalkDir;
 
 // 设置应用字体

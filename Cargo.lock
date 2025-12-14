@@ -3,38 +3,6 @@
 version = 4
 
 [[package]]
-name = "SteamCloudFileManager"
-version = "0.6.6-beta"
-dependencies = [
- "anyhow",
- "byteorder",
- "chrono",
- "dirs",
- "eframe",
- "egui",
- "egui_extras",
- "env_logger",
- "image",
- "keyvalues-parser",
- "log",
- "regex",
- "rfd",
- "serde",
- "serde_json",
- "steamworks",
- "steamworks-sys",
- "sysinfo",
- "tracing",
- "tracing-subscriber",
- "tungstenite",
- "ureq 3.1.4",
- "url",
- "walkdir",
- "winapi",
- "winres",
-]
-
-[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4054,6 +4022,38 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "steam-cloud-file-manager"
+version = "0.6.7"
+dependencies = [
+ "anyhow",
+ "byteorder",
+ "chrono",
+ "dirs",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "env_logger",
+ "image",
+ "keyvalues-parser",
+ "log",
+ "regex",
+ "rfd",
+ "serde",
+ "serde_json",
+ "steamworks",
+ "steamworks-sys",
+ "sysinfo",
+ "tracing",
+ "tracing-subscriber",
+ "tungstenite",
+ "ureq 3.1.4",
+ "url",
+ "walkdir",
+ "winapi",
+ "winres",
+]
 
 [[package]]
 name = "steamworks"

@@ -2,8 +2,8 @@
 Name=Steam Cloud File Manager
 GenericName=Steam Cloud Manager
 Comment=Manage and view Steam cloud save files
-Exec=steamcloudfilemanager
-Icon=steamcloudfilemanager
+Exec=steam-cloud-file-manager
+Icon=steam-cloud-file-manager
 Terminal=false
 Type=Application
 Categories=Utility;Game;
