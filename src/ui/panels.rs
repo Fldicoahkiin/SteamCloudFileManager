@@ -118,7 +118,6 @@ fn collect_visible_file_indices(
 ) -> Vec<usize> {
     let mut indices = Vec::new();
     collect_visible_indices_recursive(nodes, show_only_local, show_only_cloud, &mut indices);
-    indices.sort_unstable();
     indices
 }
 
@@ -516,13 +515,20 @@ fn render_tree_body_recursive(
                                 if shift && last_selected_index.is_some() {
                                     // Shift 点击：范围选择
                                     let last_idx = last_selected_index.unwrap();
-                                    let start = last_idx.min(file_index);
-                                    let end = last_idx.max(file_index);
 
-                                    // 清空当前选择，只选中范围内且可见的文件
-                                    selected_files.clear();
-                                    for &idx in visible_indices {
-                                        if idx >= start && idx <= end {
+                                    // 在 visible_indices 中查找位置（基于视觉顺序）
+                                    let start_pos =
+                                        visible_indices.iter().position(|&i| i == last_idx);
+                                    let end_pos =
+                                        visible_indices.iter().position(|&i| i == file_index);
+
+                                    if let (Some(s), Some(e)) = (start_pos, end_pos) {
+                                        let min_pos = s.min(e);
+                                        let max_pos = s.max(e);
+
+                                        // 清空当前选择，只选中范围内的文件
+                                        selected_files.clear();
+                                        for &idx in &visible_indices[min_pos..=max_pos] {
                                             selected_files.push(idx);
                                         }
                                     }
