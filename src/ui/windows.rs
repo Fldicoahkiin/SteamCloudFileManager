@@ -255,17 +255,29 @@ pub fn draw_game_selector_window(
         .show(ctx, |ui| {
             if is_scanning && games.is_empty() {
                 // 扫描中且没有游戏，显示居中的加载提示
-                ui.vertical_centered(|ui| {
-                    ui.add_space(ui.available_height() / 2.0 - 40.0);
-                    ui.spinner();
-                    ui.add_space(10.0);
-                    ui.label("正在扫描游戏库...");
-                });
+                let rect = ui.available_rect_before_wrap();
+                ui.scope_builder(
+                    egui::UiBuilder::new().max_rect(rect).layout(
+                        egui::Layout::top_down(egui::Align::Center)
+                            .with_main_align(egui::Align::Center),
+                    ),
+                    |ui| {
+                        ui.spinner();
+                        ui.add_space(10.0);
+                        ui.label("正在扫描游戏库...");
+                    },
+                );
             } else if games.is_empty() {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(ui.available_height() / 2.0 - 30.0);
-                    ui.label("未发现云存档的游戏");
-                });
+                let rect = ui.available_rect_before_wrap();
+                ui.scope_builder(
+                    egui::UiBuilder::new().max_rect(rect).layout(
+                        egui::Layout::top_down(egui::Align::Center)
+                            .with_main_align(egui::Align::Center),
+                    ),
+                    |ui| {
+                        ui.label("未发现云存档的游戏");
+                    },
+                );
             } else {
                 ui.horizontal(|ui| {
                     ui.heading(format!("{} 个有云存档的游戏", games.len()));
