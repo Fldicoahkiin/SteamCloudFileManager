@@ -27,7 +27,7 @@ impl UploadPreviewDialog {
             return action;
         }
 
-        egui::Window::new("📤 准备上传")
+        egui::Window::new("准备上传")
             .resizable(false)
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -57,17 +57,42 @@ impl UploadPreviewDialog {
                 }
 
                 ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
 
-                // 按钮
+                // 操作按钮
                 ui.horizontal(|ui| {
-                    if ui.button("取消").clicked() {
-                        action = UploadAction::Cancel;
-                        self.show = false;
+                    if ui.button("📄 添加文件").clicked() {
+                        if let Some(paths) = rfd::FileDialog::new().pick_files() {
+                            for path in paths {
+                                if let Err(e) = self.queue.add_file(path.clone()) {
+                                    tracing::warn!("添加文件失败 {}: {}", path.display(), e);
+                                }
+                            }
+                        }
                     }
-                    if ui.button("✓ 确认上传").clicked() {
-                        action = UploadAction::Confirm;
-                        self.show = false;
+
+                    if ui.button("📁 添加文件夹").clicked() {
+                        if let Some(folder) = rfd::FileDialog::new().pick_folder() {
+                            if let Err(e) = self.queue.add_folder(&folder) {
+                                tracing::warn!("添加文件夹失败 {}: {}", folder.display(), e);
+                            }
+                        }
                     }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button("✓ 确认上传").clicked() {
+                            action = UploadAction::Confirm;
+                            self.show = false;
+                        }
+
+                        ui.add_space(10.0);
+
+                        if ui.button("取消").clicked() {
+                            action = UploadAction::Cancel;
+                            self.show = false;
+                        }
+                    });
                 });
             });
 

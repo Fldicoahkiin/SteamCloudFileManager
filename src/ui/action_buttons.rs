@@ -49,7 +49,7 @@ pub fn draw_file_action_buttons(
 
         if ui
             .add_enabled(can_operate, egui::Button::new("上传"))
-            .on_hover_text("选择文件或文件夹进行上传")
+            .on_hover_text("上传文件或文件夹")
             .clicked()
         {
             action = FileAction::Upload;

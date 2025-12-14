@@ -477,9 +477,7 @@ pub fn upload(
     use rfd::FileDialog;
 
     // 先选择文件
-    let files = FileDialog::new()
-        .add_filter("所有文件", &["*"])
-        .pick_files();
+    let files = FileDialog::new().pick_files();
 
     // 再选择文件夹
     let folder = FileDialog::new().pick_folder();
@@ -593,6 +591,11 @@ impl UploadQueue {
 
     // 添加文件夹（递归）
     pub fn add_folder(&mut self, folder_path: &Path) -> Result<()> {
+        let folder_name = folder_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .ok_or_else(|| anyhow!("无法获取文件夹名"))?;
+
         for entry in WalkDir::new(folder_path) {
             let entry = entry?;
             if entry.file_type().is_file() {
@@ -614,15 +617,23 @@ impl UploadQueue {
                     .strip_prefix(folder_path)
                     .map_err(|e| anyhow!("无法计算相对路径: {}", e))?;
 
-                // 统一使用 / 作为分隔符（跨平台）
-                let cloud_path = if let Some(ref root) = self.virtual_root {
-                    format!(
-                        "{}/{}",
-                        root,
-                        relative_path.to_str().unwrap().replace("\\", "/")
-                    )
+                let relative_path_str = relative_path.to_str().unwrap().replace("\\", "/");
+
+                // 构建云端路径：[virtual_root]/[folder_name]/[relative_path]
+                // 注意：如果 relative_path 为空（即直接是文件夹本身，虽然 WalkDir 这里是文件所以不会空，但以防万一），
+                // 或者 relative_path 只是文件名，这里逻辑是一样的。
+                // 例如：folder=qwe, file=qwe/233 -> relative=233 -> cloud=qwe/233
+
+                let folder_relative_path = if relative_path_str.is_empty() {
+                    folder_name.to_string()
                 } else {
-                    relative_path.to_str().unwrap().replace("\\", "/")
+                    format!("{}/{}", folder_name, relative_path_str)
+                };
+
+                let cloud_path = if let Some(ref root) = self.virtual_root {
+                    format!("{}/{}", root, folder_relative_path)
+                } else {
+                    folder_relative_path
                 };
 
                 self.tasks.push(UploadTask {

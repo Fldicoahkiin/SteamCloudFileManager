@@ -427,45 +427,62 @@ impl SteamCloudApp {
     }
 
     fn handle_file_drop(&mut self, ctx: &egui::Context, _ui: &mut egui::Ui) {
+        // 检测文件拖拽悬停
+        if !ctx.input(|i| i.raw.hovered_files.is_empty()) {
+            let painter = ctx.layer_painter(egui::LayerId::new(
+                egui::Order::Foreground,
+                egui::Id::new("file_drop_overlay"),
+            ));
+
+            let screen_rect = ctx.content_rect();
+            painter.rect_filled(
+                screen_rect,
+                0.0,
+                egui::Color32::from_rgba_premultiplied(0, 0, 0, 150),
+            );
+
+            painter.text(
+                screen_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "释放文件以上传",
+                egui::FontId::proportional(30.0),
+                egui::Color32::WHITE,
+            );
+        }
+
         // 处理文件拖放
-        ctx.input(|i| {
-            if !i.raw.dropped_files.is_empty() {
-                for file in &i.raw.dropped_files {
-                    if let Some(path) = &file.path {
-                        self.upload_file_from_path(path);
+        let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
+        if !dropped_files.is_empty() {
+            if !self.is_connected {
+                self.show_error("未连接到 Steam");
+                return;
+            }
+
+            let mut queue = crate::file_manager::UploadQueue::new();
+            let mut added_count = 0;
+
+            for file in dropped_files {
+                if let Some(path) = &file.path {
+                    if path.is_file() {
+                        if let Err(e) = queue.add_file(path.to_path_buf()) {
+                            tracing::warn!("添加文件失败 {}: {}", path.display(), e);
+                        } else {
+                            added_count += 1;
+                        }
+                    } else if path.is_dir() {
+                        if let Err(e) = queue.add_folder(path) {
+                            tracing::warn!("添加文件夹失败 {}: {}", path.display(), e);
+                        } else {
+                            added_count += 1;
+                        }
                     }
                 }
             }
-        });
-    }
 
-    fn upload_file_from_path(&mut self, path: &std::path::Path) {
-        if !self.is_connected {
-            self.show_error("未连接到 Steam");
-            return;
-        }
-
-        // 使用新的上传系统
-        let mut queue = crate::file_manager::UploadQueue::new();
-
-        if path.is_file() {
-            if let Err(e) = queue.add_file(path.to_path_buf()) {
-                self.show_error(&format!("添加文件失败: {}", e));
-                return;
+            if added_count > 0 {
+                // 显示预览对话框，而不是直接上传
+                self.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
             }
-        } else if path.is_dir() {
-            if let Err(e) = queue.add_folder(path) {
-                self.show_error(&format!("添加文件夹失败: {}", e));
-                return;
-            }
-        } else {
-            self.show_error("无效的文件路径");
-            return;
-        }
-
-        if queue.total_files() > 0 {
-            // 直接开始上传，不显示预览
-            self.upload_start(queue);
         }
     }
 
