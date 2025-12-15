@@ -312,7 +312,6 @@ Our software automatically identifies and displays the actual storage location o
 - [ ] Automatic backup schedule
 - [ ] Version update detection
 - [ ] Batch file renaming
-- [ ] File version history management
 - [ ] Symlink sync support (experimental)
 
 ### Package Manager Support
