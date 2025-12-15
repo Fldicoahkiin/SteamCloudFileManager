@@ -122,7 +122,7 @@ jobs:
             cp "$STEAM_LIB" "$APP_PATH/Contents/MacOS/"
             echo "Steam API library copied"
           fi
-          
+
           # 获取 App 名字
           APP_NAME=$(basename "$APP_PATH")
 
@@ -141,34 +141,7 @@ jobs:
       - name: Prepare Windows/Linux artifact
         if: "!matrix.use_bundle"
         shell: bash
-        run: |
-          cd target/${{ matrix.target }}/release
-          mkdir -p dist
-
-          ORIGINAL_BIN="steam-cloud-file-manager"
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            ORIGINAL_BIN="steam-cloud-file-manager.exe"
-          fi
-
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            mv "$ORIGINAL_BIN" SteamCloudFileManager.exe
-            cp SteamCloudFileManager.exe dist/
-            
-            # 复制 DLL
-            if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi
-            if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi
-            
-            cd dist
-            7z a -tzip ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.zip *
-          else
-            cp "$ORIGINAL_BIN" dist/steam-cloud-file-manager
-            
-            # 复制 SO
-            if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi
-            
-            cd dist
-            tar czf ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.tar.gz *
-          fi
+        run: "cd target/${{ matrix.target }}/release\nmkdir -p dist\n\nORIGINAL_BIN=\"SteamCloudFileManager\"\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  ORIGINAL_BIN=\"SteamCloudFileManager.exe\"\nfi\n\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  cp \"$ORIGINAL_BIN\" dist/\n  \n  # 复制 DLL\n  if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi\n  if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi\n  \n  cd dist\n  7z a -tzip ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.zip *\nelse\n  cp \"$ORIGINAL_BIN\" dist/steam-cloud-file-manager\n  \n  # 复制 SO\n  if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi\n  \n  cd dist\n  tar czf ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.tar.gz *\nfi\n"
       - name: Build .deb package
         if: matrix.build_deb
         run: |
@@ -179,7 +152,7 @@ jobs:
         run: |
           cargo install cargo-generate-rpm
           cargo build --release --target ${{ matrix.target }}
-          strip -s target/${{ matrix.target }}/release/steam-cloud-file-manager
+          strip -s target/${{ matrix.target }}/release/SteamCloudFileManager
           cargo generate-rpm --target ${{ matrix.target }}
       - name: Build AppImage
         if: matrix.build_appimage
