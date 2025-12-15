@@ -127,6 +127,15 @@ jobs:
           APP_NAME=$(basename "$APP_PATH")
 
           # 使用 create-dmg 创建 DMG
+          # 构造新的文件名格式: SteamCloudFileManager-{version}-{platform}.dmg
+          PLATFORM_SUFFIX=""
+          if [[ "${{ matrix.target }}" == *"aarch64"* ]]; then
+            PLATFORM_SUFFIX="macos-aarch64"
+          else
+            PLATFORM_SUFFIX="macos-x86_64"
+          fi
+          DMG_NAME="SteamCloudFileManager-${{ env.VERSION }}-${PLATFORM_SUFFIX}.dmg"
+
           create-dmg \
             --volname "Steam Cloud File Manager" \
             --window-pos 200 120 \
@@ -135,13 +144,13 @@ jobs:
             --icon "$APP_NAME" 200 190 \
             --hide-extension "$APP_NAME" \
             --app-drop-link 600 185 \
-            "${{ matrix.asset_name }}-${{ env.VERSION }}.dmg" \
+            "$DMG_NAME" \
             "$APP_PATH" \
-            || hdiutil create -volname "Steam Cloud File Manager" -srcfolder "$APP_PATH" -ov -format UDZO "${{ matrix.asset_name }}-${{ env.VERSION }}.dmg"
+            || hdiutil create -volname "Steam Cloud File Manager" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_NAME"
       - name: Prepare Windows/Linux artifact
         if: "!matrix.use_bundle"
         shell: bash
-        run: "cd target/${{ matrix.target }}/release\nmkdir -p dist\n\nORIGINAL_BIN=\"SteamCloudFileManager\"\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  ORIGINAL_BIN=\"SteamCloudFileManager.exe\"\nfi\n\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  cp \"$ORIGINAL_BIN\" dist/\n  \n  # 复制 DLL\n  if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi\n  if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi\n  \n  cd dist\n  7z a -tzip ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.zip *\nelse\n  cp \"$ORIGINAL_BIN\" dist/steam-cloud-file-manager\n  \n  # 复制 SO\n  if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi\n  \n  cd dist\n  tar czf ../../../../${{ matrix.asset_name }}-${{ env.VERSION }}.tar.gz *\nfi\n"
+        run: "cd target/${{ matrix.target }}/release\nmkdir -p dist\n\nORIGINAL_BIN=\"SteamCloudFileManager\"\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  ORIGINAL_BIN=\"SteamCloudFileManager.exe\"\nfi\n\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  # Windows: 保持 PascalCase 命名\n  cp \"$ORIGINAL_BIN\" dist/\n  \n  # 复制 DLL\n  if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi\n  if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi\n  \n  cd dist\n  # 新格式: SteamCloudFileManager-{version}-windows-x86_64.zip\n  7z a -tzip ../../../../SteamCloudFileManager-${{ env.VERSION }}-windows-x86_64.zip *\nelse\n  # Linux: 重命名为小写+连字符（Linux 惯例）\n  cp \"$ORIGINAL_BIN\" dist/steam-cloud-file-manager\n  \n  # 复制 SO\n  if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi\n  \n  cd dist\n  # 新格式: SteamCloudFileManager-{version}-linux-x86_64.tar.gz\n  tar czf ../../../../SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.tar.gz *\nfi\n"
       - name: Build .deb package
         if: matrix.build_deb
         run: |
@@ -178,8 +187,9 @@ jobs:
           # 查找生成的 AppImage（cargo-appimage 生成在 target/appimage/ 目录）
           APPIMAGE_FILE=$(find target/appimage -name "*.AppImage" | head -n 1)
           if [ -n "$APPIMAGE_FILE" ]; then
-            mv "$APPIMAGE_FILE" ${{ matrix.asset_name }}-${{ env.VERSION }}.AppImage
-            echo "构建成功: ${{ matrix.asset_name }}-${{ env.VERSION }}.AppImage"
+            # 新格式: SteamCloudFileManager-{version}-linux-x86_64.AppImage
+            mv "$APPIMAGE_FILE" SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.AppImage
+            echo "构建成功: SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.AppImage"
           else
             echo "错误: 未找到 AppImage 文件"
             echo "调试信息 - 查找所有 AppImage 文件："
@@ -221,8 +231,8 @@ jobs:
 
           if [ -n "$TARBALL" ]; then
             echo "找到 tarball: $TARBALL"
-            # 使用绝对路径移动到工作区根，确保 upload-artifact 能匹配到
-            DEST="${GITHUB_WORKSPACE}/${{ matrix.asset_name }}-${{ env.VERSION }}-aur.tar.gz"
+            # 新格式: SteamCloudFileManager-{version}-linux-x86_64-aur.tar.gz
+            DEST="${GITHUB_WORKSPACE}/SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64-aur.tar.gz"
             mv "$TARBALL" "$DEST"
             echo "生成 AUR tarball: $DEST"
             ls -lh "$DEST"
@@ -234,7 +244,7 @@ jobs:
           CRATE=$(find target -type f -name "*.crate" -print -quit 2>/dev/null || true)
           if [ -n "$CRATE" ]; then
             echo "找到 crate 文件: $CRATE"
-            DEST="${GITHUB_WORKSPACE}/${{ matrix.asset_name }}-${{ env.VERSION }}-aur.tar.gz"
+            DEST="${GITHUB_WORKSPACE}/SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64-aur.tar.gz"
             cp "$CRATE" "$DEST"
             echo "生成 AUR tarball（来自 crate）: $DEST"
             ls -lh "$DEST"
