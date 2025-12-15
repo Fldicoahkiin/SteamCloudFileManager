@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::mpsc::{channel, Receiver};
 
 const GITHUB_API_RELEASES: &str =
     "https://api.github.com/repos/Fldicoahkiin/SteamCloudFileManager/releases/latest";
@@ -33,7 +34,9 @@ pub enum UpdateStatus {
     Available(ReleaseInfo),
     NoUpdate,
     Downloading(f32), // 下载进度 0.0-1.0
+    #[allow(dead_code)]
     Installing,
+    #[allow(dead_code)]
     Success,
     Error(String),
 }
@@ -122,22 +125,72 @@ impl UpdateManager {
         false
     }
 
-    // 下载并安装更新
-    pub fn download_and_install(&mut self, release: &ReleaseInfo) -> Result<()> {
-        tracing::info!("开始下载更新: {}", release.tag_name);
+    // 启动异步下载
+    pub fn start_download(&mut self, release: &ReleaseInfo) -> Receiver<Result<PathBuf, String>> {
+        tracing::info!("开始异步下载更新: {}", release.tag_name);
 
+        // 打印下载目录
+        if let Ok(update_dir) = Self::get_update_dir() {
+            tracing::info!("下载目录: {}", update_dir.display());
+        }
+
+        let (tx, rx) = channel();
+        let release_clone = release.clone();
+
+        std::thread::spawn(move || {
+            let result = Self::download_in_background(&release_clone);
+            let _ = tx.send(result);
+        });
+
+        self.status = UpdateStatus::Downloading(0.0);
+        rx
+    }
+
+    // 后台下载
+    fn download_in_background(release: &ReleaseInfo) -> Result<PathBuf, String> {
         // 根据平台选择对应的资源文件
-        let asset = Self::select_asset_for_platform(&release.assets)?;
+        let asset = Self::select_asset_for_platform(&release.assets).map_err(|e| e.to_string())?;
         tracing::info!("选择资源文件: {}", asset.name);
 
         // 下载文件
-        let download_path = self.download_asset(&asset)?;
+        let update_dir = Self::get_update_dir().map_err(|e| e.to_string())?;
+        let download_path = update_dir.join(&asset.name);
+
+        tracing::info!("下载文件: {}", asset.name);
+        tracing::info!("下载地址: {}", asset.browser_download_url);
+        tracing::info!("保存路径: {}", download_path.display());
+        tracing::info!("文件大小: {} MB", asset.size as f64 / 1024.0 / 1024.0);
+
+        tracing::info!("开始下载...");
+
+        // 如果文件已存在，先删除
+        if download_path.exists() {
+            tracing::info!("删除已存在的旧文件");
+            fs::remove_file(&download_path).map_err(|e| e.to_string())?;
+        }
+
+        let response = ureq::get(&asset.browser_download_url).call().map_err(|e| {
+            tracing::error!("HTTP 请求失败: {}", e);
+            format!("下载失败: {}", e)
+        })?;
+
+        let mut file = fs::File::create(&download_path).map_err(|e| e.to_string())?;
+        let mut reader = response.into_body().into_reader();
+
+        std::io::copy(&mut reader, &mut file).map_err(|e| {
+            tracing::error!("写入文件失败: {}", e);
+            format!("写入文件失败: {}", e)
+        })?;
+
         tracing::info!("下载完成: {}", download_path.display());
+        Ok(download_path)
+    }
 
-        // 安装更新
+    // 安装已下载的更新
+    #[allow(dead_code)]
+    pub fn install_downloaded_update(&mut self, download_path: &PathBuf) -> Result<()> {
         self.status = UpdateStatus::Installing;
-        self.install_update(&download_path)?;
-
+        self.install_update(download_path)?;
         self.status = UpdateStatus::Success;
         tracing::info!("更新安装成功");
         Ok(())
@@ -151,7 +204,7 @@ impl UpdateManager {
         let pattern = match (platform, arch) {
             ("macos", "x86_64") => "macos-x86_64",
             ("macos", "aarch64") => "macos-aarch64",
-            ("windows", "x86_64") => "windows-x86_64.exe",
+            ("windows", "x86_64") => "windows-x86_64",
             ("linux", "x86_64") => "linux-x86_64",
             _ => return Err(anyhow!("不支持的平台: {} ({})", platform, arch)),
         };
@@ -163,83 +216,182 @@ impl UpdateManager {
             .ok_or_else(|| anyhow!("未找到适合当前平台的安装包"))
     }
 
-    // 下载资源文件
-    fn download_asset(&mut self, asset: &ReleaseAsset) -> Result<PathBuf> {
-        let temp_dir = std::env::temp_dir();
-        let download_path = temp_dir.join(&asset.name);
+    // 获取更新下载目录
+    pub fn get_update_dir() -> Result<PathBuf> {
+        let update_dir = if cfg!(target_os = "macos") {
+            let home = std::env::var("HOME")?;
+            PathBuf::from(home)
+                .join("Library")
+                .join("Caches")
+                .join("SteamCloudFileManager")
+                .join("updates")
+        } else if cfg!(target_os = "windows") {
+            let appdata = std::env::var("LOCALAPPDATA")?;
+            PathBuf::from(appdata)
+                .join("SteamCloudFileManager")
+                .join("updates")
+        } else {
+            let home = std::env::var("HOME")?;
+            PathBuf::from(home)
+                .join(".cache")
+                .join("SteamCloudFileManager")
+                .join("updates")
+        };
 
-        tracing::info!("下载到: {}", download_path.display());
-
-        let response = ureq::get(&asset.browser_download_url)
-            .call()
-            .map_err(|e| anyhow!("下载失败: {}", e))?;
-
-        let total_size = asset.size;
-        let mut downloaded: u64 = 0;
-        let mut file = fs::File::create(&download_path)?;
-
-        let mut reader = response.into_body().into_reader();
-        let mut buffer = [0; 8192];
-
-        loop {
-            let n = std::io::Read::read(&mut reader, &mut buffer)?;
-            if n == 0 {
-                break;
-            }
-            std::io::Write::write_all(&mut file, &buffer[..n])?;
-            downloaded += n as u64;
-
-            let progress = downloaded as f32 / total_size as f32;
-            self.status = UpdateStatus::Downloading(progress);
+        if !update_dir.exists() {
+            fs::create_dir_all(&update_dir)?;
         }
 
-        Ok(download_path)
+        Ok(update_dir)
     }
 
     // 安装更新
+    #[allow(dead_code)]
     fn install_update(&self, download_path: &PathBuf) -> Result<()> {
-        let current_exe = std::env::current_exe()?;
-        let backup_path = current_exe.with_extension("bak");
-
-        tracing::info!("备份当前程序到: {}", backup_path.display());
-
-        // 备份当前程序
-        if current_exe.exists() {
-            fs::copy(&current_exe, &backup_path)?;
-        }
-
-        // 替换程序
         #[cfg(target_os = "macos")]
         {
-            // macOS 需要设置执行权限
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(download_path)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(download_path, perms)?;
+            // macOS: DMG 需要手动安装，打开 Finder 显示文件
+            tracing::info!("macOS 更新已下载到: {}", download_path.display());
+            tracing::info!("请手动打开 DMG 文件并拖拽应用到 Applications 文件夹");
+
+            // 打开 Finder 显示下载的 DMG
+            if let Err(e) = std::process::Command::new("open")
+                .arg("-R")
+                .arg(download_path)
+                .spawn()
+            {
+                tracing::error!("无法打开 Finder: {}", e);
+            }
+
+            Err(anyhow!("macOS 需要手动安装 DMG 文件"))
+        }
+
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: 使用系统命令解压 ZIP 并替换 exe
+            tracing::info!("开始安装 Windows 更新...");
+
+            let current_exe = std::env::current_exe()?;
+            let exe_dir = current_exe
+                .parent()
+                .ok_or_else(|| anyhow!("无法获取程序目录"))?;
+            let backup_path = current_exe.with_extension("bak");
+            let temp_extract_dir = exe_dir.join("update_temp");
+
+            // 备份当前程序
+            if current_exe.exists() {
+                tracing::info!("备份当前程序到: {}", backup_path.display());
+                fs::copy(&current_exe, &backup_path)?;
+            }
+
+            // 创建临时解压目录
+            if temp_extract_dir.exists() {
+                fs::remove_dir_all(&temp_extract_dir)?;
+            }
+            fs::create_dir_all(&temp_extract_dir)?;
+
+            // 使用 PowerShell 解压 ZIP
+            let output = std::process::Command::new("powershell")
+                .arg("-Command")
+                .arg(format!(
+                    "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
+                    download_path.display(),
+                    temp_extract_dir.display()
+                ))
+                .output()?;
+
+            if !output.status.success() {
+                return Err(anyhow!("解压 ZIP 失败"));
+            }
+
+            // 查找解压后的 exe 文件
+            let new_exe = temp_extract_dir.join("SteamCloudFileManager.exe");
+            if !new_exe.exists() {
+                return Err(anyhow!("未找到更新的程序文件"));
+            }
+
+            // 替换程序
+            fs::copy(&new_exe, &current_exe)?;
+
+            // 清理临时文件
+            let _ = fs::remove_dir_all(&temp_extract_dir);
+            let _ = fs::remove_file(download_path);
+
+            tracing::info!("更新安装完成");
+            Ok(())
         }
 
         #[cfg(target_os = "linux")]
         {
-            // Linux 需要设置执行权限
-            use std::os::unix::fs::PermissionsExt;
-            let mut perms = fs::metadata(download_path)?.permissions();
-            perms.set_mode(0o755);
-            fs::set_permissions(download_path, perms)?;
+            // Linux: 使用系统命令解压 tar.gz 并替换二进制
+            tracing::info!("开始安装 Linux 更新...");
+
+            let current_exe = std::env::current_exe()?;
+            let exe_dir = current_exe
+                .parent()
+                .ok_or_else(|| anyhow!("无法获取程序目录"))?;
+            let backup_path = current_exe.with_extension("bak");
+            let temp_extract_dir = exe_dir.join("update_temp");
+
+            // 备份当前程序
+            if current_exe.exists() {
+                tracing::info!("备份当前程序到: {}", backup_path.display());
+                fs::copy(&current_exe, &backup_path)?;
+            }
+
+            // 创建临时解压目录
+            if temp_extract_dir.exists() {
+                fs::remove_dir_all(&temp_extract_dir)?;
+            }
+            fs::create_dir_all(&temp_extract_dir)?;
+
+            // 使用 tar 命令解压
+            let output = std::process::Command::new("tar")
+                .arg("-xzf")
+                .arg(download_path)
+                .arg("-C")
+                .arg(&temp_extract_dir)
+                .output()?;
+
+            if !output.status.success() {
+                return Err(anyhow!("解压 tar.gz 失败"));
+            }
+
+            // 查找解压后的二进制文件
+            let new_exe = temp_extract_dir.join("steam-cloud-file-manager");
+            if !new_exe.exists() {
+                return Err(anyhow!("未找到更新的程序文件"));
+            }
+
+            // 设置执行权限
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = fs::metadata(&new_exe)?.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&new_exe, perms)?;
+            }
+
+            // 替换程序
+            fs::copy(&new_exe, &current_exe)?;
+
+            // 清理临时文件
+            let _ = fs::remove_dir_all(&temp_extract_dir);
+            let _ = fs::remove_file(download_path);
+
+            tracing::info!("更新安装完成");
+            Ok(())
         }
-
-        // 替换文件
-        fs::copy(download_path, &current_exe)?;
-
-        // 清理下载文件
-        let _ = fs::remove_file(download_path);
-
-        tracing::info!("更新安装完成，请重启应用");
-        Ok(())
     }
 
     // 重置状态
     pub fn reset(&mut self) {
         self.status = UpdateStatus::Idle;
+    }
+
+    // 设置错误状态
+    pub fn set_error(&mut self, error: String) {
+        self.status = UpdateStatus::Error(error);
     }
 
     // 打开 GitHub Release 页面

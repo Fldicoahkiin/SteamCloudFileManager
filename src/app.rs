@@ -49,6 +49,7 @@ pub struct SteamCloudApp {
     upload_rx: Option<Receiver<Result<String, String>>>,
     upload_progress_rx: Option<Receiver<(usize, usize, String)>>,
     update_manager: crate::update::UpdateManager,
+    update_download_rx: Option<Receiver<Result<PathBuf, String>>>,
 }
 
 impl SteamCloudApp {
@@ -122,6 +123,7 @@ impl SteamCloudApp {
             upload_rx: None,
             upload_progress_rx: None,
             update_manager: crate::update::UpdateManager::new(),
+            update_download_rx: None,
         };
 
         // 启动时自动扫描游戏
@@ -942,6 +944,53 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
+        // 处理更新下载结果
+        if let Some(rx) = &self.update_download_rx {
+            match rx.try_recv() {
+                Ok(Ok(download_path)) => {
+                    tracing::info!("下载完成: {}", download_path.display());
+
+                    // macOS: 打开 Finder 显示文件
+                    #[cfg(target_os = "macos")]
+                    {
+                        if let Err(e) = std::process::Command::new("open")
+                            .arg("-R")
+                            .arg(&download_path)
+                            .spawn()
+                        {
+                            tracing::error!("无法打开 Finder: {}", e);
+                        }
+                        // macOS 下载完成后重置为 Idle 状态
+                        self.update_manager.reset();
+                    }
+
+                    // Windows/Linux: 自动安装
+                    #[cfg(not(target_os = "macos"))]
+                    {
+                        if let Err(e) = self
+                            .update_manager
+                            .install_downloaded_update(&download_path)
+                        {
+                            self.update_manager
+                                .set_error(format!("安装失败: {}\n\n请手动下载更新", e));
+                        }
+                    }
+
+                    self.update_download_rx = None;
+                }
+                Ok(Err(err)) => {
+                    tracing::error!("下载失败: {}", err);
+                    self.update_manager
+                        .set_error(format!("下载失败: {}\n\n请手动下载更新", err));
+                    self.update_download_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.update_download_rx = None;
+                }
+            }
+        }
+
         egui::TopBottomPanel::top("top_panel").show(ctx, |ui| {
             ui.heading("Steam 云文件管理器");
             self.draw_connection_panel(ui);
@@ -1098,12 +1147,16 @@ impl eframe::App for SteamCloudApp {
 
         let was_showing_about = self.show_about;
         if self.show_about {
-            crate::ui::draw_about_window(
+            if let Some(release) = crate::ui::draw_about_window(
                 ctx,
                 &mut self.show_about,
                 &mut self.about_icon_texture,
                 &mut self.update_manager,
-            );
+            ) {
+                // 启动异步下载
+                let rx = self.update_manager.start_download(&release);
+                self.update_download_rx = Some(rx);
+            }
         }
 
         // 关闭 About 窗口时，如果是 NoUpdate 状态则重置为 Idle

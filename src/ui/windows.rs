@@ -3,15 +3,18 @@ use crate::vdf_parser::UserInfo;
 use egui;
 
 // 绘制 About 窗口
+// 返回值: (是否需要启动下载, 下载的 release)
 pub fn draw_about_window(
     ctx: &egui::Context,
     show: &mut bool,
     about_icon_texture: &mut Option<egui::TextureHandle>,
     update_manager: &mut crate::update::UpdateManager,
-) {
+) -> Option<crate::update::ReleaseInfo> {
     let steam_blue = egui::Color32::from_rgb(102, 192, 244);
     let text_subtle = ctx.style().visuals.text_color().gamma_multiply(0.6);
     let text_normal = ctx.style().visuals.text_color();
+
+    let mut download_release = None;
 
     egui::Window::new("About")
         .open(show)
@@ -185,7 +188,65 @@ pub fn draw_about_window(
                 });
             });
 
-            ui.add_space(24.0);
+            ui.add_space(16.0);
+
+            // 更新操作区域（仅在有新版本时显示）
+            let update_status = update_manager.status().clone();
+            if matches!(&update_status, crate::update::UpdateStatus::Available(_)) {
+                ui.separator();
+                ui.add_space(12.0);
+
+                if let crate::update::UpdateStatus::Available(release) = &update_status {
+                    let mut should_open_page = false;
+
+                    ui.vertical_centered(|ui| {
+                        #[cfg(target_os = "macos")]
+                        ui.label(
+                            egui::RichText::new("发现新版本，macOS 需要手动安装：")
+                                .size(12.0)
+                                .color(text_subtle),
+                        );
+
+                        #[cfg(not(target_os = "macos"))]
+                        ui.label(
+                            egui::RichText::new("发现新版本，可以进行更新操作：")
+                                .size(12.0)
+                                .color(text_subtle),
+                        );
+                        ui.add_space(8.0);
+
+                        #[cfg(target_os = "macos")]
+                        let button_text = "📥 下载安装包";
+
+                        #[cfg(not(target_os = "macos"))]
+                        let button_text = "📥 下载并安装";
+
+                        if ui.button(button_text).clicked() {
+                            download_release = Some(release.clone());
+                        }
+                        ui.add_space(4.0);
+                        if ui.button("🌐 查看详情").clicked() {
+                            should_open_page = true;
+                        }
+
+                        // 显示下载路径
+                        if let Ok(update_dir) = crate::update::UpdateManager::get_update_dir() {
+                            ui.add_space(8.0);
+                            ui.label(
+                                egui::RichText::new(format!("下载位置: {}", update_dir.display()))
+                                    .size(10.0)
+                                    .color(text_subtle),
+                            );
+                        }
+                    });
+
+                    if should_open_page {
+                        crate::update::UpdateManager::open_release_page();
+                    }
+                }
+
+                ui.add_space(12.0);
+            }
 
             ui.separator();
             ui.add_space(16.0);
@@ -267,43 +328,9 @@ pub fn draw_about_window(
             ui.separator();
             ui.add_space(12.0);
 
-            // 更新操作区域（仅在有新版本时显示操作按钮）
+            // 下载/安装进度显示区域
             let update_status = update_manager.status().clone();
             match &update_status {
-                crate::update::UpdateStatus::Available(release) => {
-                    let mut should_download = false;
-                    let mut should_open_page = false;
-
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            egui::RichText::new("发现新版本，可以进行更新操作：")
-                                .size(12.0)
-                                .color(text_subtle),
-                        );
-                        ui.add_space(8.0);
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.add_space((ui.available_width() - 250.0) / 2.0);
-                        if ui.button("📥 下载并安装").clicked() {
-                            should_download = true;
-                        }
-                        if ui.button("🌐 查看详情").clicked() {
-                            should_open_page = true;
-                        }
-                    });
-
-                    if should_download {
-                        let _ = update_manager.download_and_install(release);
-                    }
-                    if should_open_page {
-                        crate::update::UpdateManager::open_release_page();
-                    }
-
-                    ui.add_space(12.0);
-                    ui.separator();
-                    ui.add_space(12.0);
-                }
                 crate::update::UpdateStatus::Downloading(progress) => {
                     ui.vertical_centered(|ui| {
                         ui.label(
@@ -423,6 +450,8 @@ pub fn draw_about_window(
 
             ui.add_space(10.0);
         });
+
+    download_release
 }
 
 // 绘制游戏选择器窗口
