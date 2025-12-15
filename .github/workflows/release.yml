@@ -259,13 +259,13 @@ jobs:
         with:
           name: ${{ matrix.asset_name }}
           path: |
-            ${{ matrix.asset_name }}-${{ env.VERSION }}.zip
-            ${{ matrix.asset_name }}-${{ env.VERSION }}.tar.gz
-            ${{ matrix.asset_name }}-${{ env.VERSION }}.dmg
+            SteamCloudFileManager-*.zip
+            SteamCloudFileManager-*.tar.gz
+            SteamCloudFileManager-*.dmg
             target/${{ matrix.target }}/debian/*.deb
             target/${{ matrix.target }}/generate-rpm/*.rpm
-            ${{ matrix.asset_name }}-${{ env.VERSION }}.AppImage
-            ${{ matrix.asset_name }}-${{ env.VERSION }}-aur.tar.gz
+            SteamCloudFileManager-*.AppImage
+            SteamCloudFileManager-*-aur.tar.gz
   create-release:
     name: Create Release
     needs: build-release
@@ -315,11 +315,13 @@ jobs:
           # 开始写多行输出到 GITHUB_OUTPUT（files）
           echo "files<<EOF" >> $GITHUB_OUTPUT
 
-          echo "artifacts/SteamCloudFileManager-windows-x86_64/SteamCloudFileManager-windows-x86_64-${VERSION}.zip" >> $GITHUB_OUTPUT
-          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-${VERSION}.tar.gz" >> $GITHUB_OUTPUT
-          echo "artifacts/SteamCloudFileManager-macos-x86_64/SteamCloudFileManager-macos-x86_64-${VERSION}.dmg" >> $GITHUB_OUTPUT
-          echo "artifacts/SteamCloudFileManager-macos-aarch64/SteamCloudFileManager-macos-aarch64-${VERSION}.dmg" >> $GITHUB_OUTPUT
+          # 格式：SteamCloudFileManager-{version}-{platform}.ext
+          echo "artifacts/SteamCloudFileManager-windows-x86_64/SteamCloudFileManager-${VERSION}-windows-x86_64.zip" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64.tar.gz" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-macos-x86_64/SteamCloudFileManager-${VERSION}-macos-x86_64.dmg" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-macos-aarch64/SteamCloudFileManager-${VERSION}-macos-aarch64.dmg" >> $GITHUB_OUTPUT
 
+          # 查找所有的 .deb 和 .rpm 包
           find artifacts -path "*/debian/*.deb" -print | sort | while IFS= read -r deb; do
             echo "$deb" >> $GITHUB_OUTPUT
           done
@@ -328,8 +330,9 @@ jobs:
             echo "$rpm" >> $GITHUB_OUTPUT
           done
 
-          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-${VERSION}.AppImage" >> $GITHUB_OUTPUT
-          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-linux-x86_64-${VERSION}-aur.tar.gz" >> $GITHUB_OUTPUT
+          # 添加 AppImage 和 AUR tarball
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64.AppImage" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64-aur.tar.gz" >> $GITHUB_OUTPUT
 
           echo "EOF" >> $GITHUB_OUTPUT
       - name: Create Release
