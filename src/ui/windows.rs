@@ -7,6 +7,7 @@ pub fn draw_about_window(
     ctx: &egui::Context,
     show: &mut bool,
     about_icon_texture: &mut Option<egui::TextureHandle>,
+    update_manager: &mut crate::update::UpdateManager,
 ) {
     let steam_blue = egui::Color32::from_rgb(102, 192, 244);
     let text_subtle = ctx.style().visuals.text_color().gamma_multiply(0.6);
@@ -69,6 +70,84 @@ pub fn draw_about_window(
                         .spacing([16.0, 8.0])
                         .striped(false)
                         .show(ui, |ui| {
+                            // 版本号行
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        egui::RichText::new("Version")
+                                            .size(13.0)
+                                            .color(text_subtle),
+                                    );
+                                },
+                            );
+                            ui.vertical(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(crate::version::full_version())
+                                            .size(13.0)
+                                            .color(text_normal)
+                                            .monospace(),
+                                    );
+                                    ui.add_space(8.0);
+
+                                    // 检查更新按钮
+                                    let checking = matches!(
+                                        update_manager.status(),
+                                        crate::update::UpdateStatus::Checking
+                                    );
+                                    let button_text = if checking {
+                                        "检查中..."
+                                    } else {
+                                        "🔄 检查更新"
+                                    };
+
+                                    if ui
+                                        .add_enabled(
+                                            !checking,
+                                            egui::Button::new(button_text).small(),
+                                        )
+                                        .clicked()
+                                    {
+                                        let _ = update_manager.check_update();
+                                    }
+                                });
+
+                                // 在 Version 行下方显示更新状态提示
+                                let update_status = update_manager.status().clone();
+                                match &update_status {
+                                    crate::update::UpdateStatus::NoUpdate => {
+                                        ui.add_space(4.0);
+                                        ui.label(
+                                            egui::RichText::new("✅ 当前已是最新版本")
+                                                .size(11.0)
+                                                .color(egui::Color32::from_rgb(76, 175, 80)),
+                                        );
+                                    }
+                                    crate::update::UpdateStatus::Available(release) => {
+                                        ui.add_space(4.0);
+                                        ui.label(
+                                            egui::RichText::new(format!(
+                                                "🎉 发现新版本: {}",
+                                                release.tag_name
+                                            ))
+                                            .size(11.0)
+                                            .color(egui::Color32::from_rgb(255, 152, 0)),
+                                        );
+                                    }
+                                    crate::update::UpdateStatus::Error(err) => {
+                                        ui.add_space(4.0);
+                                        ui.label(
+                                            egui::RichText::new(format!("❌ {}", err))
+                                                .size(10.0)
+                                                .color(egui::Color32::from_rgb(244, 67, 54)),
+                                        );
+                                    }
+                                    _ => {}
+                                }
+                            });
+                            ui.end_row();
+
                             let mut row = |key: &str, val: String| {
                                 ui.with_layout(
                                     egui::Layout::right_to_left(egui::Align::Center),
@@ -86,8 +165,6 @@ pub fn draw_about_window(
                                 );
                                 ui.end_row();
                             };
-
-                            row("Version", crate::version::full_version().to_string());
                             row(
                                 "OS",
                                 format!(
@@ -189,6 +266,116 @@ pub fn draw_about_window(
             ui.add_space(16.0);
             ui.separator();
             ui.add_space(12.0);
+
+            // 更新操作区域（仅在有新版本时显示操作按钮）
+            let update_status = update_manager.status().clone();
+            match &update_status {
+                crate::update::UpdateStatus::Available(release) => {
+                    let mut should_download = false;
+                    let mut should_open_page = false;
+
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new("发现新版本，可以进行更新操作：")
+                                .size(12.0)
+                                .color(text_subtle),
+                        );
+                        ui.add_space(8.0);
+                    });
+
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 250.0) / 2.0);
+                        if ui.button("📥 下载并安装").clicked() {
+                            should_download = true;
+                        }
+                        if ui.button("🌐 查看详情").clicked() {
+                            should_open_page = true;
+                        }
+                    });
+
+                    if should_download {
+                        let _ = update_manager.download_and_install(release);
+                    }
+                    if should_open_page {
+                        crate::update::UpdateManager::open_release_page();
+                    }
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                }
+                crate::update::UpdateStatus::Downloading(progress) => {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new("📥 正在下载更新...")
+                                .size(13.0)
+                                .color(steam_blue),
+                        );
+                        ui.add_space(8.0);
+                        ui.add(egui::ProgressBar::new(*progress).show_percentage());
+                    });
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                }
+                crate::update::UpdateStatus::Installing => {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new("⚙️ 正在安装更新...")
+                                .size(13.0)
+                                .color(steam_blue),
+                        );
+                    });
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                }
+                crate::update::UpdateStatus::Success => {
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new("✅ 更新安装成功！")
+                                .size(13.0)
+                                .color(egui::Color32::from_rgb(76, 175, 80)),
+                        );
+                        ui.add_space(8.0);
+                        ui.label(
+                            egui::RichText::new("请重启应用以使用新版本")
+                                .size(11.0)
+                                .color(text_subtle),
+                        );
+                        ui.add_space(8.0);
+                        if ui.button("🔄 立即重启").clicked() {
+                            std::process::exit(0);
+                        }
+                    });
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                }
+                crate::update::UpdateStatus::Error(err) => {
+                    let err_msg = err.clone();
+                    ui.vertical_centered(|ui| {
+                        ui.label(
+                            egui::RichText::new(format!("❌ {}", err_msg))
+                                .size(12.0)
+                                .color(egui::Color32::from_rgb(244, 67, 54)),
+                        );
+                    });
+
+                    ui.add_space(8.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space((ui.available_width() - 80.0) / 2.0);
+                        if ui.button("🔄 重试").clicked() {
+                            update_manager.reset();
+                        }
+                    });
+
+                    ui.add_space(12.0);
+                    ui.separator();
+                    ui.add_space(12.0);
+                }
+                _ => {}
+            }
 
             // 日志管理区域
             ui.vertical_centered(|ui| {

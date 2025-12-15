@@ -48,6 +48,7 @@ pub struct SteamCloudApp {
     upload_complete: Option<crate::ui::UploadCompleteDialog>,
     upload_rx: Option<Receiver<Result<String, String>>>,
     upload_progress_rx: Option<Receiver<(usize, usize, String)>>,
+    update_manager: crate::update::UpdateManager,
 }
 
 impl SteamCloudApp {
@@ -120,6 +121,7 @@ impl SteamCloudApp {
             upload_complete: None,
             upload_rx: None,
             upload_progress_rx: None,
+            update_manager: crate::update::UpdateManager::new(),
         };
 
         // 启动时自动扫描游戏
@@ -1094,8 +1096,25 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
+        let was_showing_about = self.show_about;
         if self.show_about {
-            crate::ui::draw_about_window(ctx, &mut self.show_about, &mut self.about_icon_texture);
+            crate::ui::draw_about_window(
+                ctx,
+                &mut self.show_about,
+                &mut self.about_icon_texture,
+                &mut self.update_manager,
+            );
+        }
+
+        // 关闭 About 窗口时，如果是 NoUpdate 状态则重置为 Idle
+        if was_showing_about
+            && !self.show_about
+            && matches!(
+                self.update_manager.status(),
+                crate::update::UpdateStatus::NoUpdate
+            )
+        {
+            self.update_manager.reset();
         }
 
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
