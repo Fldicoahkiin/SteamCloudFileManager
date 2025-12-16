@@ -237,8 +237,8 @@ pub fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64) {
         ui.label("配额:");
         let used = total - available;
         let usage_percent = (used as f32 / total as f32 * 100.0).round();
-        let used_str = crate::utils::format_size(used);
-        let total_str = crate::utils::format_size(total);
+        let used_str = crate::file_manager::format_size(used);
+        let total_str = crate::file_manager::format_size(total);
         ui.label(format!(
             "{:.1}% 已使用 ({}/{})",
             usage_percent, used_str, total_str

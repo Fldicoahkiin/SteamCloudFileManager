@@ -1,6 +1,7 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod app;
+mod app_state;
 mod cdp_client;
 mod error;
 mod file_manager;
@@ -13,7 +14,6 @@ mod steam_process;
 mod ui;
 mod update;
 mod user_manager;
-mod utils;
 mod vdf_parser;
 mod version;
 

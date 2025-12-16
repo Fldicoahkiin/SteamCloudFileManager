@@ -38,6 +38,31 @@ impl SteamCloudManager {
         }
     }
 
+    // 异步连接到 Steam
+    pub fn connect_async(
+        manager: Arc<Mutex<Self>>,
+        app_id: u32,
+    ) -> std::sync::mpsc::Receiver<Result<u32, String>> {
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        std::thread::spawn(move || {
+            let result = {
+                let mut mgr = match manager.lock() {
+                    Ok(m) => m,
+                    Err(e) => {
+                        tracing::error!(error = %e, "Steam 管理器锁错误");
+                        let _ = tx.send(Err("Steam 管理器锁错误".to_string()));
+                        return;
+                    }
+                };
+                mgr.connect(app_id)
+            };
+            let _ = tx.send(result.map(|_| app_id).map_err(|e| e.to_string()));
+        });
+
+        rx
+    }
+
     pub fn connect(&mut self, app_id: u32) -> Result<()> {
         if self.is_connected() {
             self.disconnect();

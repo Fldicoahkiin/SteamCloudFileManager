@@ -227,7 +227,7 @@ impl CdpClient {
                 let file_count = item["file_count"].as_u64().unwrap_or(0) as usize;
 
                 let size_str = item["total_size_str"].as_str().unwrap_or("");
-                let total_size = crate::utils::parse_size(size_str);
+                let total_size = crate::file_manager::parse_size(size_str);
                 if total_size == 0 && !size_str.trim().is_empty() {
                     tracing::warn!(
                         "App {} ({:?}) 大小解析为0: Raw='{}'",
@@ -328,7 +328,7 @@ impl CdpClient {
 
                     all_files.push(CloudFile {
                         name: filename,
-                        size: crate::utils::parse_size(size_str),
+                        size: crate::file_manager::parse_size(size_str),
                         timestamp,
                         is_persisted: true,
                         exists: true,

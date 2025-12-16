@@ -1,55 +1,55 @@
 use crate::error::{AppError, AppResult};
-use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::{CloudFile, SteamCloudManager};
-use crate::vdf_parser::{UserInfo, VdfParser};
+use crate::vdf_parser::VdfParser;
 use eframe::egui;
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-#[derive(Default)]
 pub struct SteamCloudApp {
+    // 核心服务
     steam_manager: Arc<Mutex<SteamCloudManager>>,
-    app_id_input: String,
-    files: Vec<CloudFile>,
-    selected_files: Vec<usize>,
-    quota_info: Option<(u64, u64)>,
-    status_message: String,
-    is_connected: bool,
-    show_error: bool,
-    error_message: String,
-    is_refreshing: bool,
-    is_connecting: bool,
-    remote_ready: bool,
+    vdf_parser: Option<VdfParser>,
+    update_manager: crate::update::UpdateManager,
+
+    // 子状态
+    connection: crate::app_state::ConnectionState,
+    file_list: crate::app_state::FileListState,
+    game_library: crate::app_state::GameLibraryState,
+    dialogs: crate::app_state::DialogState,
+    misc: crate::app_state::MiscState,
+
+    // 异步通道
     loader_rx: Option<Receiver<Result<Vec<CloudFile>, String>>>,
     connect_rx: Option<Receiver<Result<u32, String>>>,
-    since_connected: Option<Instant>,
-    local_save_paths: Vec<(String, PathBuf)>,
-    cloud_games: Vec<CloudGameInfo>,
-    show_game_selector: bool,
-    is_scanning_games: bool,
     scan_games_rx: Option<Receiver<Result<crate::game_scanner::ScanResult, String>>>,
-    vdf_parser: Option<VdfParser>,
-    all_users: Vec<UserInfo>,
-    show_user_selector: bool,
-    show_about: bool,
-    show_debug_warning: bool,
-    about_icon_texture: Option<egui::TextureHandle>,
-    guide_dialog: Option<crate::ui::GuideDialog>,
     restart_rx: Option<Receiver<crate::steam_process::RestartStatus>>,
-    file_tree: Option<crate::file_tree::FileTree>,
-    search_query: String,
-    show_only_local: bool,
-    show_only_cloud: bool,
-    last_selected_index: Option<usize>,
-    upload_preview: Option<crate::ui::UploadPreviewDialog>,
-    upload_progress: Option<crate::ui::UploadProgressDialog>,
-    upload_complete: Option<crate::ui::UploadCompleteDialog>,
     upload_rx: Option<Receiver<Result<String, String>>>,
     upload_progress_rx: Option<Receiver<(usize, usize, String)>>,
-    update_manager: crate::update::UpdateManager,
     update_download_rx: Option<Receiver<Result<PathBuf, String>>>,
+}
+
+impl Default for SteamCloudApp {
+    fn default() -> Self {
+        Self {
+            steam_manager: Arc::new(Mutex::new(SteamCloudManager::new())),
+            vdf_parser: VdfParser::new().ok(),
+            update_manager: crate::update::UpdateManager::new(),
+            connection: Default::default(),
+            file_list: Default::default(),
+            game_library: Default::default(),
+            dialogs: Default::default(),
+            misc: Default::default(),
+            loader_rx: None,
+            connect_rx: None,
+            scan_games_rx: None,
+            restart_rx: None,
+            upload_rx: None,
+            upload_progress_rx: None,
+            update_download_rx: None,
+        }
+    }
 }
 
 impl SteamCloudApp {
@@ -66,79 +66,35 @@ impl SteamCloudApp {
     }
 
     fn ensure_connected(&self) -> AppResult<()> {
-        if !self.is_connected {
+        if !self.connection.is_connected {
             return Err(AppError::SteamNotConnected);
         }
         Ok(())
     }
 
     fn validate_app_id(&self) -> AppResult<u32> {
-        self.app_id_input
+        self.connection
+            .app_id_input
             .trim()
             .parse::<u32>()
             .map_err(|_| AppError::InvalidAppId)
     }
 
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // 设置字体
         crate::ui::setup_fonts(&cc.egui_ctx);
 
-        let mut app = Self {
-            steam_manager: Arc::new(Mutex::new(SteamCloudManager::new())),
-            app_id_input: String::new(),
-            files: Vec::new(),
-            selected_files: Vec::new(),
-            quota_info: None,
-            status_message: "请输入App ID并连接到Steam".to_string(),
-            is_connected: false,
-            show_error: false,
-            error_message: String::new(),
-            is_refreshing: false,
-            is_connecting: false,
-            remote_ready: false,
-            loader_rx: None,
-            connect_rx: None,
-            since_connected: None,
-            local_save_paths: Vec::new(),
-            cloud_games: Vec::new(),
-            show_game_selector: false,
-            is_scanning_games: false,
-            scan_games_rx: None,
-            vdf_parser: VdfParser::new().ok(),
-            all_users: Vec::new(),
-            show_user_selector: false,
-            show_about: false,
-            show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
-            about_icon_texture: None,
-            guide_dialog: None,
-            restart_rx: None,
-            file_tree: None,
-            search_query: String::new(),
-            show_only_local: false,
-            show_only_cloud: false,
-            last_selected_index: None,
-            upload_preview: None,
-            upload_progress: None,
-            upload_complete: None,
-            upload_rx: None,
-            upload_progress_rx: None,
-            update_manager: crate::update::UpdateManager::new(),
-            update_download_rx: None,
-        };
-
-        // 启动时自动扫描游戏
+        let mut app = Self::default();
         app.scan_cloud_games();
-
         app
     }
 
     fn connect_to_steam(&mut self) {
-        if self.app_id_input.trim().is_empty() {
+        if self.connection.app_id_input.trim().is_empty() {
             self.show_error("请输入App ID");
             return;
         }
 
-        if self.is_connecting || self.connect_rx.is_some() {
+        if self.connection.is_connecting || self.connect_rx.is_some() {
             tracing::warn!("正在连接中，请勿重复点击");
             return;
         }
@@ -152,50 +108,27 @@ impl SteamCloudApp {
         };
 
         tracing::info!(app_id = app_id, "开始连接到 Steam");
-        self.is_connecting = true;
-        self.is_connected = false;
-        self.remote_ready = false;
-        self.files.clear();
-        self.selected_files.clear();
-        self.quota_info = None;
-        self.file_tree = None;
-        self.local_save_paths.clear();
-        self.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
+        self.reset_connection_state();
+        self.connection.is_connecting = true;
+        self.misc.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
 
-        let steam_manager = self.steam_manager.clone();
-        let (tx, rx) = std::sync::mpsc::channel();
+        let rx = SteamCloudManager::connect_async(self.steam_manager.clone(), app_id);
         self.connect_rx = Some(rx);
-
-        std::thread::spawn(move || {
-            let result = {
-                let mut manager = match steam_manager.lock() {
-                    Ok(m) => m,
-                    Err(e) => {
-                        tracing::error!(error = %e, "Steam 管理器锁错误");
-                        let _ = tx.send(Err("Steam 管理器锁错误".to_string()));
-                        return;
-                    }
-                };
-                manager.connect(app_id)
-            };
-            let _ = tx.send(result.map(|_| app_id).map_err(|e| e.to_string()));
-        });
     }
 
     fn disconnect_from_steam(&mut self) {
-        let mut manager = self.steam_manager.lock().expect("steam_manager 锁不可用");
-        manager.disconnect();
+        if let Ok(mut manager) = self.steam_manager.lock() {
+            manager.disconnect();
+        }
 
-        self.is_connected = false;
-        self.is_connecting = false;
-        self.remote_ready = false;
-        self.files.clear();
-        self.selected_files.clear();
-        self.quota_info = None;
-        self.file_tree = None; // 清空文件树
-        self.local_save_paths.clear();
-        self.since_connected = None;
-        self.status_message = "已断开连接".to_string();
+        self.reset_connection_state();
+    }
+
+    fn reset_connection_state(&mut self) {
+        self.connection.reset();
+        self.file_list.clear();
+        self.misc.quota_info = None;
+        self.misc.status_message = "已断开连接".to_string();
     }
 
     fn refresh_files(&mut self) {
@@ -210,14 +143,19 @@ impl SteamCloudApp {
         }
 
         tracing::info!("开始刷新云文件列表");
-        self.is_refreshing = true;
-        self.files.clear();
+        self.file_list.is_refreshing = true;
+        self.file_list.files.clear();
 
         let steam_manager = self.steam_manager.clone();
         let (tx, rx) = std::sync::mpsc::channel();
         self.loader_rx = Some(rx);
 
-        let app_id = self.app_id_input.trim().parse::<u32>().unwrap_or(0);
+        let app_id = self
+            .connection
+            .app_id_input
+            .trim()
+            .parse::<u32>()
+            .unwrap_or(0);
 
         std::thread::spawn(move || {
             // 使用 FileService 统一获取文件
@@ -247,25 +185,22 @@ impl SteamCloudApp {
     fn update_quota(&mut self) {
         if let Ok(manager) = self.steam_manager.lock() {
             if let Ok((total, available)) = manager.get_quota() {
-                self.quota_info = Some((total, available));
+                self.misc.quota_info = Some((total, available));
             }
         }
     }
 
     fn download(&mut self) {
-        if self.selected_files.is_empty() {
+        if self.file_list.selected_files.is_empty() {
             self.show_error("请选择要下载的文件");
             return;
         }
 
-        match crate::file_manager::download(
-            &self.files,
-            &self.selected_files,
-            self.steam_manager.clone(),
-        ) {
+        let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
+        match file_ops.download_by_indices(&self.file_list.files, &self.file_list.selected_files) {
             Ok(Some((success_count, failed_files))) => {
                 if failed_files.is_empty() {
-                    self.status_message = format!("成功下载 {} 个文件", success_count);
+                    self.misc.status_message = format!("成功下载 {} 个文件", success_count);
                 } else {
                     let error_msg = format!(
                         "下载完成：成功 {} 个，失败 {} 个\n失败文件：{}",
@@ -287,15 +222,14 @@ impl SteamCloudApp {
 
     // 上传
     fn upload(&mut self) {
-        if !self.is_connected {
+        if !self.connection.is_connected {
             self.show_error("未连接到 Steam");
             return;
         }
 
-        // 直接调用上传，不显示选择对话框
-        match crate::file_manager::upload(self.steam_manager.clone()) {
+        match crate::file_manager::FileOperations::select_and_build_upload_queue() {
             Ok(Some(queue)) => {
-                self.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
+                self.dialogs.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
             }
             Ok(None) => {
                 // 用户取消
@@ -311,7 +245,7 @@ impl SteamCloudApp {
         let total_files = queue.total_files();
 
         // 显示进度对话框
-        self.upload_progress = Some(crate::ui::UploadProgressDialog::new(total_files));
+        self.dialogs.upload_progress = Some(crate::ui::UploadProgressDialog::new(total_files));
 
         // 在后台线程执行上传
         let steam_manager = self.steam_manager.clone();
@@ -348,15 +282,13 @@ impl SteamCloudApp {
     fn forget(&mut self) {
         use crate::file_manager::FileOperationResult;
 
-        let result = crate::file_manager::forget_selected(
-            &self.files,
-            &self.selected_files,
-            self.steam_manager.clone(),
-        );
+        let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
+        let result =
+            file_ops.forget_by_indices(&self.file_list.files, &self.file_list.selected_files);
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
-                self.status_message = msg;
+                self.misc.status_message = msg;
                 self.refresh_files();
             }
             FileOperationResult::Error(msg) => {
@@ -368,15 +300,13 @@ impl SteamCloudApp {
     fn delete(&mut self) {
         use crate::file_manager::FileOperationResult;
 
-        let result = crate::file_manager::delete_selected(
-            &self.files,
-            &self.selected_files,
-            self.steam_manager.clone(),
-        );
+        let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
+        let result =
+            file_ops.delete_by_indices(&self.file_list.files, &self.file_list.selected_files);
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
-                self.status_message = msg;
+                self.misc.status_message = msg;
                 self.refresh_files();
             }
             FileOperationResult::Error(msg) => {
@@ -386,8 +316,7 @@ impl SteamCloudApp {
     }
 
     fn show_error(&mut self, message: &str) {
-        self.error_message = message.to_string();
-        self.show_error = true;
+        self.dialogs.show_error(message);
     }
 
     fn scan_cloud_games(&mut self) {
@@ -415,8 +344,8 @@ impl SteamCloudApp {
                 Err(e) => tracing::warn!("无法打开 Steam 云存储页面: {}", e),
             }
 
-            self.is_scanning_games = true;
-            self.status_message = "正在扫描游戏库...".to_string();
+            self.game_library.is_scanning_games = true;
+            self.misc.status_message = "正在扫描游戏库...".to_string();
             let (tx, rx) = std::sync::mpsc::channel();
             self.scan_games_rx = Some(rx);
 
@@ -457,7 +386,7 @@ impl SteamCloudApp {
         // 处理文件拖放
         let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
         if !dropped_files.is_empty() {
-            if !self.is_connected {
+            if !self.connection.is_connected {
                 self.show_error("未连接到 Steam");
                 return;
             }
@@ -485,19 +414,19 @@ impl SteamCloudApp {
 
             if added_count > 0 {
                 // 显示预览对话框，而不是直接上传
-                self.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
+                self.dialogs.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
             }
         }
     }
 
     fn draw_connection_panel(&mut self, ui: &mut egui::Ui) {
-        if self.show_debug_warning {
+        if self.dialogs.show_debug_warning {
             let (restart_clicked, dismiss_clicked, show_manual) =
                 crate::ui::draw_debug_warning_ui(ui);
 
             // 处理手动指南
             if show_manual {
-                self.guide_dialog = Some(crate::ui::get_manual_guide_dialog());
+                self.dialogs.guide_dialog = Some(crate::ui::get_manual_guide_dialog());
             }
 
             // 处理重启操作
@@ -505,7 +434,7 @@ impl SteamCloudApp {
                 tracing::info!("用户点击自动重启 Steam");
 
                 // 显示进度对话框
-                self.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
+                self.dialogs.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
                     "正在关闭 Steam...".to_string(),
                 ));
 
@@ -520,13 +449,13 @@ impl SteamCloudApp {
                     });
                 });
 
-                self.show_debug_warning = false;
+                self.dialogs.show_debug_warning = false;
             }
 
             // 处理忽略操作
             if dismiss_clicked {
                 tracing::info!("用户选择暂时忽略 CDP 调试警告");
-                self.show_debug_warning = false;
+                self.dialogs.show_debug_warning = false;
             }
         }
 
@@ -536,38 +465,38 @@ impl SteamCloudApp {
             crate::ui::draw_toolbar_buttons(
                 ui,
                 user_id,
-                &mut self.show_about,
-                &mut self.show_user_selector,
-                &mut self.show_game_selector,
+                &mut self.dialogs.show_about,
+                &mut self.game_library.show_user_selector,
+                &mut self.game_library.show_game_selector,
             );
 
-            if self.show_user_selector && self.all_users.is_empty() {
+            if self.game_library.show_user_selector && self.game_library.all_users.is_empty() {
                 if let Some(parser) = &self.vdf_parser {
                     if let Ok(users) = parser.get_all_users_info() {
-                        self.all_users = users;
+                        self.game_library.all_users = users;
                     }
                 }
             }
 
-            if self.show_game_selector
-                && !self.is_scanning_games
+            if self.game_library.show_game_selector
+                && !self.game_library.is_scanning_games
                 && self.scan_games_rx.is_none()
-                && self.cloud_games.is_empty()
+                && self.game_library.cloud_games.is_empty()
             {
                 self.scan_cloud_games();
             }
 
             let action = crate::ui::draw_connection_controls(
                 ui,
-                &mut self.app_id_input,
-                self.is_connected,
-                self.is_connecting,
+                &mut self.connection.app_id_input,
+                self.connection.is_connected,
+                self.connection.is_connecting,
             );
 
             match action {
                 crate::ui::ConnectionAction::InputChanged => {
-                    self.is_connected = false;
-                    self.remote_ready = false;
+                    self.connection.is_connected = false;
+                    self.connection.remote_ready = false;
                     self.disconnect_from_steam();
                 }
                 crate::ui::ConnectionAction::Connect => {
@@ -585,70 +514,50 @@ impl SteamCloudApp {
     }
 
     fn draw_file_list(&mut self, ui: &mut egui::Ui) {
-        if !self.is_connected && !self.is_connecting {
-            // 未连接状态
-            ui.vertical_centered(|ui| {
-                ui.add_space(ui.available_height() / 2.0 - 80.0);
-                ui.heading("请输入 App ID 并连接到 Steam");
-                ui.add_space(20.0);
-                ui.label("您可以：");
-                ui.label("点击上方的 '游戏库' 按钮选择游戏");
-                ui.label("或直接输入 App ID 并点击 '连接'");
-            });
-        } else if self.is_connecting || (self.is_connected && !self.remote_ready) {
-            // 连接中或加载中状态
-            ui.vertical_centered(|ui| {
-                ui.add_space(ui.available_height() / 2.0 - 40.0);
-                ui.spinner();
-                ui.add_space(10.0);
-                if self.is_connecting {
-                    ui.label("正在连接到 Steam...");
-                } else {
-                    ui.label("正在加载文件列表...");
-                }
-            });
-        } else if let Some(tree) = &mut self.file_tree {
-            // 已连接且有文件树
+        if !self.connection.is_connected && !self.connection.is_connecting {
+            crate::ui::draw_disconnected_view(ui);
+        } else if self.connection.is_connecting
+            || (self.connection.is_connected && !self.connection.remote_ready)
+        {
+            crate::ui::draw_loading_view(ui, self.connection.is_connecting);
+        } else if let Some(tree) = &mut self.file_list.file_tree {
             let mut state = crate::ui::TreeViewState {
-                search_query: &mut self.search_query,
-                show_only_local: &mut self.show_only_local,
-                show_only_cloud: &mut self.show_only_cloud,
-                last_selected_index: &mut self.last_selected_index,
+                search_query: &mut self.file_list.search_query,
+                show_only_local: &mut self.file_list.show_only_local,
+                show_only_cloud: &mut self.file_list.show_only_cloud,
+                last_selected_index: &mut self.file_list.last_selected_index,
             };
             crate::ui::render_file_tree(
                 ui,
                 tree,
-                &mut self.selected_files,
-                &self.files,
-                &self.local_save_paths,
-                self.remote_ready,
+                &mut self.file_list.selected_files,
+                &self.file_list.files,
+                &self.file_list.local_save_paths,
+                self.connection.remote_ready,
                 &mut state,
             );
         } else {
-            // 已连接但没有文件
-            ui.vertical_centered(|ui| {
-                ui.add_space(ui.available_height() / 2.0 - 50.0);
-                ui.heading("没有找到云文件");
-                ui.add_space(10.0);
-                ui.label("该游戏没有云存档文件");
-            });
+            crate::ui::draw_no_files_view(ui);
         }
     }
 
     fn draw_action_buttons(&mut self, ui: &mut egui::Ui) {
         ui.separator();
 
-        let can_ops =
-            self.is_connected && self.remote_ready && !self.is_refreshing && !self.is_connecting;
+        let can_ops = self.connection.is_connected
+            && self.connection.remote_ready
+            && !self.file_list.is_refreshing
+            && !self.connection.is_connecting;
 
-        let has_selection = !self.selected_files.is_empty();
-        let selected_count = self.selected_files.len();
-        let total_count = self.files.len();
+        let has_selection = !self.file_list.selected_files.is_empty();
+        let selected_count = self.file_list.selected_files.len();
+        let total_count = self.file_list.files.len();
 
         let selected_total_size: u64 = self
+            .file_list
             .selected_files
             .iter()
-            .filter_map(|&idx| self.files.get(idx))
+            .filter_map(|&idx| self.file_list.files.get(idx))
             .map(|f| f.size)
             .sum();
 
@@ -663,14 +572,17 @@ impl SteamCloudApp {
 
         match action {
             crate::ui::FileAction::SelectAll => {
-                self.selected_files = crate::ui::select_all_files(self.files.len());
+                self.file_list.selected_files =
+                    crate::ui::select_all_files(self.file_list.files.len());
             }
             crate::ui::FileAction::InvertSelection => {
-                self.selected_files =
-                    crate::ui::invert_file_selection(&self.selected_files, self.files.len());
+                self.file_list.selected_files = crate::ui::invert_file_selection(
+                    &self.file_list.selected_files,
+                    self.file_list.files.len(),
+                );
             }
             crate::ui::FileAction::ClearSelection => {
-                self.selected_files = crate::ui::clear_file_selection();
+                self.file_list.selected_files = crate::ui::clear_file_selection();
             }
             crate::ui::FileAction::DownloadSelected => {
                 self.download();
@@ -689,7 +601,7 @@ impl SteamCloudApp {
     }
 
     fn draw_status_panel(&mut self, ui: &mut egui::Ui) {
-        let cloud_enabled = if self.is_connected {
+        let cloud_enabled = if self.connection.is_connected {
             self.steam_manager
                 .lock()
                 .ok()
@@ -698,27 +610,28 @@ impl SteamCloudApp {
             None
         };
 
-        let (account_enabled, app_enabled) = if self.is_connected && self.remote_ready {
-            if let Ok(manager) = self.steam_manager.lock() {
-                (
-                    manager.is_cloud_enabled_for_account().ok(),
-                    manager.is_cloud_enabled_for_app().ok(),
-                )
+        let (account_enabled, app_enabled) =
+            if self.connection.is_connected && self.connection.remote_ready {
+                if let Ok(manager) = self.steam_manager.lock() {
+                    (
+                        manager.is_cloud_enabled_for_account().ok(),
+                        manager.is_cloud_enabled_for_app().ok(),
+                    )
+                } else {
+                    (None, None)
+                }
             } else {
                 (None, None)
-            }
-        } else {
-            (None, None)
-        };
+            };
 
         let state = crate::ui::StatusPanelState {
-            status_message: self.status_message.clone(),
+            status_message: self.misc.status_message.clone(),
             cloud_enabled,
-            is_connected: self.is_connected,
-            remote_ready: self.remote_ready,
+            is_connected: self.connection.is_connected,
+            remote_ready: self.connection.remote_ready,
             account_enabled,
             app_enabled,
-            quota_info: self.quota_info,
+            quota_info: self.misc.quota_info,
         };
 
         let action = crate::ui::draw_complete_status_panel(ui, &state);
@@ -738,20 +651,20 @@ impl SteamCloudApp {
 
 impl eframe::App for SteamCloudApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        if self.is_connected {
+        if self.connection.is_connected {
             if let Ok(manager) = self.steam_manager.try_lock() {
                 manager.run_callbacks();
             }
 
             // 检查超时（30秒）
-            if !self.remote_ready && self.is_refreshing {
-                if let Some(since) = self.since_connected {
+            if !self.connection.remote_ready && self.file_list.is_refreshing {
+                if let Some(since) = self.connection.since_connected {
                     if since.elapsed() >= Duration::from_secs(30) {
                         tracing::warn!("Steam API 加载超时，停止等待");
-                        self.is_refreshing = false;
-                        self.remote_ready = true;
+                        self.file_list.is_refreshing = false;
+                        self.connection.remote_ready = true;
                         self.loader_rx = None;
-                        self.status_message = "加载超时，请重试".to_string();
+                        self.misc.status_message = "加载超时，请重试".to_string();
                     }
                 }
             }
@@ -760,10 +673,10 @@ impl eframe::App for SteamCloudApp {
         if let Some(rx) = &self.connect_rx {
             match rx.try_recv() {
                 Ok(Ok(app_id)) => {
-                    self.is_connecting = false;
-                    self.is_connected = true;
-                    self.status_message = format!("正在加载文件列表 (App ID: {})...", app_id);
-                    self.since_connected = Some(Instant::now());
+                    self.connection.is_connecting = false;
+                    self.connection.is_connected = true;
+                    self.misc.status_message = format!("正在加载文件列表 (App ID: {})...", app_id);
+                    self.connection.since_connected = Some(Instant::now());
                     self.connect_rx = None;
                     tracing::info!("Steam连接成功");
 
@@ -771,13 +684,13 @@ impl eframe::App for SteamCloudApp {
                     self.refresh_files();
                 }
                 Ok(Err(err)) => {
-                    self.is_connecting = false;
+                    self.connection.is_connecting = false;
                     self.connect_rx = None;
                     self.show_error(&format!("连接Steam失败: {}", err));
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.is_connecting = false;
+                    self.connection.is_connecting = false;
                     self.connect_rx = None;
                 }
             }
@@ -787,46 +700,48 @@ impl eframe::App for SteamCloudApp {
             match rx.try_recv() {
                 Ok(Ok(files)) => {
                     let count = files.len();
-                    self.files = files;
-                    self.selected_files.clear();
+                    self.file_list.files = files;
+                    self.file_list.selected_files.clear();
                     self.update_quota();
 
                     // 更新本地存档路径
-                    if let Ok(app_id) = self.app_id_input.parse::<u32>() {
+                    if let Ok(app_id) = self.connection.app_id_input.parse::<u32>() {
                         let parser_data = self
                             .ensure_vdf_parser()
                             .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
                         if let Some((steam_path, user_id)) = parser_data {
-                            self.local_save_paths = crate::path_resolver::collect_local_save_paths(
-                                &self.files,
-                                &steam_path,
-                                &user_id,
-                                app_id,
-                            );
+                            self.file_list.local_save_paths =
+                                crate::path_resolver::collect_local_save_paths(
+                                    &self.file_list.files,
+                                    &steam_path,
+                                    &user_id,
+                                    app_id,
+                                );
                         } else {
-                            self.local_save_paths.clear();
+                            self.file_list.local_save_paths.clear();
                         }
                     } else {
-                        self.local_save_paths.clear();
+                        self.file_list.local_save_paths.clear();
                     }
 
                     // 构建文件树
-                    self.file_tree = Some(crate::file_tree::FileTree::new(&self.files));
+                    self.file_list.file_tree =
+                        Some(crate::file_tree::FileTree::new(&self.file_list.files));
 
-                    self.status_message = format!("已加载 {} 个文件", count);
-                    self.is_refreshing = false;
-                    self.remote_ready = true;
+                    self.misc.status_message = format!("已加载 {} 个文件", count);
+                    self.file_list.is_refreshing = false;
+                    self.connection.remote_ready = true;
                     self.loader_rx = None;
                 }
                 Ok(Err(err)) => {
                     self.show_error(&format!("刷新文件列表失败: {}", err));
-                    self.is_refreshing = false;
+                    self.file_list.is_refreshing = false;
                     self.loader_rx = None;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.is_refreshing = false;
+                    self.file_list.is_refreshing = false;
                     self.loader_rx = None;
                 }
             }
@@ -835,7 +750,7 @@ impl eframe::App for SteamCloudApp {
         if let Some(rx) = &self.scan_games_rx {
             match rx.try_recv() {
                 Ok(Ok(result)) => {
-                    self.cloud_games = result.games;
+                    self.game_library.cloud_games = result.games;
 
                     // 构建详细的状态信息
                     let mut status_parts = Vec::new();
@@ -843,9 +758,12 @@ impl eframe::App for SteamCloudApp {
                     if result.cdp_count > 0 {
                         status_parts.push(format!("CDP: {} 个", result.cdp_count));
                     }
-                    status_parts.push(format!("总计: {} 个游戏", self.cloud_games.len()));
+                    status_parts.push(format!(
+                        "总计: {} 个游戏",
+                        self.game_library.cloud_games.len()
+                    ));
 
-                    self.status_message = status_parts.join(" | ");
+                    self.misc.status_message = status_parts.join(" | ");
 
                     // 如果 CDP 获取为 0，弹出警告
                     if result.cdp_count == 0 && crate::cdp_client::CdpClient::is_cdp_running() {
@@ -858,17 +776,17 @@ impl eframe::App for SteamCloudApp {
                         );
                     }
 
-                    self.is_scanning_games = false;
+                    self.game_library.is_scanning_games = false;
                     self.scan_games_rx = None;
                 }
                 Ok(Err(err)) => {
                     self.show_error(&format!("扫描游戏失败: {}", err));
-                    self.is_scanning_games = false;
+                    self.game_library.is_scanning_games = false;
                     self.scan_games_rx = None;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.is_scanning_games = false;
+                    self.game_library.is_scanning_games = false;
                     self.scan_games_rx = None;
                 }
             }
@@ -878,7 +796,7 @@ impl eframe::App for SteamCloudApp {
         if let Some(rx) = &self.upload_progress_rx {
             match rx.try_recv() {
                 Ok((current, total, filename)) => {
-                    if let Some(progress) = &mut self.upload_progress {
+                    if let Some(progress) = &mut self.dialogs.upload_progress {
                         progress.current_index = current;
                         progress.total_files = total;
                         progress.current_file = filename.clone();
@@ -921,8 +839,8 @@ impl eframe::App for SteamCloudApp {
                             })
                             .unwrap_or_default();
 
-                        self.upload_progress = None;
-                        self.upload_complete = Some(crate::ui::UploadCompleteDialog::new(
+                        self.dialogs.upload_progress = None;
+                        self.dialogs.upload_complete = Some(crate::ui::UploadCompleteDialog::new(
                             success_count,
                             failed_count,
                             total_size,
@@ -933,7 +851,7 @@ impl eframe::App for SteamCloudApp {
                     self.upload_rx = None;
                 }
                 Ok(Err(err)) => {
-                    self.upload_progress = None;
+                    self.dialogs.upload_progress = None;
                     self.show_error(&format!("上传失败: {}", err));
                     self.upload_rx = None;
                 }
@@ -1002,29 +920,33 @@ impl eframe::App for SteamCloudApp {
         });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            if self.is_connected && self.remote_ready {
+            if self.connection.is_connected && self.connection.remote_ready {
                 self.handle_file_drop(ctx, ui);
             }
 
             self.draw_file_list(ui);
         });
 
-        if self.show_error
-            && crate::ui::draw_error_window(ctx, &mut self.show_error, &self.error_message)
+        if self.dialogs.show_error
+            && crate::ui::draw_error_window(
+                ctx,
+                &mut self.dialogs.show_error,
+                &self.dialogs.error_message,
+            )
         {
-            self.show_error = false;
+            self.dialogs.show_error = false;
         }
 
-        if self.show_game_selector {
+        if self.game_library.show_game_selector {
             let (selected_app_id, refresh_clicked) = crate::ui::draw_game_selector_window(
                 ctx,
-                &mut self.show_game_selector,
-                &self.cloud_games,
-                self.is_scanning_games,
+                &mut self.game_library.show_game_selector,
+                &self.game_library.cloud_games,
+                self.game_library.is_scanning_games,
             );
             if let Some(app_id) = selected_app_id {
-                self.app_id_input = app_id.to_string();
-                self.show_game_selector = false;
+                self.connection.app_id_input = app_id.to_string();
+                self.game_library.show_game_selector = false;
                 self.connect_to_steam();
             }
             if refresh_clicked {
@@ -1039,17 +961,17 @@ impl eframe::App for SteamCloudApp {
                 use crate::steam_process::RestartStatus;
                 match status {
                     RestartStatus::Closing => {
-                        if let Some(dialog) = &mut self.guide_dialog {
+                        if let Some(dialog) = &mut self.dialogs.guide_dialog {
                             dialog.update_status("正在关闭 Steam...".to_string(), false, false);
                         }
                     }
                     RestartStatus::Starting => {
-                        if let Some(dialog) = &mut self.guide_dialog {
+                        if let Some(dialog) = &mut self.dialogs.guide_dialog {
                             dialog.update_status("正在启动 Steam...".to_string(), false, false);
                         }
                     }
                     RestartStatus::Success => {
-                        if let Some(dialog) = &mut self.guide_dialog {
+                        if let Some(dialog) = &mut self.dialogs.guide_dialog {
                             dialog.update_status("Steam 已成功重启!".to_string(), true, false);
                         }
                         self.restart_rx = None;
@@ -1061,15 +983,18 @@ impl eframe::App for SteamCloudApp {
                         // 显示手动操作引导
                         #[cfg(target_os = "macos")]
                         {
-                            self.guide_dialog = Some(crate::ui::create_macos_manual_guide());
+                            self.dialogs.guide_dialog =
+                                Some(crate::ui::create_macos_manual_guide());
                         }
                         #[cfg(target_os = "windows")]
                         {
-                            self.guide_dialog = Some(crate::ui::create_windows_manual_guide());
+                            self.dialogs.guide_dialog =
+                                Some(crate::ui::create_windows_manual_guide());
                         }
                         #[cfg(target_os = "linux")]
                         {
-                            self.guide_dialog = Some(crate::ui::create_linux_manual_guide());
+                            self.dialogs.guide_dialog =
+                                Some(crate::ui::create_linux_manual_guide());
                         }
                     }
                 }
@@ -1078,7 +1003,7 @@ impl eframe::App for SteamCloudApp {
 
         // 绘制引导对话框
         let mut close_dialog = false;
-        if let Some(dialog) = &mut self.guide_dialog {
+        if let Some(dialog) = &mut self.dialogs.guide_dialog {
             let action = dialog.draw(ctx);
             match action {
                 crate::ui::GuideDialogAction::Confirm => {
@@ -1092,65 +1017,65 @@ impl eframe::App for SteamCloudApp {
             }
         }
         if close_dialog {
-            self.guide_dialog = None;
+            self.dialogs.guide_dialog = None;
         }
 
-        if self.show_user_selector {
+        if self.game_library.show_user_selector {
             let selected_user_id = crate::ui::draw_user_selector_window(
                 ctx,
-                &mut self.show_user_selector,
-                &self.all_users,
+                &mut self.game_library.show_user_selector,
+                &self.game_library.all_users,
             );
             if let Some(user_id) = selected_user_id {
                 if let Some(parser) = &self.vdf_parser {
                     let steam_path = parser.get_steam_path().clone();
                     self.vdf_parser = Some(VdfParser::with_user_id(steam_path, user_id));
-                    self.cloud_games.clear();
-                    self.status_message = "已切换用户".to_string();
+                    self.game_library.cloud_games.clear();
+                    self.misc.status_message = "已切换用户".to_string();
                     self.scan_cloud_games();
                 }
-                self.show_user_selector = false;
+                self.game_library.show_user_selector = false;
             }
         }
 
         // 上传预览对话框
-        if let Some(preview) = &mut self.upload_preview {
+        if let Some(preview) = &mut self.dialogs.upload_preview {
             match preview.draw(ctx) {
                 crate::ui::UploadAction::Confirm => {
                     // 开始上传
-                    if let Some(preview) = self.upload_preview.take() {
+                    if let Some(preview) = self.dialogs.upload_preview.take() {
                         self.upload_start(preview.queue);
                     }
                 }
                 crate::ui::UploadAction::Cancel => {
-                    self.upload_preview = None;
+                    self.dialogs.upload_preview = None;
                 }
                 crate::ui::UploadAction::None => {}
             }
         }
 
         // 上传进度对话框
-        if let Some(progress) = &mut self.upload_progress {
+        if let Some(progress) = &mut self.dialogs.upload_progress {
             progress.draw(ctx);
             if !progress.show {
-                self.upload_progress = None;
+                self.dialogs.upload_progress = None;
             }
         }
 
         // 上传完成对话框
-        if let Some(complete) = &mut self.upload_complete {
+        if let Some(complete) = &mut self.dialogs.upload_complete {
             if complete.draw(ctx) {
-                self.upload_complete = None;
+                self.dialogs.upload_complete = None;
                 self.refresh_files();
             }
         }
 
-        let was_showing_about = self.show_about;
-        if self.show_about {
+        let was_showing_about = self.dialogs.show_about;
+        if self.dialogs.show_about {
             if let Some(release) = crate::ui::draw_about_window(
                 ctx,
-                &mut self.show_about,
-                &mut self.about_icon_texture,
+                &mut self.dialogs.show_about,
+                &mut self.dialogs.about_icon_texture,
                 &mut self.update_manager,
             ) {
                 // 启动异步下载
@@ -1161,7 +1086,7 @@ impl eframe::App for SteamCloudApp {
 
         // 关闭 About 窗口时，如果是 NoUpdate 状态则重置为 Idle
         if was_showing_about
-            && !self.show_about
+            && !self.dialogs.show_about
             && matches!(
                 self.update_manager.status(),
                 crate::update::UpdateStatus::NoUpdate

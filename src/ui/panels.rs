@@ -226,7 +226,7 @@ pub fn render_file_tree(
                     .on_hover_text(path.display().to_string())
                     .clicked()
                 {
-                    crate::utils::open_folder(path);
+                    crate::file_manager::open_folder(path);
                 }
             }
         });
@@ -552,7 +552,7 @@ fn render_tree_body_recursive(
 
                     // 文件大小列
                     row.col(|ui| {
-                        ui.label(crate::utils::format_size(file.size));
+                        ui.label(crate::file_manager::format_size(file.size));
                     });
 
                     // 写入日期列

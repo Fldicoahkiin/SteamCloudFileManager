@@ -76,7 +76,7 @@ pub fn draw_file_action_buttons(
             if selected_count > 0 {
                 ui.label(format!(
                     "总大小: {}",
-                    crate::utils::format_size(selected_total_size)
+                    crate::file_manager::format_size(selected_total_size)
                 ));
             }
         });

@@ -317,44 +317,180 @@ impl FileOperations {
 
         (success_count, failed_files)
     }
-}
 
-// 下载文件
-pub fn download(
-    files: &[CloudFile],
-    selected_indices: &[usize],
-    steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> Result<Option<(usize, Vec<String>)>> {
-    use rfd::FileDialog;
+    // 下载指定索引的文件
+    pub fn download_by_indices(
+        &self,
+        files: &[CloudFile],
+        selected_indices: &[usize],
+    ) -> Result<Option<(usize, Vec<String>)>> {
+        use rfd::FileDialog;
 
-    if selected_indices.is_empty() {
-        return Err(anyhow!("请选择要下载的文件"));
-    }
+        if selected_indices.is_empty() {
+            return Err(anyhow!("请选择要下载的文件"));
+        }
 
-    // 选择保存目录
-    if let Some(base_dir) = FileDialog::new().pick_folder() {
-        let file_ops = FileOperations::new(steam_manager);
-        let mut success_count = 0;
-        let mut failed_files = Vec::new();
+        if let Some(base_dir) = FileDialog::new().pick_folder() {
+            let mut success_count = 0;
+            let mut failed_files = Vec::new();
 
-        for &index in selected_indices {
-            if index >= files.len() {
-                continue;
+            for &index in selected_indices {
+                if index >= files.len() {
+                    continue;
+                }
+
+                let file = &files[index];
+                let file_path = base_dir.join(&file.name);
+
+                match self.download_file(file, &file_path) {
+                    Ok(_) => success_count += 1,
+                    Err(e) => failed_files.push(format!("{}: {}", file.name, e)),
+                }
             }
 
-            let file = &files[index];
-            // 保持文件夹结构：使用文件的原始名称（包含路径）
-            let file_path = base_dir.join(&file.name);
+            Ok(Some((success_count, failed_files)))
+        } else {
+            Ok(None)
+        }
+    }
 
-            match file_ops.download_file(file, &file_path) {
-                Ok(_) => success_count += 1,
-                Err(e) => failed_files.push(format!("{}: {}", file.name, e)),
+    // 批量取消云同步
+    pub fn forget_files(&self, filenames: &[String]) -> (usize, Vec<String>) {
+        let (success_count, failed_files) =
+            self.batch_operation(filenames, |filename| self.forget_file(filename));
+
+        if success_count > 0 {
+            tracing::info!("取消云同步完成，触发云同步...");
+            if let Ok(manager) = self.steam_manager.lock() {
+                if let Err(e) = manager.sync_cloud_files() {
+                    tracing::warn!("触发云同步失败: {}", e);
+                }
             }
         }
 
-        Ok(Some((success_count, failed_files)))
-    } else {
-        Ok(None)
+        (success_count, failed_files)
+    }
+
+    // 批量删除文件
+    pub fn delete_files(&self, filenames: &[String]) -> (usize, Vec<String>) {
+        let (success_count, failed_files) =
+            self.batch_operation(filenames, |filename| self.delete_file(filename));
+
+        if success_count > 0 {
+            tracing::info!("删除完成，触发云同步...");
+            if let Ok(manager) = self.steam_manager.lock() {
+                if let Err(e) = manager.sync_cloud_files() {
+                    tracing::warn!("触发云同步失败: {}", e);
+                }
+            }
+        }
+
+        (success_count, failed_files)
+    }
+
+    // 取消云同步指定索引的文件
+    pub fn forget_by_indices(
+        &self,
+        files: &[CloudFile],
+        selected_files: &[usize],
+    ) -> FileOperationResult {
+        if selected_files.is_empty() {
+            return FileOperationResult::Error("请选择要取消云同步的文件".to_string());
+        }
+
+        let filenames: Vec<String> = selected_files
+            .iter()
+            .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
+            .collect();
+
+        let (forgotten_count, failed_files) = self.forget_files(&filenames);
+
+        if !failed_files.is_empty() {
+            return FileOperationResult::Error(format!(
+                "部分文件取消云同步失败: {}",
+                failed_files.join(", ")
+            ));
+        }
+
+        if forgotten_count > 0 {
+            FileOperationResult::SuccessWithRefresh(format!(
+                "已取消云同步 {} 个文件",
+                forgotten_count
+            ))
+        } else {
+            FileOperationResult::Error("没有文件被取消云同步".to_string())
+        }
+    }
+
+    // 删除指定索引的文件
+    pub fn delete_by_indices(
+        &self,
+        files: &[CloudFile],
+        selected_files: &[usize],
+    ) -> FileOperationResult {
+        if selected_files.is_empty() {
+            return FileOperationResult::Error("请选择要删除的文件".to_string());
+        }
+
+        let filenames: Vec<String> = selected_files
+            .iter()
+            .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
+            .collect();
+
+        let (deleted_count, failed_files) = self.delete_files(&filenames);
+
+        if !failed_files.is_empty() {
+            return FileOperationResult::Error(format!(
+                "部分文件删除失败: {}",
+                failed_files.join(", ")
+            ));
+        }
+
+        if deleted_count > 0 {
+            FileOperationResult::SuccessWithRefresh(format!("已删除 {} 个文件", deleted_count))
+        } else {
+            FileOperationResult::Error("没有文件被删除".to_string())
+        }
+    }
+
+    // 选择文件并构建上传队列
+    pub fn select_and_build_upload_queue() -> Result<Option<UploadQueue>> {
+        use rfd::FileDialog;
+
+        // 选择文件
+        let files = FileDialog::new().pick_files();
+
+        // 选择文件夹
+        let folder = FileDialog::new().pick_folder();
+
+        // 如果两者都没选，返回 None
+        if files.is_none() && folder.is_none() {
+            return Ok(None);
+        }
+
+        let mut queue = UploadQueue::new();
+
+        // 添加文件
+        if let Some(paths) = files {
+            for path in paths {
+                if let Err(e) = queue.add_file(path.clone()) {
+                    tracing::warn!("跳过文件 {}: {}", path.display(), e);
+                }
+            }
+        }
+
+        // 添加文件夹
+        if let Some(folder_path) = folder {
+            if let Err(e) = queue.add_folder(&folder_path) {
+                tracing::warn!("添加文件夹失败 {}: {}", folder_path.display(), e);
+            }
+        }
+
+        if queue.total_files() > 0 {
+            Ok(Some(queue))
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -362,154 +498,6 @@ pub fn download(
 pub enum FileOperationResult {
     Error(String),              // 错误消息
     SuccessWithRefresh(String), // 成功消息 + 需要刷新
-}
-
-// 取消云同步
-pub fn forget(
-    filenames: &[String],
-    steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> (usize, Vec<String>) {
-    let file_ops = FileOperations::new(steam_manager.clone());
-    let (success_count, failed_files) =
-        file_ops.batch_operation(filenames, |filename| file_ops.forget_file(filename));
-
-    // 取消云同步后，触发云同步
-    if success_count > 0 {
-        tracing::info!("取消云同步完成，触发云同步...");
-        if let Ok(manager) = steam_manager.lock() {
-            if let Err(e) = manager.sync_cloud_files() {
-                tracing::warn!("触发云同步失败: {}", e);
-            }
-        }
-    }
-
-    (success_count, failed_files)
-}
-
-// 删除文件
-pub fn delete(
-    filenames: &[String],
-    steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> (usize, Vec<String>) {
-    let file_ops = FileOperations::new(steam_manager.clone());
-    let (success_count, failed_files) =
-        file_ops.batch_operation(filenames, |filename| file_ops.delete_file(filename));
-
-    // 删除完成后，触发云同步
-    if success_count > 0 {
-        tracing::info!("删除完成，触发云同步...");
-        if let Ok(manager) = steam_manager.lock() {
-            if let Err(e) = manager.sync_cloud_files() {
-                tracing::warn!("触发云同步失败: {}", e);
-            }
-        }
-    }
-
-    (success_count, failed_files)
-}
-
-// 取消云同步选中的文件
-pub fn forget_selected(
-    files: &[CloudFile],
-    selected_files: &[usize],
-    steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> FileOperationResult {
-    if selected_files.is_empty() {
-        return FileOperationResult::Error("请选择要取消云同步的文件".to_string());
-    }
-
-    let filenames: Vec<String> = selected_files
-        .iter()
-        .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
-        .collect();
-
-    let (forgotten_count, failed_files) = forget(&filenames, steam_manager);
-
-    if !failed_files.is_empty() {
-        return FileOperationResult::Error(format!(
-            "部分文件取消云同步失败: {}",
-            failed_files.join(", ")
-        ));
-    }
-
-    if forgotten_count > 0 {
-        FileOperationResult::SuccessWithRefresh(format!("已取消云同步 {} 个文件", forgotten_count))
-    } else {
-        FileOperationResult::Error("没有文件被取消云同步".to_string())
-    }
-}
-
-// 删除选中的文件
-pub fn delete_selected(
-    files: &[CloudFile],
-    selected_files: &[usize],
-    steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> FileOperationResult {
-    if selected_files.is_empty() {
-        return FileOperationResult::Error("请选择要删除的文件".to_string());
-    }
-
-    let filenames: Vec<String> = selected_files
-        .iter()
-        .filter_map(|&index| files.get(index).map(|f| f.name.clone()))
-        .collect();
-
-    let (deleted_count, failed_files) = delete(&filenames, steam_manager);
-
-    if !failed_files.is_empty() {
-        return FileOperationResult::Error(format!(
-            "部分文件删除失败: {}",
-            failed_files.join(", ")
-        ));
-    }
-
-    if deleted_count > 0 {
-        FileOperationResult::SuccessWithRefresh(format!("已删除 {} 个文件", deleted_count))
-    } else {
-        FileOperationResult::Error("没有文件被删除".to_string())
-    }
-}
-
-// 上传文件（支持文件和文件夹混合）
-pub fn upload(
-    _steam_manager: std::sync::Arc<std::sync::Mutex<crate::steam_api::SteamCloudManager>>,
-) -> Result<Option<UploadQueue>> {
-    use rfd::FileDialog;
-
-    // 先选择文件
-    let files = FileDialog::new().pick_files();
-
-    // 再选择文件夹
-    let folder = FileDialog::new().pick_folder();
-
-    // 如果两者都没选，返回 None
-    if files.is_none() && folder.is_none() {
-        return Ok(None);
-    }
-
-    let mut queue = UploadQueue::new();
-
-    // 添加文件
-    if let Some(paths) = files {
-        for path in paths {
-            if let Err(e) = queue.add_file(path.clone()) {
-                tracing::warn!("跳过文件 {}: {}", path.display(), e);
-            }
-        }
-    }
-
-    // 添加文件夹
-    if let Some(folder_path) = folder {
-        if let Err(e) = queue.add_folder(&folder_path) {
-            tracing::warn!("添加文件夹失败 {}: {}", folder_path.display(), e);
-        }
-    }
-
-    if queue.total_files() > 0 {
-        Ok(Some(queue))
-    } else {
-        Ok(None)
-    }
 }
 
 use std::path::Path;
@@ -659,20 +647,19 @@ impl UploadQueue {
     }
 }
 
-// 格式化文件大小
-pub fn format_size(bytes: u64) -> String {
-    const KB: u64 = 1024;
-    const MB: u64 = KB * 1024;
-    const GB: u64 = MB * 1024;
-
-    if bytes >= GB {
-        format!("{:.2} GB", bytes as f64 / GB as f64)
-    } else if bytes >= MB {
-        format!("{:.2} MB", bytes as f64 / MB as f64)
-    } else if bytes >= KB {
-        format!("{:.2} KB", bytes as f64 / KB as f64)
-    } else {
-        format!("{} B", bytes)
+// 打开文件夹
+pub fn open_folder(path: &std::path::Path) {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = std::process::Command::new("explorer").arg(path).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(path).spawn();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(path).spawn();
     }
 }
 
@@ -845,4 +832,45 @@ pub struct UploadResult {
     pub total_size: u64,
     pub elapsed_secs: u64,
     pub failed_files: Vec<(String, String)>,
+}
+
+// 格式化文件大小
+pub fn format_size(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.2} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+// 解析大小字符串为字节数（如 "1.5 MB" -> 1572864）
+pub fn parse_size(s: &str) -> u64 {
+    let s = s.replace(",", "").to_lowercase();
+    let s = s.replace("\u{a0}", " ");
+    let parts: Vec<&str> = s.split_whitespace().collect();
+
+    if parts.is_empty() {
+        return 0;
+    }
+
+    let num = parts[0].parse::<f64>().unwrap_or(0.0);
+    if parts.len() > 1 {
+        match parts[1] {
+            "kb" | "k" => (num * 1024.0) as u64,
+            "mb" | "m" => (num * 1024.0 * 1024.0) as u64,
+            "gb" | "g" => (num * 1024.0 * 1024.0 * 1024.0) as u64,
+            "b" | "bytes" => num as u64,
+            _ => num as u64,
+        }
+    } else {
+        num as u64
+    }
 }

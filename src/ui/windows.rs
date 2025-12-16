@@ -558,7 +558,7 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo) -> Option<u32> {
                 ui.label(format!(
                     "{} 个文件 | {}",
                     game.file_count,
-                    crate::utils::format_size(game.total_size)
+                    crate::file_manager::format_size(game.total_size)
                 ));
 
                 // 安装目录
