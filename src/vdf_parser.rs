@@ -6,6 +6,7 @@ use std::fs;
 use std::io::{Cursor, Read};
 use std::path::PathBuf;
 
+#[derive(Clone)]
 pub struct VdfParser {
     steam_path: PathBuf,
     user_id: String,
@@ -205,10 +206,6 @@ impl VdfParser {
         it.next()?;
         let val = it.next()?;
         Some((key, val))
-    }
-
-    pub fn get_all_users_info(&self) -> Result<Vec<UserInfo>> {
-        crate::user_manager::get_all_users_info(&self.steam_path, &self.user_id)
     }
 
     pub fn with_user_id(steam_path: PathBuf, user_id: String) -> Self {

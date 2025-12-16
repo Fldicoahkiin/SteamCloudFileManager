@@ -1,7 +1,9 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod app;
+mod app_handlers;
 mod app_state;
+mod async_handlers;
 mod cdp_client;
 mod error;
 mod file_manager;

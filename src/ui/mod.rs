@@ -1,4 +1,5 @@
 pub mod action_buttons;
+pub mod app_panels;
 pub mod app_views;
 pub mod font_loader;
 pub mod guide_dialog;
@@ -9,6 +10,7 @@ pub mod upload_dialog;
 pub mod windows;
 
 pub use action_buttons::*;
+pub use app_panels::*;
 pub use app_views::*;
 pub use font_loader::setup_fonts;
 pub use guide_dialog::*;
