@@ -99,6 +99,10 @@ impl SteamCloudApp {
         );
     }
 
+    fn open_cloud_url(&mut self) {
+        self.handlers.open_cloud_url(&self.connection.app_id_input);
+    }
+
     fn download(&mut self) {
         self.handlers
             .download_files(&self.file_list, &mut self.misc, &mut self.dialogs);
@@ -330,7 +334,7 @@ impl eframe::App for SteamCloudApp {
             crate::ui::TopPanelEvent::ScanGames => self.scan_cloud_games(),
             crate::ui::TopPanelEvent::Connect => self.connect_to_steam(),
             crate::ui::TopPanelEvent::Disconnect => self.disconnect_from_steam(),
-            crate::ui::TopPanelEvent::Refresh => self.refresh_files(),
+            crate::ui::TopPanelEvent::Refresh => self.open_cloud_url(),
             crate::ui::TopPanelEvent::Restart => {
                 let (tx, rx) = std::sync::mpsc::channel();
                 self.async_handlers.restart_rx = Some(rx);
@@ -413,6 +417,8 @@ impl eframe::App for SteamCloudApp {
                 &mut self.game_library.show_game_selector,
                 &self.game_library.cloud_games,
                 self.game_library.is_scanning_games,
+                self.game_library.vdf_count,
+                self.game_library.cdp_count,
                 &self.misc.i18n,
             );
             if let Some(app_id) = selected_app_id {

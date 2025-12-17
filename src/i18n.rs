@@ -174,6 +174,20 @@ impl I18n {
         }
     }
 
+    pub fn disconnect_sync_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "断开后 Steam 将自动同步",
+            Language::English => "Steam will auto-sync after disconnect",
+        }
+    }
+
+    pub fn refresh_open_url_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "在 Steam 中打开云存储页面",
+            Language::English => "Open cloud storage page in Steam",
+        }
+    }
+
     // 账户和游戏选择
     pub fn account_cloud_status(&self) -> &'static str {
         match self.lang {
@@ -1286,30 +1300,6 @@ impl I18n {
         }
     }
 
-    // 游戏扫描相关
-    pub fn vdf_count(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("VDF: {} 个", count),
-            Language::English => format!("VDF: {}", count),
-        }
-    }
-
-    pub fn cdp_count(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("CDP: {} 个", count),
-            Language::English => format!("CDP: {}", count),
-        }
-    }
-
-    pub fn total_games(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("总计: {} 个游戏", count),
-            Language::English => {
-                format!("Total: {} game{}", count, if count != 1 { "s" } else { "" })
-            }
-        }
-    }
-
     pub fn scan_games_failed(&self, err: &str) -> String {
         match self.lang {
             Language::Chinese => format!("扫描游戏失败: {}", err),
@@ -1501,6 +1491,91 @@ impl I18n {
         match self.lang {
             Language::Chinese => "上传文件或文件夹",
             Language::English => "Upload file or folder",
+        }
+    }
+
+    // 按钮悬停提示
+    pub fn select_all_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "选择列表中的所有文件",
+            Language::English => "Select all files in the list",
+        }
+    }
+
+    pub fn invert_selection_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "反转当前选择状态",
+            Language::English => "Invert current selection",
+        }
+    }
+
+    pub fn clear_selection_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "取消选择所有文件",
+            Language::English => "Deselect all files",
+        }
+    }
+
+    pub fn download_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "下载选中的文件到本地",
+            Language::English => "Download selected files to local",
+        }
+    }
+
+    pub fn upload_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "上传文件或文件夹到云端",
+            Language::English => "Upload files or folders to cloud",
+        }
+    }
+
+    pub fn delete_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "从云端和本地删除选中的文件",
+            Language::English => "Delete selected files from cloud and local",
+        }
+    }
+
+    pub fn forget_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "仅从云端移除，保留本地文件",
+            Language::English => "Remove from cloud only, keep local files",
+        }
+    }
+
+    pub fn connect_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "连接到 Steam 云存储 API",
+            Language::English => "Connect to Steam Cloud API",
+        }
+    }
+
+    pub fn disconnect_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "断开与 Steam 的连接",
+            Language::English => "Disconnect from Steam",
+        }
+    }
+
+    pub fn about_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "查看软件版本和作者信息",
+            Language::English => "View software version and author info",
+        }
+    }
+
+    pub fn select_account_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "切换 Steam 账户",
+            Language::English => "Switch Steam account",
+        }
+    }
+
+    pub fn select_game_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "选择要管理云存档的游戏",
+            Language::English => "Select game to manage cloud saves",
         }
     }
 

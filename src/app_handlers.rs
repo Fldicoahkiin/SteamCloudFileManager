@@ -109,6 +109,31 @@ impl AppHandlers {
         }
     }
 
+    pub fn open_cloud_url(&self, app_id_input: &str) {
+        if let Ok(app_id) = app_id_input.parse::<u32>() {
+            let steam_url = format!(
+                "steam://openurl/https://store.steampowered.com/account/remotestorageapp/?appid={}",
+                app_id
+            );
+            #[cfg(target_os = "macos")]
+            {
+                let _ = std::process::Command::new("open").arg(&steam_url).spawn();
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", "", &steam_url])
+                    .spawn();
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let _ = std::process::Command::new("xdg-open")
+                    .arg(&steam_url)
+                    .spawn();
+            }
+        }
+    }
+
     pub fn download_files(
         &self,
         file_list: &FileListState,
