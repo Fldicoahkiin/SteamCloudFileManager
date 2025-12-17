@@ -310,15 +310,6 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
                         .map(|m| m.name.clone())
                         .or_else(|| appinfo.and_then(|a| a.name.clone()));
 
-                    if game_name.is_none() {
-                        tracing::debug!(
-                            app_id = app_id,
-                            has_manifest = manifest.is_some(),
-                            has_appinfo = appinfo.is_some(),
-                            "App ID 无游戏名称"
-                        );
-                    }
-
                     games.push(CloudGameInfo {
                         app_id,
                         file_count: files.len(),

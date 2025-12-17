@@ -145,7 +145,7 @@ impl FileService {
 
                             f.root_description = cdp_file.root_description.clone();
 
-                            tracing::debug!(
+                            tracing::trace!(
                                 "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",
                                 f.name,
                                 f.root,
@@ -155,7 +155,7 @@ impl FileService {
                                 url
                             );
                         } else {
-                            tracing::debug!(
+                            tracing::trace!(
                                 "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | 保留原 root_description",
                                 f.name,
                                 f.root,
@@ -164,7 +164,7 @@ impl FileService {
                             );
                         }
                     } else {
-                        tracing::debug!(
+                        tracing::trace!(
                             "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
                             cdp_file.name,
                             cdp_file.root,
@@ -177,8 +177,61 @@ impl FileService {
             }
         }
 
+        // 输出每个文件的详细信息
+        log_file_details(&files);
+
         Ok(files)
     }
+}
+
+// 输出每个文件的详细信息日志
+fn log_file_details(files: &[CloudFile]) {
+    if files.is_empty() {
+        return;
+    }
+
+    tracing::info!(
+        "========== 文件详情列表 ({} 个文件) ==========",
+        files.len()
+    );
+
+    for (i, f) in files.iter().enumerate() {
+        // 解析 CDP 信息
+        let (_cdp_url, cdp_folder) = if f.root_description.starts_with("CDP:") {
+            let content = &f.root_description[4..];
+            let parts: Vec<&str> = content.split('|').collect();
+            let url = parts.first().unwrap_or(&"");
+            let folder = parts.get(1).unwrap_or(&"");
+            (url.to_string(), folder.to_string())
+        } else {
+            ("N/A".to_string(), f.root_description.clone())
+        };
+
+        let time_str = f.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
+        let size_str = format_size(f.size);
+        let exists_str = if f.exists { "✓" } else { "✗" };
+        let synced_str = if f.is_persisted {
+            "已同步"
+        } else {
+            "未同步"
+        };
+
+        // 一行输出所有关键信息
+        tracing::info!(
+            "[{:>3}] {} | Root={} ({}) | CDP={} | {} | {} | {} | {}",
+            i + 1,
+            f.name,
+            f.root,
+            crate::path_resolver::get_cdp_folder_name(f.root),
+            cdp_folder,
+            size_str,
+            time_str,
+            exists_str,
+            synced_str
+        );
+    }
+
+    tracing::info!("========== 文件列表结束 ==========");
 }
 
 impl Default for FileService {

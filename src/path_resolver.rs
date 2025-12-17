@@ -419,9 +419,6 @@ pub fn collect_local_save_paths(
 
     // 预先缓存 game_install_dir，避免重复查找
     let game_install_dir_cache = get_game_install_dir(steam_path, app_id).ok();
-    if let Some(ref dir) = game_install_dir_cache {
-        tracing::info!("找到游戏安装目录: {}", dir.display());
-    }
 
     // 按父目录去重，而不是按 root 类型
     let mut path_map: HashMap<PathBuf, (String, PathBuf)> = HashMap::new();

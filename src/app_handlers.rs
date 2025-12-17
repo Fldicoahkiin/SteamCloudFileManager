@@ -1,8 +1,8 @@
 use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryState, MiscState};
 use crate::async_handlers::AsyncHandlers;
-use crate::error::{AppError, AppResult};
 use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
+use anyhow::{anyhow, Result as AnyhowResult};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -58,9 +58,9 @@ impl AppHandlers {
         connection: &ConnectionState,
         file_list: &mut FileListState,
         async_handlers: &mut AsyncHandlers,
-    ) -> AppResult<()> {
+    ) -> AnyhowResult<()> {
         if !connection.is_connected {
-            return Err(AppError::SteamNotConnected);
+            return Err(anyhow!("Steam 未连接"));
         }
 
         if async_handlers.loader_rx.is_some() {

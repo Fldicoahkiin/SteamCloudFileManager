@@ -220,9 +220,6 @@ impl CdpClient {
                     .as_str()
                     .map(|s| s.to_string())
                     .filter(|s| !s.is_empty());
-                if let Some(ref name) = game_name {
-                    tracing::debug!("解析到游戏: ID={}, Name={}", app_id, name);
-                }
 
                 let file_count = item["file_count"].as_u64().unwrap_or(0) as usize;
 
