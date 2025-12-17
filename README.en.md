@@ -305,13 +305,14 @@ Our software automatically identifies and displays the actual storage location o
 
 ### Feature Development
 
+- [x] Multi-language support (i18n) - Chinese/English
+- [x] Version update detection
+- [x] Tree view
+- [x] Batch upload/download
 - [ ] File conflict detection and handling
-- [ ] Multi-language support (i18n)
 - [ ] Cloud save backup and restore
 - [ ] File comparison (local vs cloud)
 - [ ] Automatic backup schedule
-- [ ] Version update detection
-- [ ] Batch file renaming
 - [ ] Symlink sync support (experimental)
 
 ### Package Manager Support
@@ -325,7 +326,15 @@ Our software automatically identifies and displays the actual storage location o
 
 ## Contributing
 
-Welcome to submit Issues and Pull Requests
+Welcome to submit Issues and Pull Requests!
+
+### Contributing Translations
+
+If you want to add a new language, please check the [i18n Contribution Guide](I18N_GUIDE.md).
+
+Currently supported languages:
+- 简体中文
+- English
 
 ## Contributors
 
