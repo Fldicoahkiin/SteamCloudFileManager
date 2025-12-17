@@ -287,15 +287,22 @@ impl FileOperations {
     }
 
     // 下载文件到指定路径
-    pub fn download_file(&self, file: &CloudFile, path: &PathBuf) -> Result<()> {
+    pub fn download_file(
+        &self,
+        file: &CloudFile,
+        path: &PathBuf,
+        local_save_paths: &[(String, PathBuf)],
+    ) -> Result<()> {
         tracing::debug!(
-            "尝试下载文件: {}, root_desc: {}",
+            "尝试下载文件: {}, root_desc: {}, is_persisted: {}, exists: {}",
             file.name,
             if file.root_description.starts_with("CDP:") {
                 "CDP URL"
             } else {
                 &file.root_description
-            }
+            },
+            file.is_persisted,
+            file.exists
         );
 
         let url_prefix = "CDP:";
@@ -319,25 +326,68 @@ impl FileOperations {
                         return Ok(());
                     }
                     Err(e) => {
-                        tracing::warn!("CDP 下载失败，尝试 Steam API: {}", e);
+                        tracing::warn!("CDP 下载失败，尝试其他方式: {}", e);
                     }
                 }
             }
         }
 
-        // 如果 CDP 下载失败或不可用，尝试 Steam API
-        tracing::debug!("使用 Steam API 下载: {}", file.name);
-        let mut manager = self
-            .steam_manager
-            .lock()
-            .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
+        // 如果文件在云端，尝试 Steam API
+        if file.is_persisted {
+            tracing::debug!("使用 Steam API 下载: {}", file.name);
+            let mut manager = self
+                .steam_manager
+                .lock()
+                .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
 
-        let data = manager
-            .read_file(&file.name)
-            .map_err(|e| anyhow!("Steam API 下载失败: {}", e))?;
+            let data = manager
+                .read_file(&file.name)
+                .map_err(|e| anyhow!("Steam API 下载失败: {}", e))?;
 
-        self.save_data_to_path(&data, path)?;
-        Ok(())
+            self.save_data_to_path(&data, path)?;
+            return Ok(());
+        }
+
+        // 文件不在云端，尝试从本地复制
+        if file.exists {
+            // 从 local_save_paths 找到对应的本地路径
+            for (desc, base_path) in local_save_paths {
+                // 匹配 root_description（去掉 CDP: 前缀如果有的话）
+                let file_root_desc = if file.root_description.starts_with("CDP:") {
+                    file.root_description
+                        .split('|')
+                        .nth(1)
+                        .unwrap_or(&file.root_description)
+                } else {
+                    &file.root_description
+                };
+
+                if desc == file_root_desc || file_root_desc.contains(desc) {
+                    let local_file_path = base_path.join(&file.name);
+                    if local_file_path.exists() {
+                        tracing::debug!("从本地复制: {} -> {:?}", file.name, local_file_path);
+                        let data = std::fs::read(&local_file_path)
+                            .map_err(|e| anyhow!("读取本地文件失败: {}", e))?;
+                        self.save_data_to_path(&data, path)?;
+                        return Ok(());
+                    }
+                }
+            }
+
+            // 尝试直接匹配文件名
+            for (_desc, base_path) in local_save_paths {
+                let local_file_path = base_path.join(&file.name);
+                if local_file_path.exists() {
+                    tracing::debug!("从本地复制: {} -> {:?}", file.name, local_file_path);
+                    let data = std::fs::read(&local_file_path)
+                        .map_err(|e| anyhow!("读取本地文件失败: {}", e))?;
+                    self.save_data_to_path(&data, path)?;
+                    return Ok(());
+                }
+            }
+        }
+
+        Err(anyhow!("文件既不在云端也无法从本地找到"))
     }
 
     // 删除文件
@@ -398,6 +448,7 @@ impl FileOperations {
         &self,
         files: &[CloudFile],
         selected_indices: &[usize],
+        local_save_paths: &[(String, PathBuf)],
     ) -> Result<Option<(usize, Vec<String>)>> {
         use rfd::FileDialog;
 
@@ -417,7 +468,7 @@ impl FileOperations {
                 let file = &files[index];
                 let file_path = base_dir.join(&file.name);
 
-                match self.download_file(file, &file_path) {
+                match self.download_file(file, &file_path, local_save_paths) {
                     Ok(_) => success_count += 1,
                     Err(e) => failed_files.push(format!("{}: {}", file.name, e)),
                 }
