@@ -527,46 +527,6 @@ impl FileOperations {
             FileOperationResult::Error("没有文件被删除".to_string())
         }
     }
-
-    // 选择文件并构建上传队列
-    pub fn select_and_build_upload_queue() -> Result<Option<UploadQueue>> {
-        use rfd::FileDialog;
-
-        // 选择文件
-        let files = FileDialog::new().pick_files();
-
-        // 选择文件夹
-        let folder = FileDialog::new().pick_folder();
-
-        // 如果两者都没选，返回 None
-        if files.is_none() && folder.is_none() {
-            return Ok(None);
-        }
-
-        let mut queue = UploadQueue::new();
-
-        // 添加文件
-        if let Some(paths) = files {
-            for path in paths {
-                if let Err(e) = queue.add_file(path.clone()) {
-                    tracing::warn!("跳过文件 {}: {}", path.display(), e);
-                }
-            }
-        }
-
-        // 添加文件夹
-        if let Some(folder_path) = folder {
-            if let Err(e) = queue.add_folder(&folder_path) {
-                tracing::warn!("添加文件夹失败 {}: {}", folder_path.display(), e);
-            }
-        }
-
-        if queue.total_files() > 0 {
-            Ok(Some(queue))
-        } else {
-            Ok(None)
-        }
-    }
 }
 
 // 文件操作结果

@@ -14,11 +14,19 @@ pub enum UploadAction {
 pub struct UploadPreviewDialog {
     pub queue: UploadQueue,
     pub show: bool,
+    // 编辑状态：(任务索引, 编辑中的路径)
+    editing_index: Option<usize>,
+    editing_path: String,
 }
 
 impl UploadPreviewDialog {
     pub fn new(queue: UploadQueue) -> Self {
-        Self { queue, show: true }
+        Self {
+            queue,
+            show: true,
+            editing_index: None,
+            editing_path: String::new(),
+        }
     }
 
     pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> UploadAction {
@@ -29,37 +37,22 @@ impl UploadPreviewDialog {
         }
 
         egui::Window::new(i18n.prepare_upload())
-            .resizable(false)
+            .resizable(true)
             .collapsible(false)
+            .min_width(600.0)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 // 统计信息
                 let total_files = self.queue.total_files();
                 let total_size = self.queue.total_size();
 
-                ui.label(i18n.will_upload_files(total_files));
-                ui.label(i18n.total_size_label(&format_size(total_size)));
+                ui.horizontal(|ui| {
+                    ui.label(RichText::new(i18n.will_upload_files(total_files)).strong());
+                    ui.label(" | ");
+                    ui.label(i18n.total_size_label(&format_size(total_size)));
+                });
 
-                ui.add_space(10.0);
-
-                // 文件列表（带滚动）
-                egui::ScrollArea::vertical()
-                    .max_height(300.0)
-                    .show(ui, |ui| {
-                        self.draw_file_list(ui);
-                    });
-
-                ui.add_space(10.0);
-
-                // 警告信息
-                if self.has_warnings() {
-                    ui.colored_label(Color32::from_rgb(255, 193, 7), i18n.warning());
-                    ui.label(i18n.overwrite_warning());
-                }
-
-                ui.add_space(10.0);
-                ui.separator();
-                ui.add_space(10.0);
+                ui.add_space(8.0);
 
                 // 操作按钮 - 添加文件/文件夹
                 ui.horizontal(|ui| {
@@ -80,14 +73,62 @@ impl UploadPreviewDialog {
                             }
                         }
                     }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if !self.queue.tasks.is_empty()
+                            && ui
+                                .button(RichText::new(i18n.clear_all()).color(Color32::GRAY))
+                                .clicked()
+                        {
+                            self.queue.tasks.clear();
+                        }
+                    });
                 });
 
-                ui.add_space(5.0);
+                ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(8.0);
+
+                // 文件列表
+                if self.queue.tasks.is_empty() {
+                    ui.vertical_centered(|ui| {
+                        ui.add_space(40.0);
+                        ui.label(
+                            RichText::new(i18n.no_files_to_upload())
+                                .color(Color32::GRAY)
+                                .size(14.0),
+                        );
+                        ui.add_space(40.0);
+                    });
+                } else {
+                    egui::ScrollArea::vertical()
+                        .max_height(350.0)
+                        .show(ui, |ui| {
+                            self.draw_file_list(ui, i18n);
+                        });
+                }
+
+                ui.add_space(8.0);
+
+                // 警告信息
+                if self.has_warnings() {
+                    ui.colored_label(Color32::from_rgb(255, 193, 7), i18n.warning());
+                    ui.label(i18n.overwrite_warning());
+                    ui.add_space(8.0);
+                }
+
+                ui.separator();
+                ui.add_space(8.0);
 
                 // 操作按钮 - 取消/确认
                 ui.horizontal(|ui| {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(i18n.confirm_upload()).clicked() {
+                        let can_upload = !self.queue.tasks.is_empty();
+
+                        if ui
+                            .add_enabled(can_upload, egui::Button::new(i18n.confirm_upload()))
+                            .clicked()
+                        {
                             action = UploadAction::Confirm;
                             self.show = false;
                         }
@@ -105,35 +146,133 @@ impl UploadPreviewDialog {
         action
     }
 
-    fn draw_file_list(&self, ui: &mut egui::Ui) {
-        // 按文件夹分组显示
-        let mut current_folder = String::new();
+    fn draw_file_list(&mut self, ui: &mut egui::Ui, i18n: &I18n) {
+        let mut to_remove: Option<usize> = None;
+        let mut path_to_update: Option<(usize, String)> = None;
 
-        for task in &self.queue.tasks {
-            let path_parts: Vec<&str> = task.cloud_path.split('/').collect();
+        // 表头
+        ui.horizontal(|ui| {
+            ui.add_space(30.0); // 为删除按钮留空间
+            ui.label(RichText::new(i18n.cloud_path()).strong());
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(RichText::new(i18n.size()).strong());
+            });
+        });
+        ui.separator();
 
-            if path_parts.len() > 1 {
-                // 有文件夹
-                let folder = path_parts[..path_parts.len() - 1].join("/");
-                if folder != current_folder {
-                    current_folder = folder.clone();
-                    ui.label(RichText::new(format!("📁 {}/", folder)).strong());
+        for (index, task) in self.queue.tasks.iter().enumerate() {
+            let is_editing = self.editing_index == Some(index);
+
+            ui.horizontal(|ui| {
+                // 删除按钮
+                if ui
+                    .button(RichText::new("✕").color(Color32::from_rgb(220, 53, 69)))
+                    .on_hover_text(i18n.remove_file())
+                    .clicked()
+                {
+                    to_remove = Some(index);
                 }
-                ui.horizontal(|ui| {
-                    ui.add_space(20.0);
-                    ui.label(format!(
-                        "📄 {}  ({})",
-                        path_parts.last().unwrap(),
-                        format_size(task.size)
+
+                // 云端路径
+                if is_editing {
+                    // 编辑模式：输入框 + 确认/取消按钮
+                    let available_width = ui.available_width() - 80.0; // 留出大小显示空间
+                    let response = ui.add(
+                        egui::TextEdit::singleline(&mut self.editing_path)
+                            .desired_width(available_width - 60.0)
+                            .hint_text(i18n.cloud_path()),
+                    );
+
+                    // 按 Enter 确认编辑
+                    if response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                        if !self.editing_path.is_empty() {
+                            path_to_update = Some((index, self.editing_path.clone()));
+                        }
+                        self.editing_index = None;
+                    }
+
+                    // 确认按钮
+                    if ui.button("✓").clicked() {
+                        if !self.editing_path.is_empty() {
+                            path_to_update = Some((index, self.editing_path.clone()));
+                        }
+                        self.editing_index = None;
+                    }
+
+                    // 取消按钮
+                    if ui.button("✗").clicked() {
+                        self.editing_index = None;
+                    }
+                } else {
+                    // 显示云端路径
+                    let path_parts: Vec<&str> = task.cloud_path.split('/').collect();
+                    let display_path = if path_parts.len() > 1 {
+                        let folder = path_parts[..path_parts.len() - 1].join("/");
+                        let filename = path_parts.last().unwrap();
+                        format!("📁 {} / 📄 {}", folder, filename)
+                    } else {
+                        format!("📄 {}", task.cloud_path)
+                    };
+
+                    // 路径标签
+                    let available_width = ui.available_width() - 100.0; // 留出大小和编辑按钮空间
+                    let path_response = ui.add_sized(
+                        [available_width, ui.spacing().interact_size.y],
+                        egui::Label::new(display_path)
+                            .wrap_mode(egui::TextWrapMode::Truncate)
+                            .sense(egui::Sense::click()),
+                    );
+
+                    if path_response.clicked() {
+                        self.editing_index = Some(index);
+                        self.editing_path = task.cloud_path.clone();
+                    }
+
+                    path_response.on_hover_text(format!(
+                        "{}: {}\n{}: {}",
+                        i18n.cloud_path(),
+                        task.cloud_path,
+                        i18n.local_file(),
+                        task.local_path.display()
                     ));
+
+                    // 编辑按钮
+                    if ui
+                        .button(RichText::new("✎").color(Color32::GRAY))
+                        .on_hover_text(i18n.edit_path())
+                        .clicked()
+                    {
+                        self.editing_index = Some(index);
+                        self.editing_path = task.cloud_path.clone();
+                    }
+                }
+
+                // 文件大小
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.label(RichText::new(format_size(task.size)).color(Color32::GRAY));
                 });
-            } else {
-                // 根目录文件
-                ui.label(format!(
-                    "📄 {}  ({})",
-                    task.cloud_path,
-                    format_size(task.size)
-                ));
+            });
+
+            ui.add_space(2.0);
+        }
+
+        // 处理删除
+        if let Some(index) = to_remove {
+            self.queue.tasks.remove(index);
+            // 如果删除的是正在编辑的项，取消编辑状态
+            if self.editing_index == Some(index) {
+                self.editing_index = None;
+            } else if let Some(editing) = self.editing_index {
+                if editing > index {
+                    self.editing_index = Some(editing - 1);
+                }
+            }
+        }
+
+        // 处理路径更新
+        if let Some((index, new_path)) = path_to_update {
+            if let Some(task) = self.queue.tasks.get_mut(index) {
+                task.cloud_path = new_path;
             }
         }
     }

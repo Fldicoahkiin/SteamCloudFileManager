@@ -152,15 +152,9 @@ impl AppHandlers {
             return;
         }
 
-        match crate::file_manager::FileOperations::select_and_build_upload_queue() {
-            Ok(Some(queue)) => {
-                dialogs.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
-            }
-            Ok(None) => {}
-            Err(e) => {
-                dialogs.show_error(&i18n.error_select_files(&e.to_string()));
-            }
-        }
+        // 直接打开空的上传准备对话框，用户在对话框中添加文件
+        let queue = crate::file_manager::UploadQueue::new();
+        dialogs.upload_preview = Some(crate::ui::UploadPreviewDialog::new(queue));
     }
 
     pub fn start_upload(

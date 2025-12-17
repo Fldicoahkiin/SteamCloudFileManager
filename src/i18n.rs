@@ -956,6 +956,48 @@ impl I18n {
         }
     }
 
+    pub fn remove_file(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "移除",
+            Language::English => "Remove",
+        }
+    }
+
+    pub fn cloud_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端路径",
+            Language::English => "Cloud Path",
+        }
+    }
+
+    pub fn edit_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "编辑路径",
+            Language::English => "Edit Path",
+        }
+    }
+
+    pub fn local_file(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地文件",
+            Language::English => "Local File",
+        }
+    }
+
+    pub fn no_files_to_upload(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "没有文件待上传，请添加文件",
+            Language::English => "No files to upload, please add files",
+        }
+    }
+
+    pub fn clear_all(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "清空列表",
+            Language::English => "Clear All",
+        }
+    }
+
     pub fn uploading_files(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "📤 正在上传文件",
