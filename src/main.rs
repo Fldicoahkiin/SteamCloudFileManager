@@ -61,7 +61,7 @@ fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "Steam 云文件管理器 - Steam Cloud File Manager",
+        "Steam Cloud File Manager",
         options,
         Box::new(|cc| {
             cc.egui_ctx.set_embed_viewports(false);
