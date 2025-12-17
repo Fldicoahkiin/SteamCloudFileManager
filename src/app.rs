@@ -263,6 +263,9 @@ impl eframe::App for SteamCloudApp {
                 .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
         }
 
+        // 轮询更新下载进度
+        self.update_manager.poll_progress();
+
         // 处理更新下载结果
         if let Some(result) = self.async_handlers.poll_update_download() {
             match result {
