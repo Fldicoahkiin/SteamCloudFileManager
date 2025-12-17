@@ -71,7 +71,10 @@ pub fn draw_file_action_buttons(
         }
 
         if ui
-            .add_enabled(can_operate, egui::Button::new(i18n.forget()))
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.forget()),
+            )
             .clicked()
         {
             action = FileAction::ForgetSelected;

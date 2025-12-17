@@ -1135,27 +1135,6 @@ impl I18n {
         }
     }
 
-    pub fn error_select_files_download(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "请选择要下载的文件",
-            Language::English => "Please select files to download",
-        }
-    }
-
-    pub fn error_select_files_delete(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "请选择要删除的文件",
-            Language::English => "Please select files to delete",
-        }
-    }
-
-    pub fn error_select_files_forget(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "请选择要取消云同步的文件",
-            Language::English => "Please select files to remove from cloud sync",
-        }
-    }
-
     // 状态消息
     pub fn status_enter_app_id(&self) -> &'static str {
         match self.lang {

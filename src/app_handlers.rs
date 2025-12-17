@@ -115,11 +115,6 @@ impl AppHandlers {
         misc: &mut MiscState,
         dialogs: &mut DialogState,
     ) {
-        if file_list.selected_files.is_empty() {
-            dialogs.show_error(misc.i18n.error_select_files_download());
-            return;
-        }
-
         let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
         match file_ops.download_by_indices(&file_list.files, &file_list.selected_files) {
             Ok(Some((success_count, failed_files))) => {

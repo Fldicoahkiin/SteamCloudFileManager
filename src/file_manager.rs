@@ -352,7 +352,7 @@ impl FileOperations {
             .map_err(|e| anyhow!("删除文件失败: {}", e))
     }
 
-    // 取消云同步
+    // 移出云端
     pub fn forget_file(&self, filename: &str) -> anyhow::Result<bool> {
         let mut manager = self
             .steam_manager
@@ -429,13 +429,13 @@ impl FileOperations {
         }
     }
 
-    // 批量取消云同步
+    // 批量移出云端
     pub fn forget_files(&self, filenames: &[String]) -> (usize, Vec<String>) {
         let (success_count, failed_files) =
             self.batch_operation(filenames, |filename| self.forget_file(filename));
 
         if success_count > 0 {
-            tracing::info!("取消云同步完成，触发云同步...");
+            tracing::info!("移出云端完成，触发云同步...");
             if let Ok(mut manager) = self.steam_manager.lock() {
                 if let Err(e) = manager.sync_cloud_files() {
                     tracing::warn!("触发云同步失败: {}", e);
@@ -463,14 +463,14 @@ impl FileOperations {
         (success_count, failed_files)
     }
 
-    // 取消云同步指定索引的文件
+    // 移出云端指定索引的文件
     pub fn forget_by_indices(
         &self,
         files: &[CloudFile],
         selected_files: &[usize],
     ) -> FileOperationResult {
         if selected_files.is_empty() {
-            return FileOperationResult::Error("请选择要取消云同步的文件".to_string());
+            return FileOperationResult::Error("请选择要移出云端的文件".to_string());
         }
 
         let filenames: Vec<String> = selected_files
@@ -482,18 +482,18 @@ impl FileOperations {
 
         if !failed_files.is_empty() {
             return FileOperationResult::Error(format!(
-                "部分文件取消云同步失败: {}",
+                "部分文件移出云端失败: {}",
                 failed_files.join(", ")
             ));
         }
 
         if forgotten_count > 0 {
             FileOperationResult::SuccessWithRefresh(format!(
-                "已取消云同步 {} 个文件",
+                "已移出云端 {} 个文件",
                 forgotten_count
             ))
         } else {
-            FileOperationResult::Error("没有文件被取消云同步".to_string())
+            FileOperationResult::Error("没有文件被移出云端".to_string())
         }
     }
 
