@@ -31,7 +31,7 @@ impl AppHandlers {
     ) {
         connection.reset();
         connection.is_connecting = true;
-        misc.status_message = format!("正在连接到 Steam (App ID: {})...", app_id);
+        misc.status_message = misc.i18n.connecting_to_steam(app_id);
 
         let rx = SteamCloudManager::connect_async(self.steam_manager.clone(), app_id);
         async_handlers.connect_rx = Some(rx);
@@ -116,7 +116,7 @@ impl AppHandlers {
         dialogs: &mut DialogState,
     ) {
         if file_list.selected_files.is_empty() {
-            dialogs.show_error("请选择要下载的文件");
+            dialogs.show_error(misc.i18n.error_select_files_download());
             return;
         }
 
@@ -124,27 +124,31 @@ impl AppHandlers {
         match file_ops.download_by_indices(&file_list.files, &file_list.selected_files) {
             Ok(Some((success_count, failed_files))) => {
                 if failed_files.is_empty() {
-                    misc.status_message = format!("成功下载 {} 个文件", success_count);
+                    misc.status_message = misc.i18n.download_success(success_count);
                 } else {
-                    let error_msg = format!(
-                        "下载完成：成功 {} 个，失败 {} 个\n失败文件：{}",
+                    let error_msg = misc.i18n.download_partial(
                         success_count,
                         failed_files.len(),
-                        failed_files.join(", ")
+                        &failed_files.join(", "),
                     );
                     dialogs.show_error(&error_msg);
                 }
             }
             Ok(None) => {}
             Err(e) => {
-                dialogs.show_error(&format!("下载失败: {}", e));
+                dialogs.show_error(&misc.i18n.download_failed(&e.to_string()));
             }
         }
     }
 
-    pub fn upload_files(&self, connection: &ConnectionState, dialogs: &mut DialogState) {
+    pub fn upload_files(
+        &self,
+        connection: &ConnectionState,
+        dialogs: &mut DialogState,
+        i18n: &crate::i18n::I18n,
+    ) {
         if !connection.is_connected {
-            dialogs.show_error("未连接到 Steam");
+            dialogs.show_error(i18n.error_not_connected());
             return;
         }
 
@@ -154,7 +158,7 @@ impl AppHandlers {
             }
             Ok(None) => {}
             Err(e) => {
-                dialogs.show_error(&format!("选择文件失败: {}", e));
+                dialogs.show_error(&i18n.error_select_files(&e.to_string()));
             }
         }
     }
@@ -270,7 +274,7 @@ impl AppHandlers {
                 .spawn();
 
             game_library.is_scanning_games = true;
-            misc.status_message = "正在扫描游戏库...".to_string();
+            misc.status_message = misc.i18n.scanning_game_library().to_string();
             let (tx, rx) = std::sync::mpsc::channel();
             async_handlers.scan_games_rx = Some(rx);
 
@@ -280,7 +284,7 @@ impl AppHandlers {
                 let _ = tx.send(result);
             });
         } else {
-            dialogs.show_error("VDF 解析器未初始化");
+            dialogs.show_error(misc.i18n.vdf_parser_not_initialized());
         }
     }
 
@@ -302,13 +306,13 @@ impl AppHandlers {
             Ok(app_id) => {
                 connection.is_connecting = false;
                 connection.is_connected = true;
-                misc.status_message = format!("正在加载文件列表 (App ID: {})...", app_id);
+                misc.status_message = misc.i18n.loading_files_for_app(app_id);
                 connection.since_connected = Some(Instant::now());
                 true
             }
             Err(err) => {
                 connection.is_connecting = false;
-                dialogs.show_error(&format!("连接Steam失败: {}", err));
+                dialogs.show_error(&misc.i18n.connect_steam_failed(&err));
                 false
             }
         }
@@ -349,12 +353,12 @@ impl AppHandlers {
                 }
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
-                misc.status_message = format!("已加载 {} 个文件", count);
+                misc.status_message = misc.i18n.status_files_loaded(count);
                 file_list.is_refreshing = false;
                 connection.remote_ready = true;
             }
             Err(err) => {
-                dialogs.show_error(&format!("刷新文件列表失败: {}", err));
+                dialogs.show_error(&misc.i18n.refresh_files_failed(&err));
                 file_list.is_refreshing = false;
             }
         }
@@ -372,27 +376,22 @@ impl AppHandlers {
                 game_library.cloud_games = result.games;
 
                 let mut status_parts = Vec::new();
-                status_parts.push(format!("VDF: {} 个", result.vdf_count));
+                status_parts.push(misc.i18n.vdf_count(result.vdf_count));
                 if result.cdp_count > 0 {
-                    status_parts.push(format!("CDP: {} 个", result.cdp_count));
+                    status_parts.push(misc.i18n.cdp_count(result.cdp_count));
                 }
-                status_parts.push(format!("总计: {} 个游戏", game_library.cloud_games.len()));
+                status_parts.push(misc.i18n.total_games(game_library.cloud_games.len()));
 
                 misc.status_message = status_parts.join(" | ");
 
                 if result.cdp_count == 0 && crate::cdp_client::CdpClient::is_cdp_running() {
-                    dialogs.show_error(
-                        "CDP 未获取到游戏数据！\n\n可能原因：\n\
-                        1. Steam 客户端未响应跳转请求\n\
-                        2. 页面加载未完成\n\
-                        3. 未登录 Steam 网页\n\n",
-                    );
+                    dialogs.show_error(misc.i18n.cdp_no_data_error());
                 }
 
                 game_library.is_scanning_games = false;
             }
             Err(err) => {
-                dialogs.show_error(&format!("扫描游戏失败: {}", err));
+                dialogs.show_error(&misc.i18n.scan_games_failed(&err));
                 game_library.is_scanning_games = false;
             }
         }
@@ -416,7 +415,12 @@ impl AppHandlers {
         }
     }
 
-    pub fn handle_upload_result(&self, result: Result<String, String>, dialogs: &mut DialogState) {
+    pub fn handle_upload_result(
+        &self,
+        result: Result<String, String>,
+        dialogs: &mut DialogState,
+        i18n: &crate::i18n::I18n,
+    ) {
         match result {
             Ok(msg) => {
                 if let Ok(result) = serde_json::from_str::<serde_json::Value>(&msg) {
@@ -450,7 +454,7 @@ impl AppHandlers {
             }
             Err(err) => {
                 dialogs.upload_progress = None;
-                dialogs.show_error(&format!("上传失败: {}", err));
+                dialogs.show_error(&i18n.upload_failed(&err));
             }
         }
     }
@@ -459,36 +463,37 @@ impl AppHandlers {
         &self,
         status: crate::steam_process::RestartStatus,
         dialogs: &mut DialogState,
+        i18n: &crate::i18n::I18n,
     ) {
         use crate::steam_process::RestartStatus;
         match status {
             RestartStatus::Closing => {
                 if let Some(dialog) = &mut dialogs.guide_dialog {
-                    dialog.update_status("正在关闭 Steam...".to_string(), false, false);
+                    dialog.update_status(i18n.closing_steam().to_string(), false, false);
                 }
             }
             RestartStatus::Starting => {
                 if let Some(dialog) = &mut dialogs.guide_dialog {
-                    dialog.update_status("正在启动 Steam...".to_string(), false, false);
+                    dialog.update_status(i18n.starting_steam().to_string(), false, false);
                 }
             }
             RestartStatus::Success => {
                 if let Some(dialog) = &mut dialogs.guide_dialog {
-                    dialog.update_status("Steam 已成功重启!".to_string(), true, false);
+                    dialog.update_status(i18n.steam_restart_success().to_string(), true, false);
                 }
             }
             RestartStatus::Error(_msg) => {
                 #[cfg(target_os = "macos")]
                 {
-                    dialogs.guide_dialog = Some(crate::ui::create_macos_manual_guide());
+                    dialogs.guide_dialog = Some(crate::ui::create_macos_manual_guide(i18n));
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    dialogs.guide_dialog = Some(crate::ui::create_windows_manual_guide());
+                    dialogs.guide_dialog = Some(crate::ui::create_windows_manual_guide(i18n));
                 }
                 #[cfg(target_os = "linux")]
                 {
-                    dialogs.guide_dialog = Some(crate::ui::create_linux_manual_guide());
+                    dialogs.guide_dialog = Some(crate::ui::create_linux_manual_guide(i18n));
                 }
             }
         }

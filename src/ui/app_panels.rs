@@ -21,8 +21,29 @@ pub fn render_top_panel(
     connection: &mut ConnectionState,
     game_library: &mut GameLibraryState,
     async_handlers: &mut AsyncHandlers,
+    misc: &mut MiscState,
 ) -> TopPanelEvent {
-    ui.heading("Steam 云文件管理器");
+    ui.horizontal(|ui| {
+        ui.heading(misc.i18n.app_title());
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let current_lang = misc.i18n.language();
+            egui::ComboBox::from_id_salt("language_selector")
+                .selected_text(current_lang.display_name())
+                .width(80.0)
+                .show_ui(ui, |ui| {
+                    for lang in crate::i18n::Language::all() {
+                        let is_selected = current_lang == *lang;
+                        if ui
+                            .selectable_label(is_selected, lang.display_name())
+                            .clicked()
+                        {
+                            misc.i18n.set_language(*lang);
+                        }
+                    }
+                });
+        });
+    });
 
     let mut event = TopPanelEvent::None;
 
@@ -31,12 +52,12 @@ pub fn render_top_panel(
         let (restart_clicked, dismiss_clicked, show_manual) = crate::ui::draw_debug_warning_ui(ui);
 
         if show_manual {
-            dialogs.guide_dialog = Some(crate::ui::get_manual_guide_dialog());
+            dialogs.guide_dialog = Some(crate::ui::get_manual_guide_dialog(&misc.i18n));
         }
 
         if restart_clicked {
             dialogs.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
-                "正在关闭 Steam...".to_string(),
+                misc.i18n.closing_steam().to_string(),
             ));
             event = TopPanelEvent::Restart;
             dialogs.show_debug_warning = false;
@@ -55,6 +76,7 @@ pub fn render_top_panel(
             &mut dialogs.show_about,
             &mut game_library.show_user_selector,
             &mut game_library.show_game_selector,
+            &misc.i18n,
         );
 
         if game_library.show_game_selector
@@ -71,6 +93,7 @@ pub fn render_top_panel(
             &mut connection.app_id_input,
             connection.is_connected,
             connection.is_connecting,
+            &misc.i18n,
         );
 
         match action {
@@ -150,6 +173,7 @@ pub fn render_bottom_panel(
         selected_count,
         total_count,
         selected_total_size,
+        &misc.i18n,
     );
 
     let mut event = match action {
@@ -196,7 +220,7 @@ pub fn render_bottom_panel(
         quota_info: misc.quota_info,
     };
 
-    let action = crate::ui::draw_complete_status_panel(ui, &state);
+    let action = crate::ui::draw_complete_status_panel(ui, &state, &misc.i18n);
 
     if matches!(action, crate::ui::StatusPanelAction::ToggleCloudEnabled)
         && event == BottomPanelEvent::None
@@ -212,12 +236,13 @@ pub fn render_center_panel(
     ui: &mut egui::Ui,
     connection: &ConnectionState,
     file_list: &mut FileListState,
+    misc: &MiscState,
 ) {
     // 文件列表
     if !connection.is_connected && !connection.is_connecting {
-        crate::ui::draw_disconnected_view(ui);
+        crate::ui::draw_disconnected_view(ui, &misc.i18n);
     } else if connection.is_connecting || (connection.is_connected && !connection.remote_ready) {
-        crate::ui::draw_loading_view(ui, connection.is_connecting);
+        crate::ui::draw_loading_view(ui, connection.is_connecting, &misc.i18n);
     } else if let Some(tree) = &mut file_list.file_tree {
         let mut state = crate::ui::TreeViewState {
             search_query: &mut file_list.search_query,
@@ -235,6 +260,6 @@ pub fn render_center_panel(
             &mut state,
         );
     } else {
-        crate::ui::draw_no_files_view(ui);
+        crate::ui::draw_no_files_view(ui, &misc.i18n);
     }
 }

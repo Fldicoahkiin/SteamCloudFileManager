@@ -1,4 +1,5 @@
 use crate::game_scanner::CloudGameInfo;
+use crate::i18n::I18n;
 use crate::vdf_parser::UserInfo;
 use egui;
 
@@ -9,6 +10,7 @@ pub fn draw_about_window(
     show: &mut bool,
     about_icon_texture: &mut Option<egui::TextureHandle>,
     update_manager: &mut crate::update::UpdateManager,
+    i18n: &I18n,
 ) -> Option<crate::update::ReleaseInfo> {
     let steam_blue = egui::Color32::from_rgb(102, 192, 244);
     let text_subtle = ctx.style().visuals.text_color().gamma_multiply(0.6);
@@ -16,7 +18,7 @@ pub fn draw_about_window(
 
     let mut download_release = None;
 
-    egui::Window::new("About")
+    egui::Window::new(i18n.about_title())
         .open(show)
         .resizable(false)
         .collapsible(false)
@@ -100,9 +102,9 @@ pub fn draw_about_window(
                                         crate::update::UpdateStatus::Checking
                                     );
                                     let button_text = if checking {
-                                        "检查中..."
+                                        i18n.checking_update()
                                     } else {
-                                        "🔄 检查更新"
+                                        i18n.check_update_btn()
                                     };
 
                                     if ui
@@ -122,7 +124,7 @@ pub fn draw_about_window(
                                     crate::update::UpdateStatus::NoUpdate => {
                                         ui.add_space(4.0);
                                         ui.label(
-                                            egui::RichText::new("✅ 当前已是最新版本")
+                                            egui::RichText::new(i18n.already_latest())
                                                 .size(11.0)
                                                 .color(egui::Color32::from_rgb(76, 175, 80)),
                                         );
@@ -130,10 +132,9 @@ pub fn draw_about_window(
                                     crate::update::UpdateStatus::Available(release) => {
                                         ui.add_space(4.0);
                                         ui.label(
-                                            egui::RichText::new(format!(
-                                                "🎉 发现新版本: {}",
-                                                release.tag_name
-                                            ))
+                                            egui::RichText::new(
+                                                i18n.new_version_found(&release.tag_name),
+                                            )
                                             .size(11.0)
                                             .color(egui::Color32::from_rgb(255, 152, 0)),
                                         );
@@ -202,30 +203,30 @@ pub fn draw_about_window(
                     ui.vertical_centered(|ui| {
                         #[cfg(target_os = "macos")]
                         ui.label(
-                            egui::RichText::new("发现新版本，macOS 需要手动安装：")
+                            egui::RichText::new(i18n.new_version_macos_hint())
                                 .size(12.0)
                                 .color(text_subtle),
                         );
 
                         #[cfg(not(target_os = "macos"))]
                         ui.label(
-                            egui::RichText::new("发现新版本，可以进行更新操作：")
+                            egui::RichText::new(i18n.new_version_hint())
                                 .size(12.0)
                                 .color(text_subtle),
                         );
                         ui.add_space(8.0);
 
                         #[cfg(target_os = "macos")]
-                        let button_text = "📥 下载安装包";
+                        let button_text = i18n.download_package();
 
                         #[cfg(not(target_os = "macos"))]
-                        let button_text = "📥 下载并安装";
+                        let button_text = i18n.download_and_install();
 
                         if ui.button(button_text).clicked() {
                             download_release = Some(release.clone());
                         }
                         ui.add_space(4.0);
-                        if ui.button("🌐 查看详情").clicked() {
+                        if ui.button(i18n.view_details()).clicked() {
                             should_open_page = true;
                         }
 
@@ -233,9 +234,11 @@ pub fn draw_about_window(
                         if let Ok(update_dir) = crate::update::UpdateManager::get_update_dir() {
                             ui.add_space(8.0);
                             ui.label(
-                                egui::RichText::new(format!("下载位置: {}", update_dir.display()))
-                                    .size(10.0)
-                                    .color(text_subtle),
+                                egui::RichText::new(
+                                    i18n.download_location(&update_dir.display().to_string()),
+                                )
+                                .size(10.0)
+                                .color(text_subtle),
                             );
                         }
                     });
@@ -267,7 +270,7 @@ pub fn draw_about_window(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     ui.label(
-                                        egui::RichText::new("Author:")
+                                        egui::RichText::new(i18n.author())
                                             .size(12.0)
                                             .color(text_subtle),
                                     );
@@ -283,7 +286,7 @@ pub fn draw_about_window(
                                 egui::Layout::right_to_left(egui::Align::Center),
                                 |ui| {
                                     ui.label(
-                                        egui::RichText::new("Repository:")
+                                        egui::RichText::new(i18n.github_repository())
                                             .size(12.0)
                                             .color(text_subtle),
                                     );
@@ -334,7 +337,7 @@ pub fn draw_about_window(
                 crate::update::UpdateStatus::Downloading(progress) => {
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new("📥 正在下载更新...")
+                            egui::RichText::new(i18n.downloading_update())
                                 .size(13.0)
                                 .color(steam_blue),
                         );
@@ -348,7 +351,7 @@ pub fn draw_about_window(
                 crate::update::UpdateStatus::Installing => {
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new("⚙️ 正在安装更新...")
+                            egui::RichText::new(i18n.installing_update())
                                 .size(13.0)
                                 .color(steam_blue),
                         );
@@ -360,18 +363,18 @@ pub fn draw_about_window(
                 crate::update::UpdateStatus::Success => {
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new("✅ 更新安装成功！")
+                            egui::RichText::new(i18n.update_success())
                                 .size(13.0)
                                 .color(egui::Color32::from_rgb(76, 175, 80)),
                         );
                         ui.add_space(8.0);
                         ui.label(
-                            egui::RichText::new("请重启应用以使用新版本")
+                            egui::RichText::new(i18n.restart_to_apply())
                                 .size(11.0)
                                 .color(text_subtle),
                         );
                         ui.add_space(8.0);
-                        if ui.button("🔄 立即重启").clicked() {
+                        if ui.button(i18n.restart_now()).clicked() {
                             std::process::exit(0);
                         }
                     });
@@ -392,7 +395,7 @@ pub fn draw_about_window(
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
                         ui.add_space((ui.available_width() - 80.0) / 2.0);
-                        if ui.button("🔄 重试").clicked() {
+                        if ui.button(i18n.retry()).clicked() {
                             update_manager.reset();
                         }
                     });
@@ -408,9 +411,9 @@ pub fn draw_about_window(
             ui.vertical_centered(|ui| {
                 if crate::logger::is_log_config_changed() {
                     let tip_text = if crate::logger::is_log_enabled() {
-                        " 日志存储已启用，重启后生效"
+                        i18n.log_enabled_hint()
                     } else {
-                        " 日志存储已禁用，重启后生效"
+                        i18n.log_disabled_hint()
                     };
                     ui.label(
                         egui::RichText::new(tip_text)
@@ -421,7 +424,10 @@ pub fn draw_about_window(
                 }
 
                 let mut log_enabled = crate::logger::is_log_enabled();
-                if ui.checkbox(&mut log_enabled, "启用日志存储").changed() {
+                if ui
+                    .checkbox(&mut log_enabled, i18n.enable_log_storage())
+                    .changed()
+                {
                     crate::logger::set_log_enabled(log_enabled);
                     if log_enabled {
                         tracing::info!("日志存储已启用，将在下次启动时生效");
@@ -432,7 +438,7 @@ pub fn draw_about_window(
 
                 ui.add_space(12.0);
 
-                if ui.button(" 打开日志目录").clicked() {
+                if ui.button(i18n.open_log_dir()).clicked() {
                     if let Err(e) = crate::logger::open_log_directory() {
                         tracing::error!("打开日志目录失败: {}", e);
                     }
@@ -441,7 +447,7 @@ pub fn draw_about_window(
                 if let Ok(log_dir) = crate::logger::get_log_dir() {
                     ui.add_space(8.0);
                     ui.label(
-                        egui::RichText::new(format!("日志位置: {}", log_dir.display()))
+                        egui::RichText::new(i18n.log_location(&log_dir.display().to_string()))
                             .size(9.0)
                             .color(text_subtle),
                     );
@@ -460,11 +466,12 @@ pub fn draw_game_selector_window(
     show: &mut bool,
     games: &[CloudGameInfo],
     is_scanning: bool,
+    i18n: &I18n,
 ) -> (Option<u32>, bool) {
     let mut selected_app_id = None;
     let mut refresh_clicked = false;
 
-    egui::Window::new("游戏库")
+    egui::Window::new(i18n.select_game_title())
         .open(show)
         .resizable(true)
         .default_size([600.0, 500.0])
@@ -480,7 +487,7 @@ pub fn draw_game_selector_window(
                     |ui| {
                         ui.spinner();
                         ui.add_space(10.0);
-                        ui.label("正在扫描游戏库...");
+                        ui.label(i18n.scanning_games());
                     },
                 );
             } else if games.is_empty() {
@@ -491,16 +498,16 @@ pub fn draw_game_selector_window(
                             .with_main_align(egui::Align::Center),
                     ),
                     |ui| {
-                        ui.label("未发现云存档的游戏");
+                        ui.label(i18n.no_cloud_games_found());
                     },
                 );
             } else {
                 ui.horizontal(|ui| {
-                    ui.heading(format!("{} 个有云存档的游戏", games.len()));
+                    ui.heading(i18n.games_with_cloud(games.len()));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // 刷新按钮
                         if ui
-                            .add_enabled(!is_scanning, egui::Button::new("刷新"))
+                            .add_enabled(!is_scanning, egui::Button::new(i18n.refresh()))
                             .clicked()
                         {
                             refresh_clicked = true;
@@ -515,7 +522,7 @@ pub fn draw_game_selector_window(
 
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     for game in games {
-                        if let Some(app_id) = draw_game_item(ui, game) {
+                        if let Some(app_id) = draw_game_item(ui, game, i18n) {
                             selected_app_id = Some(app_id);
                         }
                         ui.add_space(5.0);
@@ -528,7 +535,7 @@ pub fn draw_game_selector_window(
 }
 
 // 绘制单个游戏项
-fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo) -> Option<u32> {
+fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Option<u32> {
     let mut clicked = false;
 
     ui.group(|ui| {
@@ -543,9 +550,12 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo) -> Option<u32> {
                     }
 
                     if game.is_installed {
-                        ui.colored_label(egui::Color32::from_rgb(0, 200, 0), "已安装");
+                        ui.colored_label(egui::Color32::from_rgb(0, 200, 0), i18n.installed());
                     } else {
-                        ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "未安装");
+                        ui.colored_label(
+                            egui::Color32::from_rgb(150, 150, 150),
+                            i18n.not_installed(),
+                        );
                     }
                 });
 
@@ -555,26 +565,51 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo) -> Option<u32> {
                 }
 
                 // 文件信息
-                ui.label(format!(
-                    "{} 个文件 | {}",
-                    game.file_count,
-                    crate::file_manager::format_size(game.total_size)
-                ));
+                let file_info = match i18n.language() {
+                    crate::i18n::Language::Chinese => format!(
+                        "{} 个文件 | {}",
+                        game.file_count,
+                        crate::file_manager::format_size(game.total_size)
+                    ),
+                    crate::i18n::Language::English => format!(
+                        "{} file{} | {}",
+                        game.file_count,
+                        if game.file_count != 1 { "s" } else { "" },
+                        crate::file_manager::format_size(game.total_size)
+                    ),
+                };
+                ui.label(file_info);
 
                 // 安装目录
                 if let Some(dir) = &game.install_dir {
-                    ui.label(format!("安装目录: {}", dir));
+                    let label = match i18n.language() {
+                        crate::i18n::Language::Chinese => format!("安装目录: {}", dir),
+                        crate::i18n::Language::English => format!("Install dir: {}", dir),
+                    };
+                    ui.label(label);
                 }
 
                 // 标签
                 if !game.categories.is_empty() {
-                    ui.label(format!("标签: {}", game.categories.join(", ")));
+                    let label = match i18n.language() {
+                        crate::i18n::Language::Chinese => {
+                            format!("标签: {}", game.categories.join(", "))
+                        }
+                        crate::i18n::Language::English => {
+                            format!("Tags: {}", game.categories.join(", "))
+                        }
+                    };
+                    ui.label(label);
                 }
 
                 // 游戏时间
                 if let Some(playtime) = game.playtime {
                     let hours = playtime as f64 / 60.0;
-                    ui.label(format!("游戏时间: {:.2} 小时", hours));
+                    let label = match i18n.language() {
+                        crate::i18n::Language::Chinese => format!("游戏时间: {:.2} 小时", hours),
+                        crate::i18n::Language::English => format!("Playtime: {:.2} hours", hours),
+                    };
+                    ui.label(label);
                 }
 
                 // 最后运行时间
@@ -584,14 +619,26 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo) -> Option<u32> {
                         use std::time::{Duration, UNIX_EPOCH};
                         let dt = UNIX_EPOCH + Duration::from_secs(last_played as u64);
                         let local: DateTime<Local> = dt.into();
-                        ui.label(format!("最后运行: {}", local.format("%Y-%m-%d %H:%M")));
+                        let label = match i18n.language() {
+                            crate::i18n::Language::Chinese => {
+                                format!("最后运行: {}", local.format("%Y-%m-%d %H:%M"))
+                            }
+                            crate::i18n::Language::English => {
+                                format!("Last played: {}", local.format("%Y-%m-%d %H:%M"))
+                            }
+                        };
+                        ui.label(label);
                     }
                 }
             });
 
             // 选择按钮
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("选择").clicked() {
+                let button_text = match i18n.language() {
+                    crate::i18n::Language::Chinese => "选择",
+                    crate::i18n::Language::English => "Select",
+                };
+                if ui.button(button_text).clicked() {
                     clicked = true;
                 }
             });
@@ -610,20 +657,21 @@ pub fn draw_user_selector_window(
     ctx: &egui::Context,
     show: &mut bool,
     users: &[UserInfo],
+    i18n: &I18n,
 ) -> Option<String> {
     let mut selected_user_id = None;
 
-    egui::Window::new("选择用户")
+    egui::Window::new(i18n.select_user())
         .open(show)
         .resizable(true)
         .default_size([400.0, 300.0])
         .show(ctx, |ui| {
-            ui.heading(format!("{} 个Steam用户", users.len()));
+            ui.heading(i18n.steam_users(users.len()));
             ui.add_space(10.0);
 
             egui::ScrollArea::vertical().show(ui, |ui| {
                 for user in users {
-                    if let Some(user_id) = draw_user_item(ui, user) {
+                    if let Some(user_id) = draw_user_item(ui, user, i18n) {
                         selected_user_id = Some(user_id);
                     }
                     ui.add_space(5.0);
@@ -635,7 +683,7 @@ pub fn draw_user_selector_window(
 }
 
 // 绘制单个用户项
-fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo) -> Option<String> {
+fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo, i18n: &I18n) -> Option<String> {
     let mut clicked = false;
 
     ui.group(|ui| {
@@ -645,14 +693,14 @@ fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo) -> Option<String> {
                     ui.strong(name);
                     ui.label(format!("ID: {}", user.user_id));
                 } else {
-                    ui.strong(format!("用户 ID: {}", user.user_id));
+                    ui.strong(format!("{}: {}", i18n.user_id(), user.user_id));
                 }
             });
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if user.is_current {
-                    ui.label("✅ 当前用户");
-                } else if ui.button("切换").clicked() {
+                    ui.label(format!("✅ {}", i18n.current_user()));
+                } else if ui.button(i18n.switch()).clicked() {
                     clicked = true;
                 }
             });
@@ -667,16 +715,21 @@ fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo) -> Option<String> {
 }
 
 // 绘制错误窗口
-pub fn draw_error_window(ctx: &egui::Context, show: &mut bool, error_message: &str) -> bool {
+pub fn draw_error_window(
+    ctx: &egui::Context,
+    show: &mut bool,
+    error_message: &str,
+    i18n: &I18n,
+) -> bool {
     let mut confirmed = false;
 
-    egui::Window::new("错误")
+    egui::Window::new(i18n.error_title())
         .open(show)
         .collapsible(false)
         .resizable(false)
         .show(ctx, |ui| {
             ui.label(error_message);
-            if ui.button("确定").clicked() {
+            if ui.button(i18n.ok()).clicked() {
                 confirmed = true;
             }
         });

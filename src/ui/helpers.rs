@@ -1,3 +1,4 @@
+use crate::i18n::I18n;
 use egui;
 
 // 绘制调试警告横幅
@@ -102,20 +103,20 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
 }
 
 // 获取手动操作指南对话框
-pub fn get_manual_guide_dialog() -> crate::ui::GuideDialog {
+pub fn get_manual_guide_dialog(i18n: &crate::i18n::I18n) -> crate::ui::GuideDialog {
     #[cfg(target_os = "macos")]
     {
-        crate::ui::create_macos_manual_guide()
+        crate::ui::create_macos_manual_guide(i18n)
     }
 
     #[cfg(target_os = "windows")]
     {
-        crate::ui::create_windows_manual_guide()
+        crate::ui::create_windows_manual_guide(i18n)
     }
 
     #[cfg(target_os = "linux")]
     {
-        crate::ui::create_linux_manual_guide()
+        crate::ui::create_linux_manual_guide(i18n)
     }
 }
 
@@ -126,25 +127,26 @@ pub fn draw_toolbar_buttons(
     on_about: &mut bool,
     on_user_selector: &mut bool,
     on_game_selector: &mut bool,
+    i18n: &I18n,
 ) {
-    if ui.button("关于").clicked() {
+    if ui.button(i18n.about_title()).clicked() {
         *on_about = true;
     }
 
     ui.separator();
 
-    if ui.button("用户").clicked() {
+    if ui.button(i18n.select_account()).clicked() {
         *on_user_selector = true;
     }
 
-    if ui.button("游戏库").clicked() {
+    if ui.button(i18n.select_game()).clicked() {
         *on_game_selector = true;
     }
 
     ui.separator();
 
     if let Some(user_id) = user_id {
-        ui.label(format!("用户: {}", user_id));
+        ui.label(format!("{}: {}", i18n.select_account(), user_id));
         ui.separator();
     }
 }
@@ -155,6 +157,7 @@ pub fn draw_connection_controls(
     app_id_input: &mut String,
     is_connected: bool,
     is_connecting: bool,
+    i18n: &I18n,
 ) -> ConnectionAction {
     ui.label("App ID:");
     let response = ui.add(egui::TextEdit::singleline(app_id_input).desired_width(150.0));
@@ -166,32 +169,19 @@ pub fn draw_connection_controls(
     }
 
     if is_connected {
-        if ui.button("断开").clicked() {
+        if ui.button(i18n.disconnect()).clicked() {
             action = ConnectionAction::Disconnect;
         }
 
-        if ui.button("刷新").clicked() {
+        if ui.button(i18n.refresh()).clicked() {
             action = ConnectionAction::Refresh;
         }
-    } else if ui.button("连接").clicked() {
+    } else if ui.button(i18n.connect()).clicked() {
         action = ConnectionAction::Connect;
     }
 
     if is_connecting {
         ui.spinner();
-    }
-
-    // 添加云同步提示
-    if is_connected {
-        ui.separator();
-        ui.label(
-            egui::RichText::new("云同步提示：断开连接后 Steam 将自动同步修改到云端")
-                .color(egui::Color32::from_rgb(100, 150, 255))
-                .size(12.0),
-        )
-        .on_hover_text(
-            "上传、删除等操作会先写入本地缓存，\n断开连接时 Steam 会自动将所有修改同步到云端。\n这是 Steam 的安全机制，确保数据不丢失。",
-        );
     }
 
     action
@@ -210,39 +200,37 @@ pub enum ConnectionAction {
 pub fn draw_cloud_status(
     ui: &mut egui::Ui,
     account_enabled: Option<bool>,
-    app_enabled: Option<bool>,
+    _app_enabled: Option<bool>,
+    i18n: &I18n,
 ) {
     ui.horizontal(|ui| {
-        ui.label("账户云存储:");
+        ui.label(format!("{}:", i18n.account_cloud_status()));
         match account_enabled {
-            Some(true) => ui.label("✅ 已启用"),
-            Some(false) => ui.label("❌ 已禁用"),
-            None => ui.label("❓ 未知"),
-        };
-    });
-
-    ui.horizontal(|ui| {
-        ui.label("应用云存储:");
-        match app_enabled {
-            Some(true) => ui.label("✅ 已启用"),
-            Some(false) => ui.label("❌ 已禁用"),
-            None => ui.label("❓ 未知"),
+            Some(true) => ui.label(format!("✅ {}", i18n.logged_in())),
+            Some(false) => ui.label(format!("❌ {}", i18n.not_logged_in())),
+            None => ui.label("❓ Unknown"),
         };
     });
 }
 
 // 绘制配额信息
-pub fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64) {
+pub fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64, i18n: &I18n) {
     ui.horizontal(|ui| {
-        ui.label("配额:");
         let used = total - available;
         let usage_percent = (used as f32 / total as f32 * 100.0).round();
         let used_str = crate::file_manager::format_size(used);
         let total_str = crate::file_manager::format_size(total);
-        ui.label(format!(
-            "{:.1}% 已使用 ({}/{})",
-            usage_percent, used_str, total_str
-        ));
+        let text = match i18n.language() {
+            crate::i18n::Language::Chinese => format!(
+                "配额: {:.1}% 已使用 ({}/{})",
+                usage_percent, used_str, total_str
+            ),
+            crate::i18n::Language::English => format!(
+                "Quota: {:.1}% used ({}/{})",
+                usage_percent, used_str, total_str
+            ),
+        };
+        ui.label(text);
     });
 }
 
@@ -251,18 +239,34 @@ pub fn draw_status_message(
     ui: &mut egui::Ui,
     status_message: &str,
     cloud_enabled: Option<bool>,
+    i18n: &I18n,
 ) -> bool {
     let mut toggled = false;
     ui.horizontal(|ui| {
-        ui.label("状态:");
+        let status_label = match i18n.language() {
+            crate::i18n::Language::Chinese => "状态:",
+            crate::i18n::Language::English => "Status:",
+        };
+        ui.label(status_label);
         ui.label(status_message);
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(enabled) = cloud_enabled {
-                let cloud_status = if enabled {
-                    "云存储: 开启"
-                } else {
-                    "云存储: 关闭"
+                let cloud_status = match i18n.language() {
+                    crate::i18n::Language::Chinese => {
+                        if enabled {
+                            "云存储: 开启"
+                        } else {
+                            "云存储: 关闭"
+                        }
+                    }
+                    crate::i18n::Language::English => {
+                        if enabled {
+                            "Cloud: On"
+                        } else {
+                            "Cloud: Off"
+                        }
+                    }
                 };
                 if ui.selectable_label(false, cloud_status).clicked() {
                     toggled = true;
@@ -295,13 +299,14 @@ pub struct StatusPanelState {
 pub fn draw_complete_status_panel(
     ui: &mut egui::Ui,
     state: &StatusPanelState,
+    i18n: &I18n,
 ) -> StatusPanelAction {
     let mut action = StatusPanelAction::None;
 
     ui.separator();
 
     // 状态消息栏
-    let toggled = draw_status_message(ui, &state.status_message, state.cloud_enabled);
+    let toggled = draw_status_message(ui, &state.status_message, state.cloud_enabled, i18n);
     if toggled {
         action = StatusPanelAction::ToggleCloudEnabled;
     }
@@ -309,18 +314,21 @@ pub fn draw_complete_status_panel(
     // 云存储状态
     if state.is_connected {
         if state.remote_ready {
-            draw_cloud_status(ui, state.account_enabled, state.app_enabled);
+            draw_cloud_status(ui, state.account_enabled, state.app_enabled, i18n);
         } else {
             ui.horizontal(|ui| {
-                ui.label("云存储状态:");
-                ui.label("未就绪");
+                let text = match i18n.language() {
+                    crate::i18n::Language::Chinese => "云存储状态: 未就绪",
+                    crate::i18n::Language::English => "Cloud Status: Not Ready",
+                };
+                ui.label(text);
             });
         }
     }
 
     // 配额信息
     if let Some((total, available)) = state.quota_info {
-        draw_quota_info(ui, total, available);
+        draw_quota_info(ui, total, available, i18n);
     }
 
     action

@@ -59,7 +59,7 @@ impl SteamCloudApp {
 
     fn connect_to_steam(&mut self) {
         if self.connection.app_id_input.trim().is_empty() {
-            self.show_error("请输入App ID");
+            self.show_error(self.misc.i18n.error_enter_app_id());
             return;
         }
 
@@ -70,7 +70,7 @@ impl SteamCloudApp {
         let app_id = match self.connection.app_id_input.trim().parse::<u32>() {
             Ok(id) => id,
             Err(_) => {
-                self.show_error("无效的 App ID");
+                self.show_error(self.misc.i18n.error_invalid_app_id());
                 return;
             }
         };
@@ -106,7 +106,7 @@ impl SteamCloudApp {
 
     fn upload(&mut self) {
         self.handlers
-            .upload_files(&self.connection, &mut self.dialogs);
+            .upload_files(&self.connection, &mut self.dialogs, &self.misc.i18n);
     }
 
     fn upload_start(&mut self, queue: crate::file_manager::UploadQueue) {
@@ -159,7 +159,7 @@ impl SteamCloudApp {
             painter.text(
                 screen_rect.center(),
                 egui::Align2::CENTER_CENTER,
-                "释放文件以上传",
+                self.misc.i18n.drop_files_to_upload(),
                 egui::FontId::proportional(30.0),
                 egui::Color32::WHITE,
             );
@@ -169,7 +169,7 @@ impl SteamCloudApp {
         let dropped_files = ctx.input(|i| i.raw.dropped_files.clone());
         if !dropped_files.is_empty() {
             if !self.connection.is_connected {
-                self.show_error("未连接到 Steam");
+                self.show_error(self.misc.i18n.error_not_connected());
                 return;
             }
 
@@ -260,7 +260,7 @@ impl eframe::App for SteamCloudApp {
 
         if let Some(result) = self.async_handlers.poll_upload_result() {
             self.handlers
-                .handle_upload_result(result, &mut self.dialogs);
+                .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
         }
 
         // 处理更新下载结果
@@ -312,6 +312,7 @@ impl eframe::App for SteamCloudApp {
                     &mut self.connection,
                     &mut self.game_library,
                     &mut self.async_handlers,
+                    &mut self.misc,
                 )
             })
             .inner;
@@ -383,7 +384,7 @@ impl eframe::App for SteamCloudApp {
                 self.handle_file_drop(ctx, ui);
             }
 
-            crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list);
+            crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list, &self.misc);
         });
 
         if self.dialogs.show_error
@@ -391,6 +392,7 @@ impl eframe::App for SteamCloudApp {
                 ctx,
                 &mut self.dialogs.show_error,
                 &self.dialogs.error_message,
+                &self.misc.i18n,
             )
         {
             self.dialogs.show_error = false;
@@ -402,6 +404,7 @@ impl eframe::App for SteamCloudApp {
                 &mut self.game_library.show_game_selector,
                 &self.game_library.cloud_games,
                 self.game_library.is_scanning_games,
+                &self.misc.i18n,
             );
             if let Some(app_id) = selected_app_id {
                 self.connection.app_id_input = app_id.to_string();
@@ -416,13 +419,13 @@ impl eframe::App for SteamCloudApp {
 
         if let Some(status) = self.async_handlers.poll_restart() {
             self.handlers
-                .handle_restart_status(status, &mut self.dialogs);
+                .handle_restart_status(status, &mut self.dialogs, &self.misc.i18n);
         }
 
         // 绘制引导对话框
         let mut close_dialog = false;
         if let Some(dialog) = &mut self.dialogs.guide_dialog {
-            let action = dialog.draw(ctx);
+            let action = dialog.draw(ctx, &self.misc.i18n);
             match action {
                 crate::ui::GuideDialogAction::Confirm => {
                     tracing::info!("用户确认引导对话框");
@@ -454,6 +457,7 @@ impl eframe::App for SteamCloudApp {
                 ctx,
                 &mut self.game_library.show_user_selector,
                 &self.game_library.all_users,
+                &self.misc.i18n,
             );
             if let Some(user_id) = selected_user_id {
                 if let Ok(parser) = VdfParser::new() {
@@ -464,7 +468,7 @@ impl eframe::App for SteamCloudApp {
                         Some(new_parser),
                     );
                     self.game_library.cloud_games.clear();
-                    self.misc.status_message = "已切换用户".to_string();
+                    self.misc.status_message = self.misc.i18n.user_switched().to_string();
                     self.scan_cloud_games();
                 }
                 self.game_library.show_user_selector = false;
@@ -473,7 +477,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传预览对话框
         if let Some(preview) = &mut self.dialogs.upload_preview {
-            match preview.draw(ctx) {
+            match preview.draw(ctx, &self.misc.i18n) {
                 crate::ui::UploadAction::Confirm => {
                     // 开始上传
                     if let Some(preview) = self.dialogs.upload_preview.take() {
@@ -489,7 +493,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传进度对话框
         if let Some(progress) = &mut self.dialogs.upload_progress {
-            progress.draw(ctx);
+            progress.draw(ctx, &self.misc.i18n);
             if !progress.show {
                 self.dialogs.upload_progress = None;
             }
@@ -497,7 +501,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传完成对话框
         if let Some(complete) = &mut self.dialogs.upload_complete {
-            if complete.draw(ctx) {
+            if complete.draw(ctx, &self.misc.i18n) {
                 self.dialogs.upload_complete = None;
                 self.refresh_files();
             }
@@ -510,6 +514,7 @@ impl eframe::App for SteamCloudApp {
                 &mut self.dialogs.show_about,
                 &mut self.dialogs.about_icon_texture,
                 &mut self.update_manager,
+                &self.misc.i18n,
             ) {
                 // 启动异步下载
                 let rx = self.update_manager.start_download(&release);

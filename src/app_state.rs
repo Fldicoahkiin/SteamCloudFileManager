@@ -1,4 +1,5 @@
 use crate::game_scanner::CloudGameInfo;
+use crate::i18n::{I18n, Language};
 use crate::steam_api::CloudFile;
 use crate::vdf_parser::UserInfo;
 use std::path::PathBuf;
@@ -96,13 +97,16 @@ impl DialogState {
 pub struct MiscState {
     pub status_message: String,
     pub quota_info: Option<(u64, u64)>,
+    pub i18n: I18n,
 }
 
 impl Default for MiscState {
     fn default() -> Self {
+        let i18n = I18n::new(Language::Chinese);
         Self {
-            status_message: "请输入App ID并连接到Steam".to_string(),
+            status_message: i18n.status_enter_app_id().to_string(),
             quota_info: None,
+            i18n,
         }
     }
 }

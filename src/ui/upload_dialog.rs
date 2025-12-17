@@ -1,4 +1,5 @@
 use crate::file_manager::{format_size, UploadQueue};
+use crate::i18n::I18n;
 use egui::{Color32, RichText};
 
 // 上传对话框的操作结果
@@ -20,14 +21,14 @@ impl UploadPreviewDialog {
         Self { queue, show: true }
     }
 
-    pub fn draw(&mut self, ctx: &egui::Context) -> UploadAction {
+    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> UploadAction {
         let mut action = UploadAction::None;
 
         if !self.show {
             return action;
         }
 
-        egui::Window::new("准备上传")
+        egui::Window::new(i18n.prepare_upload())
             .resizable(false)
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -36,8 +37,8 @@ impl UploadPreviewDialog {
                 let total_files = self.queue.total_files();
                 let total_size = self.queue.total_size();
 
-                ui.label(format!("将要上传 {} 个文件到 Steam Cloud", total_files));
-                ui.label(format!("总大小: {}", format_size(total_size)));
+                ui.label(i18n.will_upload_files(total_files));
+                ui.label(i18n.total_size_label(&format_size(total_size)));
 
                 ui.add_space(10.0);
 
@@ -52,17 +53,17 @@ impl UploadPreviewDialog {
 
                 // 警告信息
                 if self.has_warnings() {
-                    ui.colored_label(Color32::from_rgb(255, 193, 7), "⚠️ 警告：");
-                    ui.label("• 同名文件将被覆盖");
+                    ui.colored_label(Color32::from_rgb(255, 193, 7), i18n.warning());
+                    ui.label(i18n.overwrite_warning());
                 }
 
                 ui.add_space(10.0);
                 ui.separator();
                 ui.add_space(10.0);
 
-                // 操作按钮
+                // 操作按钮 - 添加文件/文件夹
                 ui.horizontal(|ui| {
-                    if ui.button("📄 添加文件").clicked() {
+                    if ui.button(i18n.add_files()).clicked() {
                         if let Some(paths) = rfd::FileDialog::new().pick_files() {
                             for path in paths {
                                 if let Err(e) = self.queue.add_file(path.clone()) {
@@ -72,23 +73,28 @@ impl UploadPreviewDialog {
                         }
                     }
 
-                    if ui.button("📁 添加文件夹").clicked() {
+                    if ui.button(i18n.add_folder()).clicked() {
                         if let Some(folder) = rfd::FileDialog::new().pick_folder() {
                             if let Err(e) = self.queue.add_folder(&folder) {
                                 tracing::warn!("添加文件夹失败 {}: {}", folder.display(), e);
                             }
                         }
                     }
+                });
 
+                ui.add_space(5.0);
+
+                // 操作按钮 - 取消/确认
+                ui.horizontal(|ui| {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button("✓ 确认上传").clicked() {
+                        if ui.button(i18n.confirm_upload()).clicked() {
                             action = UploadAction::Confirm;
                             self.show = false;
                         }
 
                         ui.add_space(10.0);
 
-                        if ui.button("取消").clicked() {
+                        if ui.button(i18n.cancel()).clicked() {
                             action = UploadAction::Cancel;
                             self.show = false;
                         }
@@ -162,12 +168,12 @@ impl UploadProgressDialog {
         }
     }
 
-    pub fn draw(&mut self, ctx: &egui::Context) {
+    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) {
         if !self.show {
             return;
         }
 
-        egui::Window::new("📤 正在上传文件")
+        egui::Window::new(i18n.uploading_files())
             .resizable(false)
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -185,14 +191,11 @@ impl UploadProgressDialog {
                     ui.add_space(10.0);
 
                     // 当前文件
-                    ui.label(format!("正在上传: {}", self.current_file));
-                    ui.label(format!(
-                        "进度: {} / {} 文件",
-                        self.current_index, self.total_files
-                    ));
+                    ui.label(i18n.uploading_file(&self.current_file));
+                    ui.label(i18n.upload_progress(self.current_index, self.total_files));
 
                     if self.speed > 0.0 {
-                        ui.label(format!("速度: {}/s", format_size(self.speed as u64)));
+                        ui.label(i18n.speed(&format_size(self.speed as u64)));
                     }
 
                     ui.add_space(10.0);
@@ -213,7 +216,7 @@ impl UploadProgressDialog {
 
                     // 控制按钮
                     ui.horizontal(|ui| {
-                        if ui.button("✕ 取消").clicked() {
+                        if ui.button(format!("✕ {}", i18n.cancel())).clicked() {
                             self.show = false;
                         }
                     });
@@ -250,14 +253,14 @@ impl UploadCompleteDialog {
         }
     }
 
-    pub fn draw(&mut self, ctx: &egui::Context) -> bool {
+    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> bool {
         let mut should_close = false;
 
         if !self.show {
             return should_close;
         }
 
-        egui::Window::new("✓ 上传完成")
+        egui::Window::new(i18n.upload_complete())
             .resizable(false)
             .collapsible(false)
             .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -265,16 +268,15 @@ impl UploadCompleteDialog {
                 ui.vertical_centered(|ui| {
                     if self.failed_count == 0 {
                         ui.label(
-                            RichText::new(format!("🎉 成功上传 {} 个文件", self.success_count))
+                            RichText::new(i18n.upload_success(self.success_count))
                                 .size(16.0)
                                 .color(Color32::from_rgb(76, 175, 80)),
                         );
                     } else {
                         ui.label(
-                            RichText::new(format!(
-                                "⚠️ 上传完成：成功 {}，失败 {}",
-                                self.success_count, self.failed_count
-                            ))
+                            RichText::new(
+                                i18n.upload_partial(self.success_count, self.failed_count),
+                            )
                             .size(16.0)
                             .color(Color32::from_rgb(255, 193, 7)),
                         );
@@ -282,12 +284,12 @@ impl UploadCompleteDialog {
 
                     ui.add_space(10.0);
 
-                    ui.label(format!("总大小: {}", format_size(self.total_size)));
-                    ui.label(format!("用时: {} 秒", self.elapsed_secs));
+                    ui.label(i18n.total_size_label(&format_size(self.total_size)));
+                    ui.label(i18n.elapsed_time(self.elapsed_secs));
 
                     if self.elapsed_secs > 0 {
                         let speed = self.total_size as f64 / self.elapsed_secs as f64;
-                        ui.label(format!("平均速度: {}/s", format_size(speed as u64)));
+                        ui.label(i18n.avg_speed(&format_size(speed as u64)));
                     }
 
                     ui.add_space(10.0);
@@ -296,7 +298,8 @@ impl UploadCompleteDialog {
                     if self.failed_count > 0 {
                         ui.separator();
                         ui.label(
-                            RichText::new("失败文件列表：").color(Color32::from_rgb(244, 67, 54)),
+                            RichText::new(i18n.failed_files())
+                                .color(Color32::from_rgb(244, 67, 54)),
                         );
 
                         egui::ScrollArea::vertical()
@@ -308,7 +311,7 @@ impl UploadCompleteDialog {
                                         ui.label(RichText::new(filename).color(Color32::GRAY));
                                     });
                                     ui.label(
-                                        RichText::new(format!("  原因: {}", error))
+                                        RichText::new(i18n.reason(error))
                                             .size(12.0)
                                             .color(Color32::DARK_GRAY),
                                     );
@@ -319,7 +322,7 @@ impl UploadCompleteDialog {
 
                     ui.add_space(10.0);
 
-                    if ui.button("确定").clicked() {
+                    if ui.button(i18n.ok()).clicked() {
                         self.show = false;
                         should_close = true;
                     }

@@ -1,3 +1,4 @@
+use crate::i18n::I18n;
 use egui;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -18,22 +19,23 @@ pub fn draw_file_action_buttons(
     can_operate: bool,
     has_selection: bool,
     selected_count: usize,
-    total_count: usize,
+    _total_count: usize,
     selected_total_size: u64,
+    i18n: &I18n,
 ) -> FileAction {
     let mut action = FileAction::None;
 
     ui.horizontal(|ui| {
         // 选择操作
-        if ui.button("全选").clicked() {
+        if ui.button(i18n.select_all()).clicked() {
             action = FileAction::SelectAll;
         }
 
-        if ui.button("反选").clicked() {
+        if ui.button(i18n.invert_selection()).clicked() {
             action = FileAction::InvertSelection;
         }
 
-        if ui.button("清除选择").clicked() {
+        if ui.button(i18n.clear_selection()).clicked() {
             action = FileAction::ClearSelection;
         }
 
@@ -41,29 +43,39 @@ pub fn draw_file_action_buttons(
 
         // 文件操作
         if ui
-            .add_enabled(can_operate && has_selection, egui::Button::new("下载"))
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.download()),
+            )
             .clicked()
         {
             action = FileAction::DownloadSelected;
         }
 
+        let upload_tooltip = match i18n.language() {
+            crate::i18n::Language::Chinese => "上传文件或文件夹",
+            crate::i18n::Language::English => "Upload file or folder",
+        };
         if ui
-            .add_enabled(can_operate, egui::Button::new("上传"))
-            .on_hover_text("上传文件或文件夹")
+            .add_enabled(can_operate, egui::Button::new(i18n.upload()))
+            .on_hover_text(upload_tooltip)
             .clicked()
         {
             action = FileAction::Upload;
         }
 
         if ui
-            .add_enabled(can_operate && has_selection, egui::Button::new("删除"))
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.delete()),
+            )
             .clicked()
         {
             action = FileAction::DeleteSelected;
         }
 
         if ui
-            .add_enabled(can_operate, egui::Button::new("取消云同步"))
+            .add_enabled(can_operate, egui::Button::new(i18n.forget()))
             .clicked()
         {
             action = FileAction::ForgetSelected;
@@ -71,13 +83,20 @@ pub fn draw_file_action_buttons(
 
         // 右侧统计信息
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.label(format!("已选: {}/{}", selected_count, total_count));
+            ui.label(i18n.selected_count(selected_count));
 
             if selected_count > 0 {
-                ui.label(format!(
-                    "总大小: {}",
-                    crate::file_manager::format_size(selected_total_size)
-                ));
+                let size_label = match i18n.language() {
+                    crate::i18n::Language::Chinese => format!(
+                        "总大小: {}",
+                        crate::file_manager::format_size(selected_total_size)
+                    ),
+                    crate::i18n::Language::English => format!(
+                        "Total: {}",
+                        crate::file_manager::format_size(selected_total_size)
+                    ),
+                };
+                ui.label(size_label);
             }
         });
     });
