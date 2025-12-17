@@ -2,7 +2,7 @@ use crate::i18n::I18n;
 use egui;
 
 // 绘制调试警告横幅
-pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
+pub fn draw_debug_warning_ui(ui: &mut egui::Ui, i18n: &I18n) -> (bool, bool, bool) {
     let mut restart_clicked = false;
     let mut dismiss_clicked = false;
     let mut show_manual = false;
@@ -16,7 +16,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
         // 警告标题
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new("⚠ Steam 调试模式未启用")
+                egui::RichText::new(i18n.debug_mode_not_enabled())
                     .color(egui::Color32::from_rgb(255, 200, 0))
                     .size(16.0)
                     .strong(),
@@ -27,13 +27,13 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
         ui.horizontal(|ui| {
             if steam_running {
                 ui.label(
-                    egui::RichText::new("✓ Steam 正在运行")
+                    egui::RichText::new(i18n.steam_running())
                         .color(egui::Color32::from_rgb(100, 200, 100))
                         .size(13.0),
                 );
             } else {
                 ui.label(
-                    egui::RichText::new("✗ Steam 未运行")
+                    egui::RichText::new(i18n.steam_not_running())
                         .color(egui::Color32::from_rgb(200, 100, 100))
                         .size(13.0),
                 );
@@ -42,7 +42,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
 
         // 说明文字
         ui.label(
-            egui::RichText::new("需要启用 Steam 的 CEF 调试模式才能使用网页登录功能")
+            egui::RichText::new(i18n.debug_mode_hint())
                 .color(egui::Color32::LIGHT_GRAY)
                 .size(13.0),
         );
@@ -53,14 +53,14 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
         ui.horizontal(|ui| {
             // 自动重启按钮
             let button_text = if steam_running {
-                "自动重启 Steam"
+                i18n.auto_restart_steam()
             } else {
-                "启动 Steam"
+                i18n.start_steam()
             };
             let hover_text = if steam_running {
-                "自动关闭并重启 Steam，添加调试参数"
+                i18n.auto_restart_hint()
             } else {
-                "以调试模式启动 Steam"
+                i18n.start_steam_hint()
             };
 
             if ui
@@ -75,8 +75,8 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
 
             // 手动操作按钮
             if ui
-                .button(egui::RichText::new("查看手动操作").size(14.0))
-                .on_hover_text("显示如何手动添加启动参数")
+                .button(egui::RichText::new(i18n.view_manual_steps()).size(14.0))
+                .on_hover_text(i18n.manual_steps_hint())
                 .clicked()
             {
                 show_manual = true;
@@ -87,11 +87,11 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui) -> (bool, bool, bool) {
             // 暂时忽略按钮
             if ui
                 .button(
-                    egui::RichText::new("✕ 暂时忽略")
+                    egui::RichText::new(i18n.dismiss_temporarily())
                         .size(14.0)
                         .color(egui::Color32::GRAY),
                 )
-                .on_hover_text("隐藏此提示（可在设置中重新显示）")
+                .on_hover_text(i18n.dismiss_hint())
                 .clicked()
             {
                 dismiss_clicked = true;
@@ -220,16 +220,7 @@ pub fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64, i18n: &I18
         let usage_percent = (used as f32 / total as f32 * 100.0).round();
         let used_str = crate::file_manager::format_size(used);
         let total_str = crate::file_manager::format_size(total);
-        let text = match i18n.language() {
-            crate::i18n::Language::Chinese => format!(
-                "配额: {:.1}% 已使用 ({}/{})",
-                usage_percent, used_str, total_str
-            ),
-            crate::i18n::Language::English => format!(
-                "Quota: {:.1}% used ({}/{})",
-                usage_percent, used_str, total_str
-            ),
-        };
+        let text = i18n.quota_usage(usage_percent, &used_str, &total_str);
         ui.label(text);
     });
 }
@@ -243,30 +234,15 @@ pub fn draw_status_message(
 ) -> bool {
     let mut toggled = false;
     ui.horizontal(|ui| {
-        let status_label = match i18n.language() {
-            crate::i18n::Language::Chinese => "状态:",
-            crate::i18n::Language::English => "Status:",
-        };
-        ui.label(status_label);
+        ui.label(i18n.status_label());
         ui.label(status_message);
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some(enabled) = cloud_enabled {
-                let cloud_status = match i18n.language() {
-                    crate::i18n::Language::Chinese => {
-                        if enabled {
-                            "云存储: 开启"
-                        } else {
-                            "云存储: 关闭"
-                        }
-                    }
-                    crate::i18n::Language::English => {
-                        if enabled {
-                            "Cloud: On"
-                        } else {
-                            "Cloud: Off"
-                        }
-                    }
+                let cloud_status = if enabled {
+                    i18n.cloud_on()
+                } else {
+                    i18n.cloud_off()
                 };
                 if ui.selectable_label(false, cloud_status).clicked() {
                     toggled = true;

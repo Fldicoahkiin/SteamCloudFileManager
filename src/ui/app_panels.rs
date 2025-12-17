@@ -49,7 +49,8 @@ pub fn render_top_panel(
 
     // 调试警告
     if dialogs.show_debug_warning {
-        let (restart_clicked, dismiss_clicked, show_manual) = crate::ui::draw_debug_warning_ui(ui);
+        let (restart_clicked, dismiss_clicked, show_manual) =
+            crate::ui::draw_debug_warning_ui(ui, &misc.i18n);
 
         if show_manual {
             dialogs.guide_dialog = Some(crate::ui::get_manual_guide_dialog(&misc.i18n));

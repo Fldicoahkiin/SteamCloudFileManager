@@ -52,13 +52,9 @@ pub fn draw_file_action_buttons(
             action = FileAction::DownloadSelected;
         }
 
-        let upload_tooltip = match i18n.language() {
-            crate::i18n::Language::Chinese => "上传文件或文件夹",
-            crate::i18n::Language::English => "Upload file or folder",
-        };
         if ui
             .add_enabled(can_operate, egui::Button::new(i18n.upload()))
-            .on_hover_text(upload_tooltip)
+            .on_hover_text(i18n.upload_tooltip())
             .clicked()
         {
             action = FileAction::Upload;
@@ -86,17 +82,8 @@ pub fn draw_file_action_buttons(
             ui.label(i18n.selected_count(selected_count));
 
             if selected_count > 0 {
-                let size_label = match i18n.language() {
-                    crate::i18n::Language::Chinese => format!(
-                        "总大小: {}",
-                        crate::file_manager::format_size(selected_total_size)
-                    ),
-                    crate::i18n::Language::English => format!(
-                        "Total: {}",
-                        crate::file_manager::format_size(selected_total_size)
-                    ),
-                };
-                ui.label(size_label);
+                let size_str = crate::file_manager::format_size(selected_total_size);
+                ui.label(i18n.total_size_label(&size_str));
             }
         });
     });

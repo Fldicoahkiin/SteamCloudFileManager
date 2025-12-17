@@ -8,14 +8,14 @@ pub enum Language {
 }
 
 impl Language {
-    /// 返回所有支持的语言列表
+    // 返回所有支持的语言列表
     pub const fn all() -> &'static [Language] {
         &[Language::Chinese, Language::English]
     }
 
     pub fn display_name(&self) -> &'static str {
         match self {
-            Language::Chinese => "中文",
+            Language::Chinese => "简体中文",
             Language::English => "English",
         }
     }
@@ -276,7 +276,7 @@ impl I18n {
 
     pub fn forget(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "遗忘",
+            Language::Chinese => "移出云端",
             Language::English => "Forget",
         }
     }
@@ -538,9 +538,9 @@ impl I18n {
 
     pub fn confirm_forget(&self, count: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("确认遗忘 {} 个文件?", count),
+            Language::Chinese => format!("确认将 {} 个文件移出云端？\n（本地副本将保留）", count),
             Language::English => format!(
-                "Confirm forget {} file{}?",
+                "Forget {} file{} from cloud?\n(Local copy will be kept)",
                 count,
                 if count != 1 { "s" } else { "" }
             ),
@@ -1359,6 +1359,127 @@ impl I18n {
         match self.lang {
             Language::Chinese => "释放文件以上传",
             Language::English => "Drop files to upload",
+        }
+    }
+
+    // 调试模式警告
+    pub fn debug_mode_not_enabled(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "⚠ Steam 调试模式未启用",
+            Language::English => "⚠ Steam Debug Mode Not Enabled",
+        }
+    }
+
+    pub fn steam_running(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✓ Steam 正在运行",
+            Language::English => "✓ Steam is running",
+        }
+    }
+
+    pub fn steam_not_running(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✗ Steam 未运行",
+            Language::English => "✗ Steam is not running",
+        }
+    }
+
+    pub fn debug_mode_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "需要启用 Steam 的 CEF 调试模式才能使用网页登录功能",
+            Language::English => "CEF debug mode is required for web login functionality",
+        }
+    }
+
+    pub fn auto_restart_steam(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "自动重启 Steam",
+            Language::English => "Auto Restart Steam",
+        }
+    }
+
+    pub fn start_steam(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "启动 Steam",
+            Language::English => "Start Steam",
+        }
+    }
+
+    pub fn auto_restart_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "自动关闭并重启 Steam，添加调试参数",
+            Language::English => "Automatically restart Steam with debug parameters",
+        }
+    }
+
+    pub fn start_steam_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "以调试模式启动 Steam",
+            Language::English => "Start Steam in debug mode",
+        }
+    }
+
+    pub fn view_manual_steps(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "查看手动操作",
+            Language::English => "View Manual Steps",
+        }
+    }
+
+    pub fn manual_steps_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "显示如何手动添加启动参数",
+            Language::English => "Show how to manually add startup parameters",
+        }
+    }
+
+    pub fn dismiss_temporarily(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✕ 暂时忽略",
+            Language::English => "✕ Dismiss",
+        }
+    }
+
+    pub fn dismiss_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "隐藏此提示（可在设置中重新显示）",
+            Language::English => "Hide this hint (can be re-enabled in settings)",
+        }
+    }
+
+    // 状态栏
+    pub fn status_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "状态:",
+            Language::English => "Status:",
+        }
+    }
+
+    pub fn cloud_on(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云存储: 开启",
+            Language::English => "Cloud: On",
+        }
+    }
+
+    pub fn cloud_off(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云存储: 关闭",
+            Language::English => "Cloud: Off",
+        }
+    }
+
+    pub fn quota_usage(&self, percent: f32, used: &str, total: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("配额: {:.1}% 已使用 ({}/{})", percent, used, total),
+            Language::English => format!("Quota: {:.1}% used ({}/{})", percent, used, total),
+        }
+    }
+
+    pub fn upload_tooltip(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "上传文件或文件夹",
+            Language::English => "Upload file or folder",
         }
     }
 }
