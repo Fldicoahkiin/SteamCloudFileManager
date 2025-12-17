@@ -308,6 +308,23 @@ impl AppHandlers {
                 connection.is_connected = true;
                 misc.status_message = misc.i18n.loading_files_for_app(app_id);
                 connection.since_connected = Some(Instant::now());
+
+                // 打开对应 app_id 的云存储页面
+                let steam_url = format!(
+                    "steam://openurl/https://store.steampowered.com/account/remotestorageapp/?appid={}",
+                    app_id
+                );
+                #[cfg(target_os = "macos")]
+                let _ = std::process::Command::new("open").arg(&steam_url).spawn();
+                #[cfg(target_os = "windows")]
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", "", &steam_url])
+                    .spawn();
+                #[cfg(target_os = "linux")]
+                let _ = std::process::Command::new("xdg-open")
+                    .arg(&steam_url)
+                    .spawn();
+
                 true
             }
             Err(err) => {

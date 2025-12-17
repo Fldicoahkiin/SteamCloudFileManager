@@ -128,7 +128,12 @@ impl FileService {
                         let vdf_root_desc = f.root_description.clone();
 
                         f.size = cdp_file.size;
-                        f.timestamp = cdp_file.timestamp;
+                        // 只有当 CDP 时间戳不是接近当前时间时才更新（避免解析失败时的 Local::now()）
+                        let now = Local::now();
+                        let time_diff = (now - cdp_file.timestamp).num_seconds().abs();
+                        if time_diff > 60 {
+                            f.timestamp = cdp_file.timestamp;
+                        }
                         f.is_persisted = true;
 
                         if cdp_file.root_description.starts_with("CDP:") {
