@@ -204,6 +204,11 @@ impl SteamCloudApp {
 
 impl eframe::App for SteamCloudApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 动态更新窗口标题
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(
+            self.misc.i18n.app_title().to_string(),
+        ));
+
         if self.connection.is_connected {
             if let Ok(manager) = self.steam_manager.try_lock() {
                 manager.run_callbacks();
@@ -347,6 +352,7 @@ impl eframe::App for SteamCloudApp {
                     &self.connection,
                     &mut self.file_list,
                     &self.misc,
+                    &self.game_library,
                     &self.steam_manager,
                 )
             })

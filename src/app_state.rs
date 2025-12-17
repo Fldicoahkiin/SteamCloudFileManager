@@ -55,6 +55,8 @@ pub struct GameLibraryState {
     pub is_scanning_games: bool,
     pub all_users: Vec<UserInfo>,
     pub show_user_selector: bool,
+    pub vdf_count: usize,
+    pub cdp_count: usize,
 }
 
 // 弹窗状态

@@ -19,4 +19,4 @@ pub use selectors::*;
 pub use upload_dialog::*;
 pub use windows::*;
 
-pub use panels::{render_file_tree, TreeViewState};
+pub use panels::{render_file_tree, FileTreeRenderParams, TreeViewState};

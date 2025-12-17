@@ -42,8 +42,8 @@ impl I18n {
     // UI 通用文本
     pub fn app_title(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "Steam 云管理器",
-            Language::English => "Steam Cloud Manager",
+            Language::Chinese => "Steam 云存档管理器",
+            Language::English => "Steam Cloud File Manager",
         }
     }
 
@@ -248,7 +248,7 @@ impl I18n {
 
     pub fn clear_selection(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "清除",
+            Language::Chinese => "清除选择",
             Language::English => "Clear",
         }
     }
@@ -1501,6 +1501,98 @@ impl I18n {
         match self.lang {
             Language::Chinese => "上传文件或文件夹",
             Language::English => "Upload file or folder",
+        }
+    }
+
+    // 文件列表面板
+    pub fn local_save_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地存档路径:",
+            Language::English => "Local Save Path:",
+        }
+    }
+
+    pub fn local_save_path_not_found(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "未找到（可能所有文件都仅在云端）",
+            Language::English => "Not found (files may only exist in cloud)",
+        }
+    }
+
+    pub fn search_files_placeholder(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "搜索文件或文件夹...",
+            Language::English => "Search files or folders...",
+        }
+    }
+
+    pub fn clear(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "清除",
+            Language::English => "Clear",
+        }
+    }
+
+    pub fn only_local(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "仅本地",
+            Language::English => "Local Only",
+        }
+    }
+
+    pub fn only_cloud(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "仅云端",
+            Language::English => "Cloud Only",
+        }
+    }
+
+    pub fn only_local_tooltip(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "只显示本地存在的文件",
+            Language::English => "Show only files that exist locally",
+        }
+    }
+
+    pub fn only_cloud_tooltip(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "只显示云端存在的文件",
+            Language::English => "Show only files that exist in cloud",
+        }
+    }
+
+    pub fn root_folder(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "根文件夹",
+            Language::English => "Root Folder",
+        }
+    }
+
+    pub fn file_size(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "文件大小",
+            Language::English => "File Size",
+        }
+    }
+
+    pub fn write_date(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "写入日期",
+            Language::English => "Write Date",
+        }
+    }
+
+    pub fn local(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地",
+            Language::English => "Local",
+        }
+    }
+
+    pub fn cloud(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端",
+            Language::English => "Cloud",
         }
     }
 }

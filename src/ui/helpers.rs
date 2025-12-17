@@ -269,6 +269,7 @@ pub struct StatusPanelState {
     pub account_enabled: Option<bool>,
     pub app_enabled: Option<bool>,
     pub quota_info: Option<(u64, u64)>,
+    pub game_counts: Option<(usize, usize, usize)>, // (vdf_count, cdp_count, total_count)
 }
 
 // 绘制完整的状态面板
@@ -282,7 +283,18 @@ pub fn draw_complete_status_panel(
     ui.separator();
 
     // 状态消息栏
-    let toggled = draw_status_message(ui, &state.status_message, state.cloud_enabled, i18n);
+    let display_message = if let Some((vdf, cdp, total)) = state.game_counts {
+        let mut parts = Vec::new();
+        parts.push(i18n.vdf_count(vdf));
+        if cdp > 0 {
+            parts.push(i18n.cdp_count(cdp));
+        }
+        parts.push(i18n.total_games(total));
+        parts.join(" | ")
+    } else {
+        state.status_message.clone()
+    };
+    let toggled = draw_status_message(ui, &display_message, state.cloud_enabled, i18n);
     if toggled {
         action = StatusPanelAction::ToggleCloudEnabled;
     }

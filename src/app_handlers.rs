@@ -380,15 +380,11 @@ impl AppHandlers {
         match result {
             Ok(result) => {
                 game_library.cloud_games = result.games;
+                game_library.vdf_count = result.vdf_count;
+                game_library.cdp_count = result.cdp_count;
 
-                let mut status_parts = Vec::new();
-                status_parts.push(misc.i18n.vdf_count(result.vdf_count));
-                if result.cdp_count > 0 {
-                    status_parts.push(misc.i18n.cdp_count(result.cdp_count));
-                }
-                status_parts.push(misc.i18n.total_games(game_library.cloud_games.len()));
-
-                misc.status_message = status_parts.join(" | ");
+                // 状态消息将在 UI 渲染时动态生成，以支持语言切换
+                misc.status_message = String::new();
 
                 if result.cdp_count == 0 && crate::cdp_client::CdpClient::is_cdp_running() {
                     dialogs.show_error(misc.i18n.cdp_no_data_error());

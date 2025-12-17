@@ -1,4 +1,5 @@
 use crate::file_tree::{FileTree, FileTreeNode};
+use crate::i18n::I18n;
 use crate::steam_api::CloudFile;
 use egui;
 use egui_extras::{Column, TableBuilder};
@@ -205,19 +206,29 @@ fn matches_filter(file: &CloudFile, show_only_local: bool, show_only_cloud: bool
     true
 }
 
+// 文件树渲染参数
+pub struct FileTreeRenderParams<'a> {
+    pub tree: &'a mut FileTree,
+    pub selected_files: &'a mut Vec<usize>,
+    pub local_save_paths: &'a [(String, PathBuf)],
+    pub remote_ready: bool,
+    pub state: &'a mut TreeViewState<'a>,
+    pub i18n: &'a I18n,
+}
+
 // 渲染完整的文件树
-pub fn render_file_tree(
-    ui: &mut egui::Ui,
-    tree: &mut FileTree,
-    selected_files: &mut Vec<usize>,
-    _files: &[CloudFile],
-    local_save_paths: &[(String, PathBuf)],
-    remote_ready: bool,
-    state: &mut TreeViewState,
-) {
+pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
+    let FileTreeRenderParams {
+        tree,
+        selected_files,
+        local_save_paths,
+        remote_ready,
+        state,
+        i18n,
+    } = params;
     // 本地存档路径
     if !local_save_paths.is_empty() {
-        ui.label("本地存档路径:");
+        ui.label(i18n.local_save_path());
         ui.horizontal_wrapped(|ui| {
             for (desc, path) in local_save_paths {
                 let button_text = format!("📁 {}", desc);
@@ -233,8 +244,8 @@ pub fn render_file_tree(
         ui.separator();
     } else if remote_ready {
         ui.horizontal(|ui| {
-            ui.label("本地存档路径:");
-            ui.label("未找到（可能所有文件都仅在云端）");
+            ui.label(i18n.local_save_path());
+            ui.label(i18n.local_save_path_not_found());
         });
         ui.separator();
     }
@@ -245,18 +256,18 @@ pub fn render_file_tree(
         ui.add(
             egui::TextEdit::singleline(state.search_query)
                 .desired_width(200.0)
-                .hint_text("搜索文件或文件夹..."),
+                .hint_text(i18n.search_files_placeholder()),
         );
 
-        if ui.button("清除").clicked() {
+        if ui.button(i18n.clear()).clicked() {
             state.search_query.clear();
         }
 
         ui.separator();
 
         if ui
-            .selectable_label(*state.show_only_local, "仅本地")
-            .on_hover_text("只显示本地存在的文件")
+            .selectable_label(*state.show_only_local, i18n.only_local())
+            .on_hover_text(i18n.only_local_tooltip())
             .clicked()
         {
             *state.show_only_local = !*state.show_only_local;
@@ -266,8 +277,8 @@ pub fn render_file_tree(
         }
 
         if ui
-            .selectable_label(*state.show_only_cloud, "仅云端")
-            .on_hover_text("只显示云端存在的文件")
+            .selectable_label(*state.show_only_cloud, i18n.only_cloud())
+            .on_hover_text(i18n.only_cloud_tooltip())
             .clicked()
         {
             *state.show_only_cloud = !*state.show_only_cloud;
@@ -293,22 +304,22 @@ pub fn render_file_tree(
         .max_scroll_height(available_height)
         .header(20.0, |mut header| {
             header.col(|ui| {
-                ui.label("根文件夹");
+                ui.label(i18n.root_folder());
             });
             header.col(|ui| {
-                ui.label("文件名");
+                ui.label(i18n.file_name());
             });
             header.col(|ui| {
-                ui.label("文件大小");
+                ui.label(i18n.file_size());
             });
             header.col(|ui| {
-                ui.label("写入日期");
+                ui.label(i18n.write_date());
             });
             header.col(|ui| {
-                ui.label("本地");
+                ui.label(i18n.local());
             });
             header.col(|ui| {
-                ui.label("云端");
+                ui.label(i18n.cloud());
             });
         })
         .body(|mut body| {
