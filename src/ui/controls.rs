@@ -129,17 +129,29 @@ pub fn draw_toolbar_buttons(
     on_game_selector: &mut bool,
     i18n: &I18n,
 ) {
-    if ui.button(i18n.about_title()).clicked() {
+    if ui
+        .button(i18n.about_title())
+        .on_hover_text(i18n.about_hint())
+        .clicked()
+    {
         *on_about = true;
     }
 
     ui.separator();
 
-    if ui.button(i18n.select_account()).clicked() {
+    if ui
+        .button(i18n.select_account())
+        .on_hover_text(i18n.select_account_hint())
+        .clicked()
+    {
         *on_user_selector = true;
     }
 
-    if ui.button(i18n.select_game()).clicked() {
+    if ui
+        .button(i18n.select_game())
+        .on_hover_text(i18n.select_game_hint())
+        .clicked()
+    {
         *on_game_selector = true;
     }
 
@@ -169,14 +181,33 @@ pub fn draw_connection_controls(
     }
 
     if is_connected {
-        if ui.button(i18n.disconnect()).clicked() {
+        if ui
+            .button(i18n.disconnect())
+            .on_hover_text(i18n.disconnect_hint())
+            .clicked()
+        {
             action = ConnectionAction::Disconnect;
         }
 
-        if ui.button(i18n.refresh()).clicked() {
+        // 刷新按钮：打开对应 appid 的云存储页面
+        if ui
+            .button(i18n.refresh())
+            .on_hover_text(i18n.refresh_open_url_hint())
+            .clicked()
+        {
             action = ConnectionAction::Refresh;
         }
-    } else if ui.button(i18n.connect()).clicked() {
+
+        // 连接时提示：断开后 Steam 将自动同步
+        ui.label(
+            egui::RichText::new(i18n.disconnect_sync_hint())
+                .color(egui::Color32::from_rgb(102, 192, 244)),
+        );
+    } else if ui
+        .button(i18n.connect())
+        .on_hover_text(i18n.connect_hint())
+        .clicked()
+    {
         action = ConnectionAction::Connect;
     }
 
@@ -196,128 +227,18 @@ pub enum ConnectionAction {
     Refresh,
 }
 
-// 绘制云存储状态信息
-pub fn draw_cloud_status(
-    ui: &mut egui::Ui,
-    account_enabled: Option<bool>,
-    _app_enabled: Option<bool>,
-    i18n: &I18n,
-) {
-    ui.horizontal(|ui| {
-        ui.label(format!("{}:", i18n.account_cloud_status()));
-        match account_enabled {
-            Some(true) => ui.label(format!("✅ {}", i18n.logged_in())),
-            Some(false) => ui.label(format!("❌ {}", i18n.not_logged_in())),
-            None => ui.label("❓ Unknown"),
-        };
-    });
+// 文件选择辅助函数
+pub fn select_all_files(file_count: usize) -> Vec<usize> {
+    (0..file_count).collect()
 }
 
-// 绘制配额信息
-pub fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64, i18n: &I18n) {
-    ui.horizontal(|ui| {
-        let used = total - available;
-        let usage_percent = (used as f32 / total as f32 * 100.0).round();
-        let used_str = crate::file_manager::format_size(used);
-        let total_str = crate::file_manager::format_size(total);
-        let text = i18n.quota_usage(usage_percent, &used_str, &total_str);
-        ui.label(text);
-    });
+pub fn invert_file_selection(current_selected: &[usize], file_count: usize) -> Vec<usize> {
+    let current_set: std::collections::HashSet<_> = current_selected.iter().copied().collect();
+    (0..file_count)
+        .filter(|i| !current_set.contains(i))
+        .collect()
 }
 
-// 绘制状态消息栏
-pub fn draw_status_message(
-    ui: &mut egui::Ui,
-    status_message: &str,
-    cloud_enabled: Option<bool>,
-    i18n: &I18n,
-) -> bool {
-    let mut toggled = false;
-    ui.horizontal(|ui| {
-        ui.label(i18n.status_label());
-        ui.label(status_message);
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if let Some(enabled) = cloud_enabled {
-                let cloud_status = if enabled {
-                    i18n.cloud_on()
-                } else {
-                    i18n.cloud_off()
-                };
-                if ui.selectable_label(false, cloud_status).clicked() {
-                    toggled = true;
-                }
-            }
-        });
-    });
-    toggled
-}
-
-// 状态面板的用户操作
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum StatusPanelAction {
-    None,
-    ToggleCloudEnabled,
-}
-
-// 状态面板的状态数据
-pub struct StatusPanelState {
-    pub status_message: String,
-    pub cloud_enabled: Option<bool>,
-    pub is_connected: bool,
-    pub remote_ready: bool,
-    pub account_enabled: Option<bool>,
-    pub app_enabled: Option<bool>,
-    pub quota_info: Option<(u64, u64)>,
-    pub game_counts: Option<(usize, usize, usize)>, // (vdf_count, cdp_count, total_count)
-}
-
-// 绘制完整的状态面板
-pub fn draw_complete_status_panel(
-    ui: &mut egui::Ui,
-    state: &StatusPanelState,
-    i18n: &I18n,
-) -> StatusPanelAction {
-    let mut action = StatusPanelAction::None;
-
-    ui.separator();
-
-    // 状态消息栏
-    let display_message = if let Some((vdf, cdp, total)) = state.game_counts {
-        let mut parts = Vec::new();
-        parts.push(i18n.vdf_count(vdf));
-        if cdp > 0 {
-            parts.push(i18n.cdp_count(cdp));
-        }
-        parts.push(i18n.total_games(total));
-        parts.join(" | ")
-    } else {
-        state.status_message.clone()
-    };
-    let toggled = draw_status_message(ui, &display_message, state.cloud_enabled, i18n);
-    if toggled {
-        action = StatusPanelAction::ToggleCloudEnabled;
-    }
-
-    // 云存储状态
-    if state.is_connected {
-        if state.remote_ready {
-            draw_cloud_status(ui, state.account_enabled, state.app_enabled, i18n);
-        } else {
-            ui.horizontal(|ui| {
-                let text = match i18n.language() {
-                    crate::i18n::Language::Chinese => "云存储状态: 未就绪",
-                    crate::i18n::Language::English => "Cloud Status: Not Ready",
-                };
-                ui.label(text);
-            });
-        }
-    }
-
-    // 配额信息
-    if let Some((total, available)) = state.quota_info {
-        draw_quota_info(ui, total, available, i18n);
-    }
-
-    action
+pub fn clear_file_selection() -> Vec<usize> {
+    Vec::new()
 }

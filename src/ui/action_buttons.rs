@@ -27,15 +27,27 @@ pub fn draw_file_action_buttons(
 
     ui.horizontal(|ui| {
         // 选择操作
-        if ui.button(i18n.select_all()).clicked() {
+        if ui
+            .button(i18n.select_all())
+            .on_hover_text(i18n.select_all_hint())
+            .clicked()
+        {
             action = FileAction::SelectAll;
         }
 
-        if ui.button(i18n.invert_selection()).clicked() {
+        if ui
+            .button(i18n.invert_selection())
+            .on_hover_text(i18n.invert_selection_hint())
+            .clicked()
+        {
             action = FileAction::InvertSelection;
         }
 
-        if ui.button(i18n.clear_selection()).clicked() {
+        if ui
+            .button(i18n.clear_selection())
+            .on_hover_text(i18n.clear_selection_hint())
+            .clicked()
+        {
             action = FileAction::ClearSelection;
         }
 
@@ -47,6 +59,7 @@ pub fn draw_file_action_buttons(
                 can_operate && has_selection,
                 egui::Button::new(i18n.download()),
             )
+            .on_hover_text(i18n.download_hint())
             .clicked()
         {
             action = FileAction::DownloadSelected;
@@ -54,7 +67,7 @@ pub fn draw_file_action_buttons(
 
         if ui
             .add_enabled(can_operate, egui::Button::new(i18n.upload()))
-            .on_hover_text(i18n.upload_tooltip())
+            .on_hover_text(i18n.upload_hint())
             .clicked()
         {
             action = FileAction::Upload;
@@ -65,6 +78,7 @@ pub fn draw_file_action_buttons(
                 can_operate && has_selection,
                 egui::Button::new(i18n.delete()),
             )
+            .on_hover_text(i18n.delete_hint())
             .clicked()
         {
             action = FileAction::DeleteSelected;
@@ -75,6 +89,7 @@ pub fn draw_file_action_buttons(
                 can_operate && has_selection,
                 egui::Button::new(i18n.forget()),
             )
+            .on_hover_text(i18n.forget_hint())
             .clicked()
         {
             action = FileAction::ForgetSelected;

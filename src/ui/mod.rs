@@ -1,22 +1,21 @@
 pub mod action_buttons;
 pub mod app_panels;
 pub mod app_views;
+pub mod controls;
+pub mod file_list;
 pub mod font_loader;
 pub mod guide_dialog;
-pub mod helpers;
-pub mod panels;
-pub mod selectors;
+pub mod status_bar;
 pub mod upload_dialog;
 pub mod windows;
 
 pub use action_buttons::*;
 pub use app_panels::*;
 pub use app_views::*;
+pub use controls::*;
+pub use file_list::{render_file_tree, FileTreeRenderParams, TreeViewState};
 pub use font_loader::setup_fonts;
 pub use guide_dialog::*;
-pub use helpers::*;
-pub use selectors::*;
+pub use status_bar::*;
 pub use upload_dialog::*;
 pub use windows::*;
-
-pub use panels::{render_file_tree, FileTreeRenderParams, TreeViewState};

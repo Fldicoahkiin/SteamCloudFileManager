@@ -466,6 +466,8 @@ pub fn draw_game_selector_window(
     show: &mut bool,
     games: &[CloudGameInfo],
     is_scanning: bool,
+    vdf_count: usize,
+    cdp_count: usize,
     i18n: &I18n,
 ) -> (Option<u32>, bool) {
     let mut selected_app_id = None;
@@ -504,6 +506,11 @@ pub fn draw_game_selector_window(
             } else {
                 ui.horizontal(|ui| {
                     ui.heading(i18n.games_with_cloud(games.len()));
+                    // 显示 VDF/CDP 数量
+                    ui.label(
+                        egui::RichText::new(format!("(VDF: {} | CDP: {})", vdf_count, cdp_count))
+                            .color(egui::Color32::GRAY),
+                    );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // 刷新按钮
                         if ui

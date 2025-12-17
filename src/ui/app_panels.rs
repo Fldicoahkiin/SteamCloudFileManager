@@ -146,12 +146,10 @@ pub fn render_bottom_panel(
     connection: &ConnectionState,
     file_list: &mut FileListState,
     misc: &MiscState,
-    game_library: &GameLibraryState,
+    _game_library: &GameLibraryState,
     steam_manager: &Arc<Mutex<SteamWorkerManager>>,
 ) -> BottomPanelEvent {
     // 文件操作按钮
-    ui.separator();
-
     let can_ops = connection.is_connected
         && connection.remote_ready
         && !file_list.is_refreshing
@@ -212,17 +210,6 @@ pub fn render_bottom_panel(
         (None, None)
     };
 
-    // 游戏计数（用于动态生成状态消息，支持语言切换）
-    let game_counts = if !game_library.cloud_games.is_empty() || game_library.vdf_count > 0 {
-        Some((
-            game_library.vdf_count,
-            game_library.cdp_count,
-            game_library.cloud_games.len(),
-        ))
-    } else {
-        None
-    };
-
     let state = crate::ui::StatusPanelState {
         status_message: misc.status_message.clone(),
         cloud_enabled,
@@ -231,7 +218,6 @@ pub fn render_bottom_panel(
         account_enabled,
         app_enabled,
         quota_info: misc.quota_info,
-        game_counts,
     };
 
     let action = crate::ui::draw_complete_status_panel(ui, &state, &misc.i18n);
