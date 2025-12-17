@@ -1,19 +1,19 @@
 use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryState, MiscState};
 use crate::async_handlers::AsyncHandlers;
 use crate::error::{AppError, AppResult};
-use crate::steam_api::SteamCloudManager;
+use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 pub struct AppHandlers {
-    steam_manager: Arc<Mutex<SteamCloudManager>>,
+    steam_manager: Arc<Mutex<SteamWorkerManager>>,
     vdf_parser: Option<VdfParser>,
 }
 
 impl AppHandlers {
     pub fn new(
-        steam_manager: Arc<Mutex<SteamCloudManager>>,
+        steam_manager: Arc<Mutex<SteamWorkerManager>>,
         vdf_parser: Option<VdfParser>,
     ) -> Self {
         Self {
@@ -33,7 +33,7 @@ impl AppHandlers {
         connection.is_connecting = true;
         misc.status_message = misc.i18n.connecting_to_steam(app_id);
 
-        let rx = SteamCloudManager::connect_async(self.steam_manager.clone(), app_id);
+        let rx = SteamWorkerManager::connect_async(self.steam_manager.clone(), app_id);
         async_handlers.connect_rx = Some(rx);
     }
 
@@ -102,7 +102,7 @@ impl AppHandlers {
     }
 
     pub fn update_quota(&self, misc: &mut MiscState) {
-        if let Ok(manager) = self.steam_manager.lock() {
+        if let Ok(mut manager) = self.steam_manager.lock() {
             if let Ok((total, available)) = manager.get_quota() {
                 misc.quota_info = Some((total, available));
             }

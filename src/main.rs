@@ -14,6 +14,7 @@ mod logger;
 mod path_resolver;
 mod steam_api;
 mod steam_process;
+mod steam_worker;
 mod ui;
 mod update;
 mod user_manager;
@@ -24,6 +25,14 @@ use app::SteamCloudApp;
 use eframe::egui;
 
 fn main() -> Result<(), eframe::Error> {
+    // 检查是否以 Worker 模式启动
+    let args: Vec<String> = std::env::args().collect();
+    if args.contains(&"--steam-worker".to_string()) {
+        // Worker 模式：不初始化 GUI，只运行 Steam API 服务
+        steam_worker::run_worker();
+        return Ok(());
+    }
+
     // 初始化日志系统（输出到文件和控制台）
     if let Err(e) = logger::init_logger() {
         eprintln!("日志初始化失败: {}", e);

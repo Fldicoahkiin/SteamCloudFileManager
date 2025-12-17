@@ -38,31 +38,6 @@ impl SteamCloudManager {
         }
     }
 
-    // 异步连接到 Steam
-    pub fn connect_async(
-        manager: Arc<Mutex<Self>>,
-        app_id: u32,
-    ) -> std::sync::mpsc::Receiver<Result<u32, String>> {
-        let (tx, rx) = std::sync::mpsc::channel();
-
-        std::thread::spawn(move || {
-            let result = {
-                let mut mgr = match manager.lock() {
-                    Ok(m) => m,
-                    Err(e) => {
-                        tracing::error!(error = %e, "Steam 管理器锁错误");
-                        let _ = tx.send(Err("Steam 管理器锁错误".to_string()));
-                        return;
-                    }
-                };
-                mgr.connect(app_id)
-            };
-            let _ = tx.send(result.map(|_| app_id).map_err(|e| e.to_string()));
-        });
-
-        rx
-    }
-
     pub fn connect(&mut self, app_id: u32) -> Result<()> {
         if self.is_connected() {
             self.disconnect();
@@ -145,7 +120,13 @@ impl SteamCloudManager {
                 tracing::info!("断开 Steam 连接 (App ID: {})", self.app_id);
                 *guard = None;
                 drop(guard);
-                std::thread::sleep(std::time::Duration::from_millis(50));
+                unsafe {
+                    steamworks_sys::SteamAPI_Shutdown();
+                }
+                tracing::info!("Steam API 已关闭");
+
+                // 等待 Steam 客户端处理断开
+                std::thread::sleep(std::time::Duration::from_millis(100));
             }
         }
         self.app_id = 0;
@@ -378,14 +359,6 @@ impl SteamCloudManager {
         let file_handle = remote_storage.file(filename);
 
         Ok(file_handle.forget())
-    }
-
-    pub fn run_callbacks(&self) {
-        if let Ok(guard) = self.client.lock() {
-            if let Some(client) = guard.as_ref() {
-                client.run_callbacks();
-            }
-        }
     }
 
     // 触发云同步

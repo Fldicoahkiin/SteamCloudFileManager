@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 pub struct FileService {
-    steam_manager: Option<Arc<Mutex<crate::steam_api::SteamCloudManager>>>,
+    steam_manager: Option<Arc<Mutex<crate::steam_worker::SteamWorkerManager>>>,
 }
 
 impl FileService {
@@ -18,7 +18,7 @@ impl FileService {
     }
 
     pub fn with_steam_manager(
-        steam_manager: Arc<Mutex<crate::steam_api::SteamCloudManager>>,
+        steam_manager: Arc<Mutex<crate::steam_worker::SteamWorkerManager>>,
     ) -> Self {
         Self {
             steam_manager: Some(steam_manager),
@@ -77,10 +77,27 @@ impl FileService {
     // 从 Steam API 获取文件列表
     fn get_files_from_steam_api(
         &self,
-        manager: &Arc<Mutex<crate::steam_api::SteamCloudManager>>,
+        manager: &Arc<Mutex<crate::steam_worker::SteamWorkerManager>>,
     ) -> Result<Vec<CloudFile>> {
-        let mgr = manager.lock().map_err(|e| anyhow!("锁错误: {}", e))?;
-        mgr.get_files_from_api()
+        use chrono::{Local, TimeZone};
+        let mut mgr = manager.lock().map_err(|e| anyhow!("锁错误: {}", e))?;
+        let worker_files = mgr.get_files()?;
+        Ok(worker_files
+            .into_iter()
+            .map(|f| CloudFile {
+                name: f.name,
+                size: f.size,
+                timestamp: Local
+                    .timestamp_opt(f.timestamp, 0)
+                    .single()
+                    .unwrap_or_else(Local::now),
+                is_persisted: f.is_persisted,
+                exists: f.exists,
+                root: f.root,
+                root_description: f.root_description,
+                conflict: false,
+            })
+            .collect())
     }
 
     // 合并 CDP 数据到现有文件列表
@@ -203,11 +220,11 @@ fn build_cloud_file_from_vdf(
 
 // 文件操作结构体
 pub struct FileOperations {
-    steam_manager: Arc<Mutex<crate::steam_api::SteamCloudManager>>,
+    steam_manager: Arc<Mutex<crate::steam_worker::SteamWorkerManager>>,
 }
 
 impl FileOperations {
-    pub fn new(steam_manager: Arc<Mutex<crate::steam_api::SteamCloudManager>>) -> Self {
+    pub fn new(steam_manager: Arc<Mutex<crate::steam_worker::SteamWorkerManager>>) -> Self {
         Self { steam_manager }
     }
 
@@ -252,7 +269,7 @@ impl FileOperations {
 
         // 如果 CDP 下载失败或不可用，尝试 Steam API
         tracing::debug!("使用 Steam API 下载: {}", file.name);
-        let manager = self
+        let mut manager = self
             .steam_manager
             .lock()
             .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
@@ -267,7 +284,7 @@ impl FileOperations {
 
     // 删除文件
     pub fn delete_file(&self, filename: &str) -> Result<bool> {
-        let manager = self
+        let mut manager = self
             .steam_manager
             .lock()
             .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
@@ -279,7 +296,7 @@ impl FileOperations {
 
     // 取消云同步
     pub fn forget_file(&self, filename: &str) -> anyhow::Result<bool> {
-        let manager = self
+        let mut manager = self
             .steam_manager
             .lock()
             .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
@@ -361,7 +378,7 @@ impl FileOperations {
 
         if success_count > 0 {
             tracing::info!("取消云同步完成，触发云同步...");
-            if let Ok(manager) = self.steam_manager.lock() {
+            if let Ok(mut manager) = self.steam_manager.lock() {
                 if let Err(e) = manager.sync_cloud_files() {
                     tracing::warn!("触发云同步失败: {}", e);
                 }
@@ -378,7 +395,7 @@ impl FileOperations {
 
         if success_count > 0 {
             tracing::info!("删除完成，触发云同步...");
-            if let Ok(manager) = self.steam_manager.lock() {
+            if let Ok(mut manager) = self.steam_manager.lock() {
                 if let Err(e) = manager.sync_cloud_files() {
                     tracing::warn!("触发云同步失败: {}", e);
                 }
@@ -685,13 +702,13 @@ pub type ProgressCallback = Box<dyn Fn(usize, usize, &str) + Send>;
 
 // 上传执行器
 pub struct UploadExecutor {
-    steam_manager: Arc<Mutex<crate::steam_api::SteamCloudManager>>,
+    steam_manager: Arc<Mutex<crate::steam_worker::SteamWorkerManager>>,
     retry_config: UploadRetryConfig,
     progress_callback: Option<ProgressCallback>,
 }
 
 impl UploadExecutor {
-    pub fn new(steam_manager: Arc<Mutex<crate::steam_api::SteamCloudManager>>) -> Self {
+    pub fn new(steam_manager: Arc<Mutex<crate::steam_worker::SteamWorkerManager>>) -> Self {
         Self {
             steam_manager,
             retry_config: UploadRetryConfig::default(),
@@ -803,7 +820,7 @@ impl UploadExecutor {
 
     // 上传到 Steam
     fn upload_to_steam(&self, cloud_path: &str, data: &[u8]) -> Result<()> {
-        let manager = self
+        let mut manager = self
             .steam_manager
             .lock()
             .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
@@ -814,7 +831,7 @@ impl UploadExecutor {
 
     // 触发云同步
     fn sync_cloud_files(&self) -> Result<()> {
-        let manager = self
+        let mut manager = self
             .steam_manager
             .lock()
             .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;

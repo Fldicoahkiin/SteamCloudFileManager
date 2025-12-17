@@ -1,4 +1,4 @@
-use crate::steam_api::SteamCloudManager;
+use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
 use eframe::egui;
 use std::sync::{Arc, Mutex};
@@ -6,7 +6,7 @@ use std::time::Duration;
 
 pub struct SteamCloudApp {
     // 核心服务
-    steam_manager: Arc<Mutex<SteamCloudManager>>,
+    steam_manager: Arc<Mutex<SteamWorkerManager>>,
     update_manager: crate::update::UpdateManager,
 
     // 业务逻辑处理器
@@ -25,7 +25,7 @@ pub struct SteamCloudApp {
 
 impl Default for SteamCloudApp {
     fn default() -> Self {
-        let steam_manager = Arc::new(Mutex::new(SteamCloudManager::new()));
+        let steam_manager = Arc::new(Mutex::new(SteamWorkerManager::new()));
         let vdf_parser = VdfParser::new().ok();
         let handlers =
             crate::app_handlers::AppHandlers::new(steam_manager.clone(), vdf_parser.clone());
@@ -372,7 +372,7 @@ impl eframe::App for SteamCloudApp {
             crate::ui::BottomPanelEvent::Delete => self.delete(),
             crate::ui::BottomPanelEvent::Forget => self.forget(),
             crate::ui::BottomPanelEvent::ToggleCloud => {
-                if let Ok(manager) = self.steam_manager.lock() {
+                if let Ok(mut manager) = self.steam_manager.lock() {
                     if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
                         let _ = manager.set_cloud_enabled_for_app(!enabled);
                     }

@@ -1,6 +1,6 @@
 use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryState, MiscState};
 use crate::async_handlers::AsyncHandlers;
-use crate::steam_api::SteamCloudManager;
+use crate::steam_worker::SteamWorkerManager;
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 
@@ -145,7 +145,7 @@ pub fn render_bottom_panel(
     connection: &ConnectionState,
     file_list: &mut FileListState,
     misc: &MiscState,
-    steam_manager: &Arc<Mutex<SteamCloudManager>>,
+    steam_manager: &Arc<Mutex<SteamWorkerManager>>,
 ) -> BottomPanelEvent {
     // 文件操作按钮
     ui.separator();
@@ -192,13 +192,13 @@ pub fn render_bottom_panel(
         steam_manager
             .lock()
             .ok()
-            .and_then(|m| m.is_cloud_enabled_for_app().ok())
+            .and_then(|mut m| m.is_cloud_enabled_for_app().ok())
     } else {
         None
     };
 
     let (account_enabled, app_enabled) = if connection.is_connected && connection.remote_ready {
-        if let Ok(manager) = steam_manager.lock() {
+        if let Ok(mut manager) = steam_manager.lock() {
             (
                 manager.is_cloud_enabled_for_account().ok(),
                 manager.is_cloud_enabled_for_app().ok(),
