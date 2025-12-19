@@ -138,6 +138,7 @@ pub enum BottomPanelEvent {
     Delete,
     Forget,
     ToggleCloud,
+    CompareFiles,
 }
 
 // 底部面板渲染
@@ -184,6 +185,7 @@ pub fn render_bottom_panel(
         crate::ui::FileAction::Upload => BottomPanelEvent::Upload,
         crate::ui::FileAction::DeleteSelected => BottomPanelEvent::Delete,
         crate::ui::FileAction::ForgetSelected => BottomPanelEvent::Forget,
+        crate::ui::FileAction::CompareFiles => BottomPanelEvent::CompareFiles,
         crate::ui::FileAction::None => BottomPanelEvent::None,
     };
 
@@ -259,6 +261,7 @@ pub fn render_center_panel(
                 remote_ready: connection.remote_ready,
                 state: &mut state,
                 i18n: &misc.i18n,
+                sync_status_map: &file_list.sync_status_map,
             },
         );
     } else {

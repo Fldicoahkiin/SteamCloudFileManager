@@ -1,7 +1,9 @@
+use crate::conflict::{AsyncHashChecker, DiffFlags, HashStatus, SyncStatus};
 use crate::game_scanner::CloudGameInfo;
 use crate::i18n::{I18n, Language};
 use crate::steam_api::CloudFile;
 use crate::vdf_parser::UserInfo;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -24,6 +26,14 @@ impl ConnectionState {
     }
 }
 
+// 文件对比详情（用于 UI 显示）
+#[derive(Debug, Clone, Default)]
+pub struct FileComparisonInfo {
+    pub status: SyncStatus,
+    pub diff_flags: DiffFlags,
+    pub hash_status: HashStatus,
+}
+
 // 文件列表状态
 #[derive(Default)]
 pub struct FileListState {
@@ -36,6 +46,9 @@ pub struct FileListState {
     pub show_only_cloud: bool,
     pub last_selected_index: Option<usize>,
     pub is_refreshing: bool,
+    pub sync_status_map: HashMap<String, SyncStatus>, // 文件名 -> 同步状态
+    pub comparison_map: HashMap<String, FileComparisonInfo>, // 文件名 -> 对比详情
+    pub hash_checker: AsyncHashChecker,               // 异步 hash 检测器
 }
 
 impl FileListState {
@@ -44,6 +57,29 @@ impl FileListState {
         self.selected_files.clear();
         self.file_tree = None;
         self.local_save_paths.clear();
+        self.sync_status_map.clear();
+        self.comparison_map.clear();
+        self.hash_checker.cancel();
+    }
+
+    // 更新同步状态
+    pub fn update_sync_status(&mut self) {
+        let comparisons = crate::conflict::detect_all(&self.files, &self.local_save_paths);
+
+        self.sync_status_map.clear();
+        self.comparison_map.clear();
+
+        for c in comparisons {
+            self.sync_status_map.insert(c.filename.clone(), c.status);
+            self.comparison_map.insert(
+                c.filename.clone(),
+                FileComparisonInfo {
+                    status: c.status,
+                    diff_flags: c.diff_flags,
+                    hash_status: c.hash_status,
+                },
+            );
+        }
     }
 }
 
@@ -70,6 +106,7 @@ pub struct DialogState {
     pub upload_preview: Option<crate::ui::UploadPreviewDialog>,
     pub upload_progress: Option<crate::ui::UploadProgressDialog>,
     pub upload_complete: Option<crate::ui::UploadCompleteDialog>,
+    pub conflict_dialog: crate::ui::ConflictDialog,
 }
 
 impl Default for DialogState {
@@ -84,6 +121,7 @@ impl Default for DialogState {
             upload_preview: None,
             upload_progress: None,
             upload_complete: None,
+            conflict_dialog: crate::ui::ConflictDialog::new(),
         }
     }
 }

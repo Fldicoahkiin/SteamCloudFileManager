@@ -1,6 +1,6 @@
 [package]
 name = "steam-cloud-file-manager"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
@@ -108,6 +108,7 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 # Network
 tungstenite = { version = "0.28.0", features = ["native-tls"] }
 ureq = "3.1.4"
+sha1 = "0.10.6"
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [

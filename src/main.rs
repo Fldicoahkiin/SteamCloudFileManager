@@ -5,6 +5,7 @@ mod app_handlers;
 mod app_state;
 mod async_handlers;
 mod cdp_client;
+mod conflict;
 mod file_manager;
 mod file_tree;
 mod game_scanner;

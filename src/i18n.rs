@@ -1670,4 +1670,208 @@ impl I18n {
             Language::English => "Cloud",
         }
     }
+
+    // 文件对比对话框
+    pub fn file_comparison_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "文件对比",
+            Language::English => "File Comparison",
+        }
+    }
+
+    pub fn total_files_count(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("共 {} 个文件", count),
+            Language::English => format!("{} files total", count),
+        }
+    }
+
+    pub fn filter_all(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "全部",
+            Language::English => "All",
+        }
+    }
+
+    pub fn filter_conflicts(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "冲突",
+            Language::English => "Conflicts",
+        }
+    }
+
+    pub fn filter_local_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地较新",
+            Language::English => "Local Newer",
+        }
+    }
+
+    pub fn filter_cloud_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端较新",
+            Language::English => "Cloud Newer",
+        }
+    }
+
+    pub fn filter_synced(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "已同步",
+            Language::English => "Synced",
+        }
+    }
+
+    pub fn column_status(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "状态",
+            Language::English => "Status",
+        }
+    }
+
+    pub fn column_filename(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "文件名",
+            Language::English => "Filename",
+        }
+    }
+
+    pub fn column_local_size(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地大小",
+            Language::English => "Local Size",
+        }
+    }
+
+    pub fn column_cloud_size(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端大小",
+            Language::English => "Cloud Size",
+        }
+    }
+
+    pub fn column_local_time(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地时间",
+            Language::English => "Local Time",
+        }
+    }
+
+    pub fn column_cloud_time(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端时间",
+            Language::English => "Cloud Time",
+        }
+    }
+
+    pub fn selected_file(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "选中文件:",
+            Language::English => "Selected:",
+        }
+    }
+
+    pub fn local_newer_by(&self, secs: i64) -> String {
+        match self.lang {
+            Language::Chinese => format!("(本地比云端新 {} 秒)", secs),
+            Language::English => format!("(local {} secs newer)", secs),
+        }
+    }
+
+    pub fn cloud_newer_by(&self, secs: i64) -> String {
+        match self.lang {
+            Language::Chinese => format!("(云端比本地新 {} 秒)", secs),
+            Language::English => format!("(cloud {} secs newer)", secs),
+        }
+    }
+
+    pub fn action_upload_to_cloud(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "上传到云端",
+            Language::English => "Upload to Cloud",
+        }
+    }
+
+    pub fn action_upload_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "用本地文件覆盖云端版本",
+            Language::English => "Overwrite cloud version with local file",
+        }
+    }
+
+    pub fn action_download_to_local(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "下载到本地",
+            Language::English => "Download to Local",
+        }
+    }
+
+    pub fn action_download_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "用云端文件覆盖本地版本",
+            Language::English => "Overwrite local version with cloud file",
+        }
+    }
+
+    pub fn action_keep_both(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "保留两者",
+            Language::English => "Keep Both",
+        }
+    }
+
+    pub fn action_keep_both_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "重命名本地文件并保留云端版本",
+            Language::English => "Rename local file and keep cloud version",
+        }
+    }
+
+    pub fn conflicts_warning(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("检测到 {} 个冲突，请手动解决", count),
+            Language::English => format!("{} conflicts detected, please resolve manually", count),
+        }
+    }
+
+    pub fn upload_all_local_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "上传所有本地较新",
+            Language::English => "Upload All Local Newer",
+        }
+    }
+
+    pub fn upload_all_hint(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("将 {} 个本地较新的文件上传到云端", count),
+            Language::English => format!("Upload {} local newer files to cloud", count),
+        }
+    }
+
+    pub fn download_all_cloud_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "下载所有云端较新",
+            Language::English => "Download All Cloud Newer",
+        }
+    }
+
+    pub fn download_all_hint(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("将 {} 个云端较新的文件下载到本地", count),
+            Language::English => format!("Download {} cloud newer files to local", count),
+        }
+    }
+
+    pub fn compare_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "对比文件",
+            Language::English => "Compare Files",
+        }
+    }
+
+    pub fn compare_files_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "对比本地和云端文件的差异",
+            Language::English => "Compare differences between local and cloud files",
+        }
+    }
 }

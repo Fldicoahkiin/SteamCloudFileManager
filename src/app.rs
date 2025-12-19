@@ -136,6 +136,12 @@ impl SteamCloudApp {
         }
     }
 
+    fn compare_files(&mut self) {
+        let app_id = self.connection.app_id_input.parse::<u32>().unwrap_or(0);
+        self.handlers
+            .compare_files(&mut self.file_list, &mut self.dialogs, app_id);
+    }
+
     fn scan_cloud_games(&mut self) {
         self.handlers.scan_cloud_games(
             &mut self.game_library,
@@ -272,6 +278,10 @@ impl eframe::App for SteamCloudApp {
                 .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
         }
 
+        // 轮询 Hash 检测结果并更新对比窗口
+        self.handlers
+            .poll_hash_results(&mut self.file_list, &mut self.dialogs);
+
         // 轮询更新下载进度
         self.update_manager.poll_progress();
 
@@ -381,6 +391,7 @@ impl eframe::App for SteamCloudApp {
             crate::ui::BottomPanelEvent::Upload => self.upload(),
             crate::ui::BottomPanelEvent::Delete => self.delete(),
             crate::ui::BottomPanelEvent::Forget => self.forget(),
+            crate::ui::BottomPanelEvent::CompareFiles => self.compare_files(),
             crate::ui::BottomPanelEvent::ToggleCloud => {
                 if let Ok(mut manager) = self.steam_manager.lock() {
                     if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
@@ -520,6 +531,19 @@ impl eframe::App for SteamCloudApp {
                 self.dialogs.upload_complete = None;
                 self.refresh_files();
             }
+        }
+
+        // 文件对比对话框（只读信息展示）
+        if let crate::ui::ConflictDialogEvent::RetryHashCheck(filename) =
+            crate::ui::draw_conflict_dialog(ctx, &mut self.dialogs.conflict_dialog, &self.misc.i18n)
+        {
+            let app_id = self.connection.app_id_input.parse::<u32>().unwrap_or(0);
+            self.handlers.retry_hash_check(
+                &filename,
+                &mut self.file_list,
+                &mut self.dialogs,
+                app_id,
+            );
         }
 
         let was_showing_about = self.dialogs.show_about;

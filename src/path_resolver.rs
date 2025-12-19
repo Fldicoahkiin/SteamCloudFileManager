@@ -297,37 +297,6 @@ pub fn resolve_cloud_file_path(
     Ok(base_path.join(filename))
 }
 
-// 解析云文件的完整路径
-fn resolve_cloud_file_path_cached(
-    root: u32,
-    filename: &str,
-    steam_path: &Path,
-    user_id: &str,
-    app_id: u32,
-    game_install_dir_cache: Option<&PathBuf>,
-) -> Result<PathBuf> {
-    // 尝试解析 Root 类型
-    let root_type = match RootType::from_u32(root) {
-        Some(rt) => rt,
-        None => {
-            log::debug!("未知的 root 值: {}，使用 SteamRemote", root);
-            RootType::SteamRemote
-        }
-    };
-
-    // GameInstallDir 使用缓存的目录
-    if root_type == RootType::GameInstallDir {
-        if let Some(install_dir) = game_install_dir_cache {
-            return Ok(install_dir.join(filename));
-        } else {
-            return Err(anyhow!("未找到游戏 {} 的安装目录", app_id));
-        }
-    }
-
-    let base_path = resolve_root_base_path(root_type, steam_path, user_id, app_id)?;
-    Ok(base_path.join(filename))
-}
-
 // 获取游戏安装目录
 // - Windows/Linux: 游戏安装目录
 // - macOS: ~/Library/Application Support/{GameName}/
@@ -402,7 +371,7 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
     Err(anyhow!(error_msg))
 }
 
-// 收集本地存档路径
+// 收集本地存档路径（使用根基础路径）
 pub fn collect_local_save_paths(
     files: &[crate::steam_api::CloudFile],
     steam_path: &Path,
@@ -420,66 +389,34 @@ pub fn collect_local_save_paths(
     // 预先缓存 game_install_dir，避免重复查找
     let game_install_dir_cache = get_game_install_dir(steam_path, app_id).ok();
 
-    // 按父目录去重，而不是按 root 类型
-    let mut path_map: HashMap<PathBuf, (String, PathBuf)> = HashMap::new();
-    let mut failed_count = 0;
-    let mut game_install_dir_failed = false;
+    // 按 root 类型收集基础路径
+    let mut path_map: HashMap<u32, (String, PathBuf)> = HashMap::new();
 
     for file in files {
-        // 解析完整文件路径，使用缓存的 game_install_dir
-        let file_path_result = resolve_cloud_file_path_cached(
-            file.root,
-            &file.name,
-            steam_path,
-            user_id,
-            app_id,
-            game_install_dir_cache.as_ref(),
-        );
+        // 跳过已经处理过的 root 类型
+        if path_map.contains_key(&file.root) {
+            continue;
+        }
 
-        match file_path_result {
-            Ok(file_path) => {
-                // 获取父目录（存档文件夹）
-                if let Some(parent) = file_path.parent() {
-                    let parent_path = parent.to_path_buf();
+        // 获取该 root 类型的基础路径
+        let base_path = if file.root == 1 {
+            // GameInstallDir 使用缓存
+            game_install_dir_cache.clone()
+        } else if let Some(root_type) = RootType::from_u32(file.root) {
+            resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
+        } else {
+            None
+        };
 
-                    // 检查父目录是否存在
-                    if parent_path.exists() {
-                        // 如果这个父目录还没有记录，添加它
-                        path_map.entry(parent_path.clone()).or_insert_with(|| {
-                            let desc = get_root_description(file.root);
-                            tracing::debug!("✓ {}: {}", desc, parent_path.display());
-                            (desc, parent_path.clone())
-                        });
-                    } else {
-                        tracing::trace!(
-                            "父目录不存在: root={}, file={}, path={}",
-                            file.root,
-                            file.name,
-                            parent_path.display()
-                        );
-                    }
-                }
-            }
-            Err(e) => {
-                failed_count += 1;
-                if file.root == 1 && !game_install_dir_failed {
-                    game_install_dir_failed = true;
-                    tracing::warn!("解析路径失败: root={}, error={}", file.root, e);
-                } else {
-                    tracing::trace!(
-                        "解析路径失败: root={}, file={}, error={}",
-                        file.root,
-                        file.name,
-                        e
-                    );
-                }
+        if let Some(base_path) = base_path {
+            // 验证完整路径是否存在
+            let full_path = base_path.join(&file.name);
+            if full_path.exists() || base_path.exists() {
+                let desc = get_root_description(file.root);
+                tracing::debug!("✓ {}: {}", desc, base_path.display());
+                path_map.insert(file.root, (desc, base_path));
             }
         }
-    }
-
-    // 记录失败统计
-    if failed_count > 0 {
-        tracing::debug!("有 {} 个文件路径解析失败", failed_count);
     }
 
     // 如果没有找到任何路径，但有 root=0 的文件，尝试添加 remote 目录
@@ -493,51 +430,22 @@ pub fn collect_local_save_paths(
         if remote_path.exists() {
             let desc = get_root_description(0);
             tracing::info!("添加 Steam Cloud remote 目录: {}", remote_path.display());
-            path_map.insert(remote_path.clone(), (desc, remote_path));
+            path_map.insert(0, (desc, remote_path));
         }
     }
 
-    let mut paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
-    // 按路径长度排序，确保父路径在前
-    paths.sort_by(|a, b| a.1.as_os_str().len().cmp(&b.1.as_os_str().len()));
+    let paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
 
-    // 过滤掉被其他路径包含的子路径（去重）
-    let filtered_paths = filter_subpaths(paths);
-
-    if !filtered_paths.is_empty() {
-        tracing::info!("检测到 {} 个本地存档根目录", filtered_paths.len());
-        for (desc, path) in &filtered_paths {
+    if !paths.is_empty() {
+        tracing::info!("检测到 {} 个本地存档根目录", paths.len());
+        for (desc, path) in &paths {
             tracing::info!("  ✓ {}: {}", desc, path.display());
         }
     } else {
         tracing::warn!("未找到任何本地存档路径 (app_id={})", app_id);
     }
 
-    filtered_paths
-}
-
-// 过滤掉被其他路径包含的子路径
-fn filter_subpaths(paths: Vec<(String, PathBuf)>) -> Vec<(String, PathBuf)> {
-    let mut filtered_paths = Vec::new();
-    for (desc, path) in &paths {
-        let mut is_subpath = false;
-        for (_, other_path) in &paths {
-            if path != other_path && path.starts_with(other_path) {
-                // 这个路径是另一个路径的子路径，跳过
-                is_subpath = true;
-                tracing::debug!(
-                    "跳过子路径: {} (包含在 {} 中)",
-                    path.display(),
-                    other_path.display()
-                );
-                break;
-            }
-        }
-        if !is_subpath {
-            filtered_paths.push((desc.clone(), path.clone()));
-        }
-    }
-    filtered_paths
+    paths
 }
 
 // 获取 Root 类型的描述文本，格式：CDP文件夹名 (Root编号)

@@ -1,6 +1,7 @@
 pub mod action_buttons;
 pub mod app_panels;
 pub mod app_views;
+pub mod conflict_dialog;
 pub mod controls;
 pub mod file_list;
 pub mod font_loader;
@@ -12,6 +13,7 @@ pub mod windows;
 pub use action_buttons::*;
 pub use app_panels::*;
 pub use app_views::*;
+pub use conflict_dialog::*;
 pub use controls::*;
 pub use file_list::{render_file_tree, FileTreeRenderParams, TreeViewState};
 pub use font_loader::setup_fonts;

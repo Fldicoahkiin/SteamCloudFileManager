@@ -1,9 +1,11 @@
+use crate::conflict::SyncStatus;
 use crate::file_tree::{FileTree, FileTreeNode};
 use crate::i18n::I18n;
 use crate::steam_api::CloudFile;
 use egui;
 use egui_extras::{Column, TableBuilder};
 use regex::Regex;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 const INDENT_WIDTH: f32 = 20.0; // 每层缩进宽度
@@ -22,6 +24,7 @@ struct TreeRenderContext<'a> {
     search_query: &'a str,
     show_only_local: bool,
     show_only_cloud: bool,
+    sync_status_map: &'a HashMap<String, SyncStatus>,
 }
 
 // 树节点渲染的可变上下文
@@ -30,6 +33,7 @@ struct TreeBodyContext<'a> {
     show_only_local: bool,
     show_only_cloud: bool,
     last_selected_index: &'a mut Option<usize>,
+    sync_status_map: &'a HashMap<String, SyncStatus>,
 }
 
 // 绘制树状线条
@@ -214,6 +218,7 @@ pub struct FileTreeRenderParams<'a> {
     pub remote_ready: bool,
     pub state: &'a mut TreeViewState<'a>,
     pub i18n: &'a I18n,
+    pub sync_status_map: &'a HashMap<String, SyncStatus>, // 文件名 -> 同步状态
 }
 
 // 渲染完整的文件树
@@ -225,6 +230,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
         remote_ready,
         state,
         i18n,
+        sync_status_map,
     } = params;
     // 本地存档路径
     if !local_save_paths.is_empty() {
@@ -295,12 +301,13 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
     TableBuilder::new(ui)
         .striped(true)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .column(Column::exact(150.0)) // 根文件夹
+        .column(Column::exact(130.0)) // 根文件夹
         .column(Column::remainder().at_least(200.0)) // 文件名（树状）
         .column(Column::exact(80.0)) // 文件大小
-        .column(Column::exact(160.0)) // 写入日期
+        .column(Column::exact(140.0)) // 写入日期
         .column(Column::exact(40.0)) // 本地
         .column(Column::exact(40.0)) // 云端
+        .column(Column::exact(60.0)) // 状态
         .max_scroll_height(available_height)
         .header(20.0, |mut header| {
             header.col(|ui| {
@@ -321,6 +328,9 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
             header.col(|ui| {
                 ui.label(i18n.cloud());
             });
+            header.col(|ui| {
+                ui.label(i18n.column_status());
+            });
         })
         .body(|mut body| {
             let root = tree.root_mut();
@@ -330,6 +340,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
                     show_only_local: *state.show_only_local,
                     show_only_cloud: *state.show_only_cloud,
                     last_selected_index: state.last_selected_index,
+                    sync_status_map,
                 };
                 render_tree_body(&mut body, children, selected_files, &mut ctx);
             }
@@ -351,6 +362,7 @@ fn render_tree_body(
         search_query: ctx.search_query,
         show_only_local: ctx.show_only_local,
         show_only_cloud: ctx.show_only_cloud,
+        sync_status_map: ctx.sync_status_map,
     };
     render_tree_body_recursive(
         body,
@@ -447,24 +459,19 @@ fn render_tree_body_recursive(
                     });
 
                     // 文件大小列
-                    row.col(|ui| {
-                        ui.label("");
-                    });
+                    row.col(|_ui| {});
 
                     // 写入日期列
-                    row.col(|ui| {
-                        ui.label("");
-                    });
+                    row.col(|_ui| {});
 
                     // 本地列
-                    row.col(|ui| {
-                        ui.label("");
-                    });
+                    row.col(|_ui| {});
 
                     // 云端列
-                    row.col(|ui| {
-                        ui.label("");
-                    });
+                    row.col(|_ui| {});
+
+                    // 状态列（文件夹不显示状态）
+                    row.col(|_ui| {});
                 });
 
                 if *is_expanded && !children.is_empty() {
@@ -493,6 +500,9 @@ fn render_tree_body_recursive(
                 let is_selected = selected_files.contains(index);
                 let file_name = name.clone();
                 let file_index = *index;
+
+                // 获取同步状态
+                let sync_status = ctx.sync_status_map.get(&file.name).copied();
 
                 // 渲染文件行
                 body.row(18.0, |mut row| {
@@ -586,6 +596,22 @@ fn render_tree_body_recursive(
                             ui.colored_label(egui::Color32::from_rgb(0, 150, 255), "✓");
                         } else {
                             ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "✗");
+                        }
+                    });
+
+                    // 状态列（最右边）
+                    row.col(|ui| {
+                        if let Some(status) = sync_status {
+                            let (icon, color) = match status {
+                                SyncStatus::Synced => ("☁", egui::Color32::GREEN), // 云标志表示已同步
+                                SyncStatus::LocalNewer => ("↑", egui::Color32::LIGHT_BLUE),
+                                SyncStatus::CloudNewer => ("↓", egui::Color32::YELLOW),
+                                SyncStatus::Conflict => ("⚠", egui::Color32::RED),
+                                SyncStatus::LocalOnly => ("📁", egui::Color32::GRAY),
+                                SyncStatus::CloudOnly => ("☁", egui::Color32::KHAKI),
+                                SyncStatus::Unknown => ("?", egui::Color32::GRAY),
+                            };
+                            ui.colored_label(color, icon);
                         }
                     });
                 });

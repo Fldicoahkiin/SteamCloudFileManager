@@ -11,6 +11,7 @@ pub enum FileAction {
     Upload,
     DeleteSelected,
     ForgetSelected,
+    CompareFiles,
 }
 
 // 绘制文件操作按钮栏
@@ -93,6 +94,17 @@ pub fn draw_file_action_buttons(
             .clicked()
         {
             action = FileAction::ForgetSelected;
+        }
+
+        ui.separator();
+
+        // 文件对比
+        if ui
+            .add_enabled(can_operate, egui::Button::new(i18n.compare_files()))
+            .on_hover_text(i18n.compare_files_hint())
+            .clicked()
+        {
+            action = FileAction::CompareFiles;
         }
 
         // 右侧统计信息

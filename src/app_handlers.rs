@@ -388,6 +388,7 @@ impl AppHandlers {
                 }
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
+                file_list.update_sync_status(); // 更新同步状态
                 misc.status_message = misc.i18n.status_files_loaded(count);
                 file_list.is_refreshing = false;
                 connection.remote_ready = true;
@@ -487,6 +488,84 @@ impl AppHandlers {
                 dialogs.upload_progress = None;
                 dialogs.show_error(&i18n.upload_failed(&err));
             }
+        }
+    }
+
+    // 执行文件对比检测
+    pub fn compare_files(
+        &self,
+        file_list: &mut FileListState,
+        dialogs: &mut DialogState,
+        app_id: u32,
+    ) {
+        let comparisons =
+            crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
+        dialogs.conflict_dialog.set_comparisons(comparisons.clone());
+
+        // 启动异步 hash 检测
+        file_list.hash_checker.start(app_id, &comparisons);
+        tracing::info!("已启动异步 Hash 检测");
+    }
+
+    // 重新检测单个文件的 hash
+    pub fn retry_hash_check(
+        &self,
+        filename: &str,
+        file_list: &mut FileListState,
+        dialogs: &mut DialogState,
+        app_id: u32,
+    ) {
+        // 找到并克隆对应的 comparison
+        let comparison = dialogs
+            .conflict_dialog
+            .comparisons
+            .iter()
+            .find(|c| c.filename == filename)
+            .cloned();
+
+        if let Some(comparison) = comparison {
+            // 更新状态为 Checking
+            if let Some(c) = dialogs
+                .conflict_dialog
+                .comparisons
+                .iter_mut()
+                .find(|c| c.filename == filename)
+            {
+                c.hash_status = crate::conflict::HashStatus::Checking;
+            }
+
+            file_list.hash_checker.start(app_id, &[comparison]);
+            tracing::info!("重新检测文件 Hash: {}", filename);
+        }
+    }
+
+    // 轮询 Hash 检测结果
+    pub fn poll_hash_results(&self, file_list: &mut FileListState, dialogs: &mut DialogState) {
+        for result in file_list.hash_checker.poll() {
+            let (hash_status, new_sync_status) = result.process();
+
+            // 更新 comparison_map
+            if let Some(info) = file_list.comparison_map.get_mut(&result.filename) {
+                info.hash_status = hash_status;
+                info.diff_flags.hash_diff = hash_status == crate::conflict::HashStatus::Mismatch;
+
+                if let Some(status) = new_sync_status {
+                    if info.status == crate::conflict::SyncStatus::Unknown {
+                        info.status = status;
+                        file_list
+                            .sync_status_map
+                            .insert(result.filename.clone(), status);
+                    }
+                }
+            }
+
+            // 更新对比窗口
+            dialogs.conflict_dialog.update_hash_result(
+                &result.filename,
+                result.local_hash,
+                result.cloud_hash,
+                result.error.is_some(),
+            );
         }
     }
 
