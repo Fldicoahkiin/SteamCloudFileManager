@@ -178,33 +178,48 @@ impl FileService {
         }
 
         // 输出每个文件的详细信息
-        log_file_details(&files);
+        log_file_details(&files, app_id);
 
         Ok(files)
     }
 }
 
 // 输出每个文件的详细信息日志
-fn log_file_details(files: &[CloudFile]) {
+fn log_file_details(files: &[CloudFile], app_id: u32) {
     if files.is_empty() {
         return;
     }
 
+    // 获取 VDF 解析器以解析本地路径
+    let parser = crate::vdf_parser::VdfParser::new().ok();
+    let (steam_path, user_id) = parser
+        .as_ref()
+        .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()))
+        .unwrap_or_else(|| (std::path::PathBuf::new(), String::new()));
+
     tracing::info!(
-        "========== 文件详情列表 ({} 个文件) ==========",
-        files.len()
+        "========== 文件详情列表 ({} 个文件) | 平台: {} ==========",
+        files.len(),
+        get_platform_name()
     );
 
     for (i, f) in files.iter().enumerate() {
-        // 解析 CDP 信息
-        let (_cdp_url, cdp_folder) = if f.root_description.starts_with("CDP:") {
+        // 解析 CDP 原始文件夹名
+        let cdp_folder = if f.root_description.starts_with("CDP:") {
             let content = &f.root_description[4..];
             let parts: Vec<&str> = content.split('|').collect();
-            let url = parts.first().unwrap_or(&"");
-            let folder = parts.get(1).unwrap_or(&"");
-            (url.to_string(), folder.to_string())
+            parts.get(1).unwrap_or(&"").to_string()
         } else {
-            ("N/A".to_string(), f.root_description.clone())
+            "N/A".to_string()
+        };
+
+        // 解析本地绝对路径
+        let local_path = if !steam_path.as_os_str().is_empty() {
+            resolve_cloud_file_path(f.root, &f.name, &steam_path, &user_id, app_id)
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|_| "N/A".to_string())
+        } else {
+            "N/A".to_string()
         };
 
         let time_str = f.timestamp.format("%Y-%m-%d %H:%M:%S").to_string();
@@ -216,22 +231,34 @@ fn log_file_details(files: &[CloudFile]) {
             "未同步"
         };
 
-        // 一行输出所有关键信息
+        // 显示原始数据：VDF root 数字 + CDP 文件夹名称 + 本地路径
         tracing::info!(
-            "[{:>3}] {} | Root={} ({}) | CDP={} | {} | {} | {} | {}",
+            "[{:>3}] {} | VDF root={} | CDP folder={} | {} | {} | {} | {} | {}",
             i + 1,
             f.name,
             f.root,
-            crate::path_resolver::get_cdp_folder_name(f.root),
             cdp_folder,
             size_str,
             time_str,
             exists_str,
-            synced_str
+            synced_str,
+            local_path
         );
     }
 
     tracing::info!("========== 文件列表结束 ==========");
+}
+
+// 获取当前平台名称
+pub fn get_platform_name() -> &'static str {
+    #[cfg(target_os = "macos")]
+    return "macOS";
+    #[cfg(target_os = "windows")]
+    return "Windows";
+    #[cfg(target_os = "linux")]
+    return "Linux";
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    return "Unknown";
 }
 
 impl Default for FileService {

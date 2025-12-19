@@ -448,53 +448,28 @@ pub fn collect_local_save_paths(
     paths
 }
 
-// 获取 Root 类型的描述文本，格式：CDP文件夹名 (Root编号)
+// 获取 Root 类型的描述文本，格式：Root类型名 (Root编号)
 pub fn get_root_description(root: u32) -> String {
-    let cdp_name = get_cdp_folder_name(root);
-    format!("{} ({})", cdp_name, root)
+    let type_name = get_root_type_name(root);
+    format!("{} ({})", type_name, root)
 }
 
-// 获取 CDP 文件夹名称
-pub fn get_cdp_folder_name(root: u32) -> &'static str {
+// 获取 Root 类型名称
+pub fn get_root_type_name(root: u32) -> &'static str {
     match root {
-        0 => "Steam Cloud",
+        0 => "SteamRemote",
         1 => "GameInstall",
         2 => "Documents",
-        3 => "AppData Roaming",
-        4 => "AppData Local",
+        3 => "AppDataRoaming",
+        4 => "AppDataLocal",
         5 => "Pictures",
         6 => "Music",
-        7 => {
-            #[cfg(target_os = "macos")]
-            return "MacAppSupport";
-            #[cfg(not(target_os = "macos"))]
-            return "Videos";
-        }
+        7 => "Videos",
         8 => "Desktop",
-        9 => "Saved Games",
+        9 => "SavedGames",
         10 => "Downloads",
         11 => "Public",
-        12 => "AppData LocalLow",
+        12 => "AppDataLocalLow",
         _ => "Unknown",
-    }
-}
-
-// CDP 网页上的 folder 名称需要映射到标准描述
-pub fn normalize_cdp_folder_name(folder: &str) -> String {
-    match folder.to_lowercase().as_str() {
-        "steam cloud" | "steamcloud" | "" => get_root_description(0),
-        "gameinstall" | "game install" => get_root_description(1),
-        "documents" | "my documents" => get_root_description(2),
-        "appdata roaming" | "roaming" => get_root_description(3),
-        "appdata local" | "local" => get_root_description(4),
-        "pictures" => get_root_description(5),
-        "music" => get_root_description(6),
-        "videos" | "movies" | "macappsupport" => get_root_description(7),
-        "desktop" => get_root_description(8),
-        "saved games" => get_root_description(9),
-        "downloads" => get_root_description(10),
-        "public" | "shared" => get_root_description(11),
-        "appdata locallow" | "locallow" => get_root_description(12),
-        _ => folder.to_string(),
     }
 }
