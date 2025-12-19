@@ -41,13 +41,21 @@ Steam's built-in cloud save management is quite basic. This tool provides more c
 
 ## Platform Support
 
-| Platform | Architecture | Status | Package Format |
-|----------|--------------|--------|----------------|
-| Windows | x64 | ✅ Supported | `.zip` |
-| Windows | ARM64 | ❌ Not Supported | Steam SDK does not provide ARM64 binaries |
-| macOS | Intel (x64) | ✅ Supported | `.dmg` |
-| macOS | Apple Silicon (ARM64) | ✅ Supported | `.dmg` |
-| Linux | x64 | ✅ Supported | `.deb`, `.rpm`, `.AppImage`, `.tar.gz` |
+### x64 (Intel/AMD)
+
+| Platform | Status | Package Format |
+|:--------:|:------:|----------------|
+| Windows | ✅ | `.zip` |
+| macOS | ✅ | `.dmg` |
+| Linux | ✅ | `.deb` `.rpm` `.AppImage` `.tar.gz` |
+
+### ARM64
+
+| Platform | Status | Note |
+|:--------:|:------:|------|
+| macOS (Apple Silicon) | ✅ | Native support |
+| Windows | ❌ | Steam SDK not available |
+| Linux | ❌ | Steam SDK not available |
 
 ## Installation
 
@@ -309,11 +317,10 @@ Our software automatically identifies and displays the actual storage location o
 - [x] Version update detection
 - [x] Tree view
 - [x] Batch upload/download
-- [ ] File conflict detection and handling
+- [x] File conflict detection and handling
 - [ ] Cloud save backup and restore
-- [ ] File comparison (local vs cloud)
-- [ ] Automatic backup schedule
 - [ ] Symlink sync support (experimental)
+- [ ] Automatic backup schedule
 
 ### Package Manager Support
 
