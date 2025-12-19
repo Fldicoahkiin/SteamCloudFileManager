@@ -74,7 +74,7 @@ pub fn render_top_panel(
         crate::ui::draw_toolbar_buttons(
             ui,
             None,
-            &mut dialogs.show_about,
+            &mut dialogs.show_settings,
             &mut game_library.show_user_selector,
             &mut game_library.show_game_selector,
             &misc.i18n,

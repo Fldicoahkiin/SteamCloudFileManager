@@ -366,6 +366,27 @@ impl I18n {
         }
     }
 
+    pub fn settings_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "设置",
+            Language::English => "Settings",
+        }
+    }
+
+    pub fn settings_log(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "日志",
+            Language::English => "Log",
+        }
+    }
+
+    pub fn settings_about(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "关于",
+            Language::English => "About",
+        }
+    }
+
     pub fn error_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "错误",

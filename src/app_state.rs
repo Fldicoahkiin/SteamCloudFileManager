@@ -99,9 +99,9 @@ pub struct GameLibraryState {
 pub struct DialogState {
     pub show_error: bool,
     pub error_message: String,
-    pub show_about: bool,
+    pub show_settings: bool,
+    pub settings_state: crate::ui::SettingsWindowState,
     pub show_debug_warning: bool,
-    pub about_icon_texture: Option<eframe::egui::TextureHandle>,
     pub guide_dialog: Option<crate::ui::GuideDialog>,
     pub upload_preview: Option<crate::ui::UploadPreviewDialog>,
     pub upload_progress: Option<crate::ui::UploadProgressDialog>,
@@ -114,9 +114,9 @@ impl Default for DialogState {
         Self {
             show_error: false,
             error_message: String::new(),
-            show_about: false,
+            show_settings: false,
+            settings_state: crate::ui::SettingsWindowState::default(),
             show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
-            about_icon_texture: None,
             guide_dialog: None,
             upload_preview: None,
             upload_progress: None,

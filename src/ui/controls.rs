@@ -124,17 +124,17 @@ pub fn get_manual_guide_dialog(i18n: &crate::i18n::I18n) -> crate::ui::GuideDial
 pub fn draw_toolbar_buttons(
     ui: &mut egui::Ui,
     user_id: Option<&str>,
-    on_about: &mut bool,
+    on_settings: &mut bool,
     on_user_selector: &mut bool,
     on_game_selector: &mut bool,
     i18n: &I18n,
 ) {
     if ui
-        .button(i18n.about_title())
-        .on_hover_text(i18n.about_hint())
+        .button(i18n.settings_title())
+        .on_hover_text(i18n.settings_title())
         .clicked()
     {
-        *on_about = true;
+        *on_settings = true;
     }
 
     ui.separator();

@@ -546,12 +546,12 @@ impl eframe::App for SteamCloudApp {
             );
         }
 
-        let was_showing_about = self.dialogs.show_about;
-        if self.dialogs.show_about {
-            if let Some(release) = crate::ui::draw_about_window(
+        let was_showing_settings = self.dialogs.show_settings;
+        if self.dialogs.show_settings {
+            if let Some(release) = crate::ui::draw_settings_window(
                 ctx,
-                &mut self.dialogs.show_about,
-                &mut self.dialogs.about_icon_texture,
+                &mut self.dialogs.show_settings,
+                &mut self.dialogs.settings_state,
                 &mut self.update_manager,
                 &self.misc.i18n,
             ) {
@@ -561,9 +561,9 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        // 关闭 About 窗口时，如果是 NoUpdate 状态则重置为 Idle
-        if was_showing_about
-            && !self.dialogs.show_about
+        // 关闭设置窗口时，如果是 NoUpdate 状态则重置为 Idle
+        if was_showing_settings
+            && !self.dialogs.show_settings
             && matches!(
                 self.update_manager.status(),
                 crate::update::UpdateStatus::NoUpdate
