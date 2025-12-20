@@ -1248,6 +1248,13 @@ impl I18n {
         }
     }
 
+    pub fn error_no_files_selected(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "请选择要操作的文件",
+            Language::English => "Please select files to operate",
+        }
+    }
+
     pub fn error_not_connected(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "未连接到 Steam",
@@ -2014,6 +2021,56 @@ impl I18n {
         match self.lang {
             Language::Chinese => format!("备份目录: {}", path),
             Language::English => format!("Backup directory: {}", path),
+        }
+    }
+
+    // 下载相关
+    pub fn download_progress_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "下载进度",
+            Language::English => "Download Progress",
+        }
+    }
+
+    pub fn download_in_progress(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "正在下载...",
+            Language::English => "Downloading...",
+        }
+    }
+
+    pub fn download_complete(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✓ 下载完成",
+            Language::English => "✓ Download Complete",
+        }
+    }
+
+    pub fn download_partial_status(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "⚠ 部分完成",
+            Language::English => "⚠ Partially Complete",
+        }
+    }
+
+    pub fn download_result_stats(&self, success: usize, total: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("成功: {} / {}", success, total),
+            Language::English => format!("Success: {} / {}", success, total),
+        }
+    }
+
+    pub fn download_failed_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "失败的文件:",
+            Language::English => "Failed files:",
+        }
+    }
+
+    pub fn download_open_dir(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "打开下载目录",
+            Language::English => "Open Download Dir",
         }
     }
 }

@@ -110,6 +110,7 @@ pub struct DialogState {
     pub show_backup: bool,
     pub backup_preview: Option<crate::ui::BackupPreviewDialog>,
     pub backup_progress: Option<crate::ui::BackupProgressDialog>,
+    pub download_progress: Option<crate::ui::DownloadProgressDialog>,
 }
 
 impl Default for DialogState {
@@ -128,6 +129,7 @@ impl Default for DialogState {
             show_backup: false,
             backup_preview: None,
             backup_progress: None,
+            download_progress: None,
         }
     }
 }

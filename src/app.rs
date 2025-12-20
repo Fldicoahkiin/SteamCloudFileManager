@@ -104,8 +104,12 @@ impl SteamCloudApp {
     }
 
     fn download(&mut self) {
-        self.handlers
-            .download_files(&self.file_list, &mut self.misc, &mut self.dialogs);
+        if let Some((tasks, _base_dir)) =
+            self.handlers
+                .prepare_download(&self.file_list, &mut self.dialogs, &self.misc.i18n)
+        {
+            self.start_download(tasks);
+        }
     }
 
     fn upload(&mut self) {
@@ -630,9 +634,16 @@ impl eframe::App for SteamCloudApp {
 
         // 绘制备份进度对话框
         if let Some(ref mut progress_dialog) = self.dialogs.backup_progress {
-            if progress_dialog.draw(ctx, &self.misc.i18n) {
-                self.dialogs.backup_progress = None;
-                self.async_handlers.backup_progress_rx = None;
+            match progress_dialog.draw(ctx, &self.misc.i18n) {
+                crate::ui::ProgressAction::Cancel => {
+                    self.async_handlers.cancel_backup();
+                }
+                crate::ui::ProgressAction::Close => {
+                    self.dialogs.backup_progress = None;
+                    self.async_handlers.backup_progress_rx = None;
+                    self.async_handlers.backup_cancel = None;
+                }
+                crate::ui::ProgressAction::None => {}
             }
         }
 
@@ -647,11 +658,70 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
+        // 处理下载进度更新
+        if let Some(ref rx) = self.async_handlers.download_progress_rx {
+            while let Ok(progress) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.download_progress {
+                    dialog.progress = progress;
+                }
+            }
+        }
+
+        // 绘制下载进度对话框
+        if let Some(ref mut progress_dialog) = self.dialogs.download_progress {
+            match progress_dialog.draw(ctx, &self.misc.i18n) {
+                crate::ui::ProgressAction::Cancel => {
+                    self.async_handlers.cancel_download();
+                }
+                crate::ui::ProgressAction::Close => {
+                    self.dialogs.download_progress = None;
+                    self.async_handlers.download_progress_rx = None;
+                    self.async_handlers.download_cancel = None;
+                }
+                crate::ui::ProgressAction::None => {}
+            }
+        }
+
+        // 处理下载结果
+        if let Some(ref rx) = self.async_handlers.download_rx {
+            if let Ok(result) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.download_progress {
+                    dialog.set_result(result);
+                }
+                self.async_handlers.download_rx = None;
+                self.async_handlers.download_progress_rx = None;
+            }
+        }
+
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
 }
 
 impl SteamCloudApp {
+    fn start_download(&mut self, tasks: Vec<crate::downloader::DownloadTask>) {
+        let total_files = tasks.len();
+        self.dialogs.download_progress = Some(crate::ui::DownloadProgressDialog::new(total_files));
+
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let steam_manager = self.handlers.steam_manager.clone();
+
+        self.async_handlers.download_rx = Some(result_rx);
+        self.async_handlers.download_progress_rx = Some(progress_rx);
+        self.async_handlers.download_cancel = Some(cancel_flag.clone());
+
+        std::thread::spawn(move || {
+            let downloader = crate::downloader::BatchDownloader::new(tasks)
+                .with_cancel_flag(cancel_flag)
+                .with_progress_sender(progress_tx)
+                .with_steam_manager(steam_manager);
+
+            let result = downloader.execute();
+            let _ = result_tx.send(result);
+        });
+    }
+
     fn start_backup(
         &mut self,
         app_id: u32,
@@ -662,14 +732,19 @@ impl SteamCloudApp {
 
         let (result_tx, result_rx) = std::sync::mpsc::channel();
         let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
         self.async_handlers.backup_rx = Some(result_rx);
         self.async_handlers.backup_progress_rx = Some(progress_rx);
+        self.async_handlers.backup_cancel = Some(cancel_flag.clone());
 
         std::thread::spawn(move || {
             let result = match crate::backup::BackupManager::new() {
-                Ok(manager) => manager.create_backup(app_id, &game_name, &files, |progress| {
-                    let _ = progress_tx.send(progress.clone());
-                }),
+                Ok(manager) => {
+                    manager.create_backup(app_id, &game_name, &files, cancel_flag, |progress| {
+                        let _ = progress_tx.send(progress.clone());
+                    })
+                }
                 Err(e) => Err(e),
             };
 

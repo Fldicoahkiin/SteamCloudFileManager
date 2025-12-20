@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 pub struct AppHandlers {
-    steam_manager: Arc<Mutex<SteamWorkerManager>>,
+    pub steam_manager: Arc<Mutex<SteamWorkerManager>>,
     vdf_parser: Option<VdfParser>,
 }
 
@@ -134,35 +134,35 @@ impl AppHandlers {
         }
     }
 
-    pub fn download_files(
+    // 准备异步下载（返回下载任务，由调用方启动异步下载）
+    pub fn prepare_download(
         &self,
         file_list: &FileListState,
-        misc: &mut MiscState,
         dialogs: &mut DialogState,
-    ) {
-        let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
-        match file_ops.download_by_indices(
+        i18n: &crate::i18n::I18n,
+    ) -> Option<(Vec<crate::downloader::DownloadTask>, std::path::PathBuf)> {
+        if file_list.selected_files.is_empty() {
+            dialogs.show_error(i18n.error_no_files_selected());
+            return None;
+        }
+
+        // 选择下载目录
+        let base_dir = crate::file_manager::FileOperations::pick_download_folder()?;
+
+        // 准备下载任务
+        let tasks = crate::file_manager::FileOperations::prepare_download_tasks(
             &file_list.files,
             &file_list.selected_files,
+            &base_dir,
             &file_list.local_save_paths,
-        ) {
-            Ok(Some((success_count, failed_files))) => {
-                if failed_files.is_empty() {
-                    misc.status_message = misc.i18n.download_success(success_count);
-                } else {
-                    let error_msg = misc.i18n.download_partial(
-                        success_count,
-                        failed_files.len(),
-                        &failed_files.join(", "),
-                    );
-                    dialogs.show_error(&error_msg);
-                }
-            }
-            Ok(None) => {}
-            Err(e) => {
-                dialogs.show_error(&misc.i18n.download_failed(&e.to_string()));
-            }
+        );
+
+        if tasks.is_empty() {
+            dialogs.show_error(i18n.error_no_files_selected());
+            return None;
         }
+
+        Some((tasks, base_dir))
     }
 
     pub fn upload_files(

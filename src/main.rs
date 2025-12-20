@@ -7,6 +7,7 @@ mod async_handlers;
 mod backup;
 mod cdp_client;
 mod conflict;
+mod downloader;
 mod file_manager;
 mod file_tree;
 mod game_scanner;

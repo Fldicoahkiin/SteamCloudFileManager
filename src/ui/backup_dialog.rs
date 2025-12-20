@@ -156,6 +156,13 @@ impl BackupPreviewDialog {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ProgressAction {
+    None,
+    Cancel,
+    Close,
+}
+
 pub struct BackupProgressDialog {
     pub show: bool,
     pub progress: BackupProgress,
@@ -175,11 +182,11 @@ impl BackupProgressDialog {
         self.result = Some(result);
     }
 
-    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> bool {
-        let mut close = false;
+    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> ProgressAction {
+        let mut action = ProgressAction::None;
 
         if !self.show {
-            return close;
+            return action;
         }
 
         egui::Window::new(i18n.backup_progress_title())
@@ -244,7 +251,7 @@ impl BackupProgressDialog {
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui.button(i18n.close()).clicked() {
-                                close = true;
+                                action = ProgressAction::Close;
                                 self.show = false;
                             }
                         });
@@ -275,11 +282,20 @@ impl BackupProgressDialog {
                         );
                     }
 
-                    ui.add_space(8.0);
+                    ui.add_space(12.0);
+
+                    // 取消按钮
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(i18n.cancel()).clicked() {
+                                action = ProgressAction::Cancel;
+                            }
+                        });
+                    });
                 }
             });
 
-        close
+        action
     }
 }
 
@@ -300,4 +316,141 @@ fn open_path(path: &std::path::Path) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+// 下载进度对话框
+pub struct DownloadProgressDialog {
+    pub show: bool,
+    pub progress: crate::downloader::DownloadProgress,
+    pub result: Option<crate::downloader::DownloadResult>,
+}
+
+impl DownloadProgressDialog {
+    pub fn new(total_files: usize) -> Self {
+        Self {
+            show: true,
+            progress: crate::downloader::DownloadProgress::new(total_files),
+            result: None,
+        }
+    }
+
+    pub fn set_result(&mut self, result: crate::downloader::DownloadResult) {
+        self.result = Some(result);
+    }
+
+    pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> ProgressAction {
+        let mut action = ProgressAction::None;
+
+        if !self.show {
+            return action;
+        }
+
+        egui::Window::new(i18n.download_progress_title())
+            .resizable(false)
+            .collapsible(false)
+            .min_width(400.0)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .show(ctx, |ui| {
+                if let Some(result) = &self.result {
+                    // 显示结果
+                    ui.add_space(8.0);
+
+                    if result.success {
+                        ui.label(
+                            RichText::new(i18n.download_complete())
+                                .color(Color32::from_rgb(100, 200, 100))
+                                .size(16.0),
+                        );
+                    } else {
+                        ui.label(
+                            RichText::new(i18n.download_partial_status())
+                                .color(Color32::from_rgb(255, 165, 0))
+                                .size(16.0),
+                        );
+                    }
+
+                    ui.add_space(8.0);
+
+                    ui.label(i18n.download_result_stats(result.success_count, result.total_files));
+
+                    if !result.failed_files.is_empty() {
+                        ui.add_space(8.0);
+                        ui.label(
+                            RichText::new(i18n.download_failed_files())
+                                .color(Color32::from_rgb(255, 100, 100)),
+                        );
+
+                        egui::ScrollArea::vertical()
+                            .max_height(100.0)
+                            .show(ui, |ui| {
+                                for (name, err) in &result.failed_files {
+                                    ui.label(format!("• {} - {}", name, err));
+                                }
+                            });
+                    }
+
+                    ui.add_space(8.0);
+                    ui.label(
+                        RichText::new(format!("{}", result.target_dir.display()))
+                            .size(11.0)
+                            .color(Color32::GRAY),
+                    );
+
+                    ui.add_space(12.0);
+
+                    ui.horizontal(|ui| {
+                        if ui.button(i18n.download_open_dir()).clicked() {
+                            if let Err(e) = open_path(&result.target_dir) {
+                                tracing::warn!("打开目录失败: {}", e);
+                            }
+                        }
+
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(i18n.close()).clicked() {
+                                action = ProgressAction::Close;
+                                self.show = false;
+                            }
+                        });
+                    });
+                } else {
+                    // 显示进度
+                    ui.add_space(8.0);
+
+                    ui.label(i18n.download_in_progress());
+                    ui.add_space(8.0);
+
+                    // 进度条
+                    let progress = self.progress.percent() / 100.0;
+                    ui.add(egui::ProgressBar::new(progress).show_percentage());
+
+                    ui.add_space(8.0);
+
+                    ui.label(format!(
+                        "{} / {}",
+                        self.progress.completed_files, self.progress.total_files
+                    ));
+
+                    if !self.progress.current_file.is_empty() {
+                        ui.label(
+                            RichText::new(&self.progress.current_file)
+                                .size(11.0)
+                                .color(Color32::GRAY),
+                        );
+                    }
+
+                    ui.add_space(12.0);
+
+                    // 取消按钮
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(i18n.cancel()).clicked() {
+                                action = ProgressAction::Cancel;
+                            }
+                        });
+                    });
+                }
+            });
+
+        action
+    }
 }

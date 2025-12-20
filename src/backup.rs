@@ -1,10 +1,13 @@
+use crate::downloader::download_single_file;
 use crate::path_resolver::get_root_type_name;
 use crate::steam_api::CloudFile;
 use anyhow::{anyhow, Result};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 // 备份清单文件格式
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,6 +150,7 @@ impl BackupManager {
         app_id: u32,
         game_name: &str,
         files: &[CloudFile],
+        cancel_flag: Arc<AtomicBool>,
         progress_callback: impl Fn(&BackupProgress),
     ) -> Result<BackupResult> {
         if files.is_empty() {
@@ -165,6 +169,12 @@ impl BackupManager {
         let mut roots_map: HashMap<u32, RootInfo> = HashMap::new();
 
         for file in files {
+            // 检查取消
+            if cancel_flag.load(Ordering::Relaxed) {
+                tracing::info!("备份已取消");
+                break;
+            }
+
             progress.current_file = file.name.clone();
             progress_callback(&progress);
 
@@ -193,8 +203,8 @@ impl BackupManager {
                 }
             }
 
-            // 下载文件
-            match download_file_for_backup(file, &target_path) {
+            // 下载文件（使用共享下载模块）
+            match download_single_file(file, &target_path) {
                 Ok(_) => {
                     tracing::debug!("备份成功: {}", file.name);
                     manifest_files.push(BackupFileEntry {
@@ -239,8 +249,9 @@ impl BackupManager {
             progress.failed_files.len()
         );
 
+        let cancelled = cancel_flag.load(Ordering::Relaxed);
         Ok(BackupResult {
-            success: progress.failed_files.is_empty(),
+            success: progress.failed_files.is_empty() && !cancelled,
             backup_path,
             total_files: files.len(),
             success_count: manifest.total_files,
@@ -277,30 +288,4 @@ impl BackupManager {
 
         Ok(())
     }
-}
-
-// 下载文件用于备份
-fn download_file_for_backup(file: &CloudFile, target_path: &Path) -> Result<()> {
-    // 优先使用 CDP URL 下载
-    if file.root_description.starts_with("CDP:") {
-        let content = &file.root_description[4..];
-        let url = content.split('|').next().unwrap_or("");
-
-        if !url.is_empty() {
-            tracing::debug!("CDP 下载: {} -> {}", file.name, target_path.display());
-
-            let resp = ureq::get(url)
-                .call()
-                .map_err(|e| anyhow!("CDP 请求失败: {}", e))?;
-
-            let mut data = Vec::new();
-            std::io::Read::read_to_end(&mut resp.into_body().into_reader(), &mut data)
-                .map_err(|e| anyhow!("读取响应失败: {}", e))?;
-
-            std::fs::write(target_path, &data)?;
-            return Ok(());
-        }
-    }
-
-    Err(anyhow!("无下载链接"))
 }

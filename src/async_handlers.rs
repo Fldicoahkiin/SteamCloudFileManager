@@ -1,6 +1,8 @@
 use crate::steam_api::CloudFile;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct AsyncHandlers {
@@ -13,6 +15,24 @@ pub struct AsyncHandlers {
     pub update_download_rx: Option<Receiver<Result<PathBuf, String>>>,
     pub backup_rx: Option<Receiver<crate::backup::BackupResult>>,
     pub backup_progress_rx: Option<Receiver<crate::backup::BackupProgress>>,
+    pub backup_cancel: Option<Arc<AtomicBool>>,
+    pub download_rx: Option<Receiver<crate::downloader::DownloadResult>>,
+    pub download_progress_rx: Option<Receiver<crate::downloader::DownloadProgress>>,
+    pub download_cancel: Option<Arc<AtomicBool>>,
+}
+
+impl AsyncHandlers {
+    pub fn cancel_backup(&self) {
+        if let Some(ref flag) = self.backup_cancel {
+            flag.store(true, Ordering::Relaxed);
+        }
+    }
+
+    pub fn cancel_download(&self) {
+        if let Some(ref flag) = self.download_cancel {
+            flag.store(true, Ordering::Relaxed);
+        }
+    }
 }
 
 impl AsyncHandlers {
