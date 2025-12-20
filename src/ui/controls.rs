@@ -120,21 +120,24 @@ pub fn get_manual_guide_dialog(i18n: &crate::i18n::I18n) -> crate::ui::GuideDial
     }
 }
 
+// 工具栏按钮状态
+pub struct ToolbarState<'a> {
+    pub user_id: Option<&'a str>,
+    pub has_files: bool,
+    pub on_settings: &'a mut bool,
+    pub on_user_selector: &'a mut bool,
+    pub on_game_selector: &'a mut bool,
+    pub on_backup: &'a mut bool,
+}
+
 // 绘制顶部工具栏按钮组
-pub fn draw_toolbar_buttons(
-    ui: &mut egui::Ui,
-    user_id: Option<&str>,
-    on_settings: &mut bool,
-    on_user_selector: &mut bool,
-    on_game_selector: &mut bool,
-    i18n: &I18n,
-) {
+pub fn draw_toolbar_buttons(ui: &mut egui::Ui, state: &mut ToolbarState, i18n: &I18n) {
     if ui
         .button(i18n.settings_title())
         .on_hover_text(i18n.settings_title())
         .clicked()
     {
-        *on_settings = true;
+        *state.on_settings = true;
     }
 
     ui.separator();
@@ -144,7 +147,7 @@ pub fn draw_toolbar_buttons(
         .on_hover_text(i18n.select_account_hint())
         .clicked()
     {
-        *on_user_selector = true;
+        *state.on_user_selector = true;
     }
 
     if ui
@@ -152,12 +155,23 @@ pub fn draw_toolbar_buttons(
         .on_hover_text(i18n.select_game_hint())
         .clicked()
     {
-        *on_game_selector = true;
+        *state.on_game_selector = true;
     }
 
     ui.separator();
 
-    if let Some(user_id) = user_id {
+    // 备份按钮
+    if ui
+        .add_enabled(state.has_files, egui::Button::new(i18n.backup()))
+        .on_hover_text(i18n.backup_hint())
+        .clicked()
+    {
+        *state.on_backup = true;
+    }
+
+    ui.separator();
+
+    if let Some(user_id) = state.user_id {
         ui.label(format!("{}: {}", i18n.select_account(), user_id));
         ui.separator();
     }

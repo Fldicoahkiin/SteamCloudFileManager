@@ -333,6 +333,7 @@ impl eframe::App for SteamCloudApp {
                     &mut self.dialogs,
                     &mut self.connection,
                     &mut self.game_library,
+                    &self.file_list,
                     &mut self.async_handlers,
                     &mut self.misc,
                 )
@@ -572,6 +573,120 @@ impl eframe::App for SteamCloudApp {
             self.update_manager.reset();
         }
 
+        // 备份对话框
+        if self.dialogs.show_backup && self.dialogs.backup_preview.is_none() {
+            // 创建备份预览对话框
+            let app_id = self.connection.app_id_input.parse::<u32>().unwrap_or(0);
+            let game_name = self
+                .game_library
+                .cloud_games
+                .iter()
+                .find(|g| g.app_id == app_id)
+                .and_then(|g| g.game_name.clone())
+                .unwrap_or_else(|| format!("Game {}", app_id));
+
+            self.dialogs.backup_preview = Some(crate::ui::BackupPreviewDialog::new(
+                app_id,
+                game_name,
+                self.file_list.files.clone(),
+            ));
+            self.dialogs.show_backup = false;
+        }
+
+        // 绘制备份预览对话框
+        if let Some(ref mut preview) = self.dialogs.backup_preview {
+            let action = preview.draw(ctx, &self.misc.i18n);
+            match action {
+                crate::ui::BackupAction::StartBackup => {
+                    // 开始备份
+                    let app_id = preview.app_id;
+                    let game_name = preview.game_name.clone();
+                    let files = preview.files.clone();
+                    self.dialogs.backup_preview = None;
+
+                    // 启动备份任务
+                    self.start_backup(app_id, game_name, files);
+                }
+                crate::ui::BackupAction::Cancel => {
+                    self.dialogs.backup_preview = None;
+                }
+                crate::ui::BackupAction::OpenBackupDir => {
+                    if let Ok(manager) = crate::backup::BackupManager::new() {
+                        let _ = manager.open_backup_dir();
+                    }
+                }
+                crate::ui::BackupAction::None => {}
+            }
+        }
+
+        // 处理备份进度更新
+        if let Some(ref rx) = self.async_handlers.backup_progress_rx {
+            while let Ok(progress) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.backup_progress {
+                    dialog.progress = progress;
+                }
+            }
+        }
+
+        // 绘制备份进度对话框
+        if let Some(ref mut progress_dialog) = self.dialogs.backup_progress {
+            if progress_dialog.draw(ctx, &self.misc.i18n) {
+                self.dialogs.backup_progress = None;
+                self.async_handlers.backup_progress_rx = None;
+            }
+        }
+
+        // 处理备份结果
+        if let Some(ref rx) = self.async_handlers.backup_rx {
+            if let Ok(result) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.backup_progress {
+                    dialog.set_result(result);
+                }
+                self.async_handlers.backup_rx = None;
+                self.async_handlers.backup_progress_rx = None;
+            }
+        }
+
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
+    }
+}
+
+impl SteamCloudApp {
+    fn start_backup(
+        &mut self,
+        app_id: u32,
+        game_name: String,
+        files: Vec<crate::steam_api::CloudFile>,
+    ) {
+        self.dialogs.backup_progress = Some(crate::ui::BackupProgressDialog::new(files.len()));
+
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        self.async_handlers.backup_rx = Some(result_rx);
+        self.async_handlers.backup_progress_rx = Some(progress_rx);
+
+        std::thread::spawn(move || {
+            let result = match crate::backup::BackupManager::new() {
+                Ok(manager) => manager.create_backup(app_id, &game_name, &files, |progress| {
+                    let _ = progress_tx.send(progress.clone());
+                }),
+                Err(e) => Err(e),
+            };
+
+            match result {
+                Ok(backup_result) => {
+                    let _ = result_tx.send(backup_result);
+                }
+                Err(e) => {
+                    let _ = result_tx.send(crate::backup::BackupResult {
+                        success: false,
+                        backup_path: std::path::PathBuf::new(),
+                        total_files: files.len(),
+                        success_count: 0,
+                        failed_files: vec![("backup".to_string(), e.to_string())],
+                    });
+                }
+            }
+        });
     }
 }

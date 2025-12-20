@@ -20,6 +20,7 @@ pub fn render_top_panel(
     dialogs: &mut DialogState,
     connection: &mut ConnectionState,
     game_library: &mut GameLibraryState,
+    file_state: &FileListState,
     async_handlers: &mut AsyncHandlers,
     misc: &mut MiscState,
 ) -> TopPanelEvent {
@@ -71,14 +72,15 @@ pub fn render_top_panel(
 
     // 工具栏和连接控制
     ui.horizontal(|ui| {
-        crate::ui::draw_toolbar_buttons(
-            ui,
-            None,
-            &mut dialogs.show_settings,
-            &mut game_library.show_user_selector,
-            &mut game_library.show_game_selector,
-            &misc.i18n,
-        );
+        let mut toolbar_state = crate::ui::ToolbarState {
+            user_id: None,
+            has_files: !file_state.files.is_empty(),
+            on_settings: &mut dialogs.show_settings,
+            on_user_selector: &mut game_library.show_user_selector,
+            on_game_selector: &mut game_library.show_game_selector,
+            on_backup: &mut dialogs.show_backup,
+        };
+        crate::ui::draw_toolbar_buttons(ui, &mut toolbar_state, &misc.i18n);
 
         if game_library.show_game_selector
             && !game_library.is_scanning_games

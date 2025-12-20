@@ -11,6 +11,8 @@ pub struct AsyncHandlers {
     pub upload_rx: Option<Receiver<Result<String, String>>>,
     pub upload_progress_rx: Option<Receiver<(usize, usize, String)>>,
     pub update_download_rx: Option<Receiver<Result<PathBuf, String>>>,
+    pub backup_rx: Option<Receiver<crate::backup::BackupResult>>,
+    pub backup_progress_rx: Option<Receiver<crate::backup::BackupProgress>>,
 }
 
 impl AsyncHandlers {

@@ -5,6 +5,7 @@ use egui;
 pub enum SettingsTab {
     #[default]
     Log,
+    Backup,
     About,
 }
 
@@ -93,6 +94,29 @@ pub fn draw_settings_window(
                     if about_response.clicked() {
                         state.tab = SettingsTab::About;
                     }
+
+                    ui.add_space(4.0);
+
+                    // 备份
+                    let backup_selected = state.tab == SettingsTab::Backup;
+                    let backup_response = ui.add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new(egui::RichText::new(i18n.backup()).color(
+                            if backup_selected {
+                                steam_blue
+                            } else {
+                                ui.style().visuals.text_color()
+                            },
+                        ))
+                        .fill(if backup_selected {
+                            ui.style().visuals.selection.bg_fill
+                        } else {
+                            egui::Color32::TRANSPARENT
+                        }),
+                    );
+                    if backup_response.clicked() {
+                        state.tab = SettingsTab::Backup;
+                    }
                 });
 
                 ui.separator();
@@ -107,6 +131,9 @@ pub fn draw_settings_window(
                             match state.tab {
                                 SettingsTab::Log => {
                                     draw_log_settings(ui, i18n);
+                                }
+                                SettingsTab::Backup => {
+                                    draw_backup_settings(ui, i18n);
                                 }
                                 SettingsTab::About => {
                                     download_release = draw_about_content(
@@ -172,6 +199,30 @@ fn draw_log_settings(ui: &mut egui::Ui, i18n: &I18n) {
         ui.add_space(8.0);
         ui.label(
             egui::RichText::new(i18n.log_location(&log_dir.display().to_string()))
+                .size(10.0)
+                .color(text_subtle),
+        );
+    }
+}
+
+// 备份设置内容
+fn draw_backup_settings(ui: &mut egui::Ui, i18n: &I18n) {
+    let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
+
+    // 打开备份目录按钮
+    if ui.button(i18n.backup_open_dir()).clicked() {
+        if let Ok(manager) = crate::backup::BackupManager::new() {
+            if let Err(e) = manager.open_backup_dir() {
+                tracing::error!("打开备份目录失败: {}", e);
+            }
+        }
+    }
+
+    // 备份目录路径
+    if let Ok(backup_dir) = crate::backup::get_backup_root_dir() {
+        ui.add_space(8.0);
+        ui.label(
+            egui::RichText::new(i18n.backup_location(&backup_dir.display().to_string()))
                 .size(10.0)
                 .color(text_subtle),
         );

@@ -107,6 +107,9 @@ pub struct DialogState {
     pub upload_progress: Option<crate::ui::UploadProgressDialog>,
     pub upload_complete: Option<crate::ui::UploadCompleteDialog>,
     pub conflict_dialog: crate::ui::ConflictDialog,
+    pub show_backup: bool,
+    pub backup_preview: Option<crate::ui::BackupPreviewDialog>,
+    pub backup_progress: Option<crate::ui::BackupProgressDialog>,
 }
 
 impl Default for DialogState {
@@ -122,6 +125,9 @@ impl Default for DialogState {
             upload_progress: None,
             upload_complete: None,
             conflict_dialog: crate::ui::ConflictDialog::new(),
+            show_backup: false,
+            backup_preview: None,
+            backup_progress: None,
         }
     }
 }

@@ -1895,4 +1895,125 @@ impl I18n {
             Language::English => "Compare differences between local and cloud files",
         }
     }
+
+    // ========== 备份功能 ==========
+
+    pub fn backup(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "备份",
+            Language::English => "Backup",
+        }
+    }
+
+    pub fn backup_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "备份云存档",
+            Language::English => "Backup Cloud Saves",
+        }
+    }
+
+    pub fn backup_file_count(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("共 {} 个文件", count),
+            Language::English => format!("{} files", count),
+        }
+    }
+
+    pub fn backup_total_size(&self, size: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("总大小: {}", size),
+            Language::English => format!("Total size: {}", size),
+        }
+    }
+
+    pub fn backup_cdp_warning(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("⚠ {} 个文件无下载链接，将跳过", count),
+            Language::English => format!("⚠ {} files without download URL will be skipped", count),
+        }
+    }
+
+    pub fn backup_file_list(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "文件列表",
+            Language::English => "File List",
+        }
+    }
+
+    pub fn backup_start(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "开始备份",
+            Language::English => "Start Backup",
+        }
+    }
+
+    pub fn backup_open_dir(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "打开备份目录",
+            Language::English => "Open Backup Dir",
+        }
+    }
+
+    pub fn backup_progress_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "备份进度",
+            Language::English => "Backup Progress",
+        }
+    }
+
+    pub fn backup_in_progress(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "正在备份...",
+            Language::English => "Backing up...",
+        }
+    }
+
+    pub fn backup_complete(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✓ 备份完成",
+            Language::English => "✓ Backup Complete",
+        }
+    }
+
+    pub fn backup_partial(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "⚠ 部分完成",
+            Language::English => "⚠ Partially Complete",
+        }
+    }
+
+    pub fn backup_result_stats(&self, success: usize, total: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("成功: {} / {}", success, total),
+            Language::English => format!("Success: {} / {}", success, total),
+        }
+    }
+
+    pub fn backup_failed_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "失败的文件:",
+            Language::English => "Failed files:",
+        }
+    }
+
+    pub fn backup_no_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "没有可备份的文件",
+            Language::English => "No files to backup",
+        }
+    }
+
+    pub fn backup_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "备份当前游戏的所有云存档",
+            Language::English => "Backup all cloud saves for current game",
+        }
+    }
+
+    pub fn backup_location(&self, path: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("备份目录: {}", path),
+            Language::English => format!("Backup directory: {}", path),
+        }
+    }
 }
