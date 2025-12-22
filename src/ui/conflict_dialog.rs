@@ -62,16 +62,19 @@ impl ConflictDialog {
             } else {
                 match (&local_hash, &cloud_hash) {
                     (Some(lh), Some(ch)) if lh == ch => {
+                        // Hash 一致 = 内容相同，强制设为已同步
                         comparison.hash_status = crate::conflict::HashStatus::Match;
                         comparison.diff_flags.hash_diff = false;
-                        if comparison.status == SyncStatus::Unknown {
-                            comparison.status = SyncStatus::Synced;
-                        }
+                        comparison.status = SyncStatus::Synced;
                     }
                     (Some(_), Some(_)) => {
+                        // Hash 不一致 = 内容不同，根据时间判断冲突方向
                         comparison.hash_status = crate::conflict::HashStatus::Mismatch;
                         comparison.diff_flags.hash_diff = true;
-                        if comparison.status == SyncStatus::Unknown {
+                        // 保持原状态（LocalNewer/CloudNewer），或设为 Conflict
+                        if comparison.status == SyncStatus::Unknown
+                            || comparison.status == SyncStatus::Synced
+                        {
                             comparison.status = SyncStatus::Conflict;
                         }
                     }

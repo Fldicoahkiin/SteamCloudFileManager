@@ -566,21 +566,32 @@ impl AppHandlers {
     // 轮询 Hash 检测结果
     pub fn poll_hash_results(&self, file_list: &mut FileListState, dialogs: &mut DialogState) {
         for result in file_list.hash_checker.poll() {
-            let (hash_status, new_sync_status) = result.process();
+            let (hash_status, _) = result.process();
 
             // 更新 comparison_map
             if let Some(info) = file_list.comparison_map.get_mut(&result.filename) {
                 info.hash_status = hash_status;
                 info.diff_flags.hash_diff = hash_status == crate::conflict::HashStatus::Mismatch;
 
-                if let Some(status) = new_sync_status {
-                    if info.status == crate::conflict::SyncStatus::Unknown {
-                        info.status = status;
-                        file_list
-                            .sync_status_map
-                            .insert(result.filename.clone(), status);
+                // Hash 一致 = 已同步
+                // Hash 不一致 = 保持原状态（LocalNewer/CloudNewer），或设为 Conflict
+                let new_status = match hash_status {
+                    crate::conflict::HashStatus::Match => crate::conflict::SyncStatus::Synced,
+                    crate::conflict::HashStatus::Mismatch => {
+                        if info.status == crate::conflict::SyncStatus::Unknown
+                            || info.status == crate::conflict::SyncStatus::Synced
+                        {
+                            crate::conflict::SyncStatus::Conflict
+                        } else {
+                            info.status // 保持 LocalNewer/CloudNewer
+                        }
                     }
-                }
+                    _ => info.status,
+                };
+                info.status = new_status;
+                file_list
+                    .sync_status_map
+                    .insert(result.filename.clone(), new_status);
             }
 
             // 更新对比窗口
