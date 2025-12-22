@@ -59,10 +59,11 @@ pub fn draw_status_message(
 }
 
 // 状态面板的用户操作
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StatusPanelAction {
     None,
     ToggleCloudEnabled,
+    ShowAppInfo(u32),
 }
 
 // 状态面板的状态数据
@@ -74,6 +75,7 @@ pub struct StatusPanelState {
     pub account_enabled: Option<bool>,
     pub app_enabled: Option<bool>,
     pub quota_info: Option<(u64, u64)>,
+    pub app_id: u32,
 }
 
 // 绘制完整的状态面板
@@ -110,6 +112,15 @@ pub fn draw_complete_status_panel(
     // 配额信息
     if let Some((total, available)) = state.quota_info {
         draw_quota_info(ui, total, available, i18n);
+    }
+
+    // 显示 appinfo.vdf 按钮
+    if state.is_connected && state.app_id > 0 {
+        ui.horizontal(|ui| {
+            if ui.button(i18n.show_appinfo_vdf()).clicked() {
+                action = StatusPanelAction::ShowAppInfo(state.app_id);
+            }
+        });
     }
 
     action

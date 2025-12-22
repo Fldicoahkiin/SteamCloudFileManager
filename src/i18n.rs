@@ -188,6 +188,13 @@ impl I18n {
         }
     }
 
+    pub fn show_appinfo_vdf(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "显示 appinfo.vdf",
+            Language::English => "Show appinfo.vdf",
+        }
+    }
+
     // 账户和游戏选择
     pub fn account_cloud_status(&self) -> &'static str {
         match self.lang {

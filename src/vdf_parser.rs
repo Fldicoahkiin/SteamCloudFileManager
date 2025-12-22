@@ -30,6 +30,14 @@ pub struct AppInfo {
     pub publisher: Option<String>,
 }
 
+// Steam Cloud 配置 (来自 appinfo.vdf 的 ufs 节)
+#[derive(Debug, Clone, Default)]
+pub struct UfsConfig {
+    pub quota: u64,
+    pub maxnumfiles: u32,
+    pub raw_text: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct UserInfo {
     pub user_id: String,
@@ -342,5 +350,324 @@ impl VdfParser {
         }
 
         Err(anyhow!("未找到游戏名称"))
+    }
+
+    // 获取指定 app_id 的 ufs 云存储配置
+    pub fn get_ufs_config(&self, app_id: u32) -> Result<UfsConfig> {
+        let appinfo_path = self.steam_path.join("appcache").join("appinfo.vdf");
+        if !appinfo_path.exists() {
+            return Err(anyhow!("appinfo.vdf 不存在"));
+        }
+
+        // 检查文件修改时间，确保不是过期缓存
+        if let Ok(metadata) = fs::metadata(&appinfo_path) {
+            if let Ok(modified) = metadata.modified() {
+                let age = std::time::SystemTime::now()
+                    .duration_since(modified)
+                    .unwrap_or_default();
+                tracing::debug!("appinfo.vdf 最后修改: {:?} 前", age);
+            }
+        }
+
+        let data = fs::read(&appinfo_path)?;
+        tracing::debug!("读取 appinfo.vdf: {} bytes", data.len());
+
+        Self::parse_app_ufs_config(&data, app_id)
+    }
+
+    // 解析 appinfo.vdf 获取指定 app 的 ufs 配置
+    fn parse_app_ufs_config(data: &[u8], target_app_id: u32) -> Result<UfsConfig> {
+        let mut cursor = Cursor::new(data);
+
+        let magic = cursor.read_u32::<LittleEndian>()?;
+        let version = match magic {
+            0x07564427 => 27,
+            0x07564428 => 28,
+            0x07564429 => 29,
+            _ => return Err(anyhow!("不支持的 appinfo.vdf 版本: 0x{:X}", magic)),
+        };
+
+        tracing::debug!("appinfo.vdf 版本: {}", version);
+        cursor.read_u32::<LittleEndian>()?; // universe
+
+        // 版本 29+ 有字符串表
+        let string_table_offset = if version >= 29 {
+            cursor.read_u64::<LittleEndian>()?
+        } else {
+            0
+        };
+
+        // 解析字符串表 (版本 29+)
+        let string_table = if version >= 29 && string_table_offset > 0 {
+            Self::parse_string_table(data, string_table_offset as usize)?
+        } else {
+            Vec::new()
+        };
+
+        // 查找 ufs 在字符串表中的索引
+        let ufs_index = string_table.iter().position(|s| s == "ufs");
+        let quota_index = string_table.iter().position(|s| s == "quota");
+        let maxnumfiles_index = string_table.iter().position(|s| s == "maxnumfiles");
+
+        tracing::debug!(
+            "字符串索引: ufs={:?}, quota={:?}, maxnumfiles={:?}",
+            ufs_index,
+            quota_index,
+            maxnumfiles_index
+        );
+
+        loop {
+            let entry_start = cursor.position();
+            let app_id = cursor.read_u32::<LittleEndian>()?;
+            if app_id == 0 {
+                break;
+            }
+
+            let size = cursor.read_u32::<LittleEndian>()?;
+
+            // size 是 size 字段之后所有数据的大小
+            // 头部字段: infostate(4) + last_updated(4) + access_token(8) + sha(20) + change_number(4) + binary_sha(20 for v28+)
+            let header_size: usize = 4 + 4 + 8 + 20 + 4 + if version >= 28 { 20 } else { 0 };
+            let vdf_size = (size as usize).saturating_sub(header_size);
+
+            if app_id == target_app_id {
+                // 跳过头部字段
+                cursor.read_u32::<LittleEndian>()?; // infostate
+                cursor.read_u32::<LittleEndian>()?; // last_updated
+                cursor.read_u64::<LittleEndian>()?; // access_token
+
+                let mut sha = vec![0u8; 20];
+                cursor.read_exact(&mut sha)?;
+
+                cursor.read_u32::<LittleEndian>()?; // change_number
+
+                if version >= 28 {
+                    let mut binary_sha = vec![0u8; 20];
+                    cursor.read_exact(&mut binary_sha)?;
+                }
+
+                let mut vdf_data = vec![0u8; vdf_size];
+                cursor.read_exact(&mut vdf_data)?;
+
+                tracing::debug!("找到 app {} 的 VDF 数据: {} bytes", app_id, vdf_data.len());
+
+                // 使用简化的解析方法
+                return Self::extract_ufs_from_binary_vdf(&vdf_data, &string_table, version);
+            } else {
+                // 跳过整个条目: 已读取 app_id(4) + size(4)，剩余 size 字节
+                cursor.set_position(entry_start + 8 + size as u64);
+            }
+        }
+
+        Err(anyhow!("未找到 app_id {} 的配置", target_app_id))
+    }
+
+    // 解析字符串表 (版本 29+)
+    fn parse_string_table(data: &[u8], offset: usize) -> Result<Vec<String>> {
+        if offset >= data.len() {
+            return Ok(Vec::new());
+        }
+
+        let mut strings = Vec::new();
+        let mut pos = offset;
+
+        while pos < data.len() {
+            let start = pos;
+            while pos < data.len() && data[pos] != 0 {
+                pos += 1;
+            }
+
+            // 跳过空字符串 (与 Python 逻辑一致)
+            if pos == start {
+                pos += 1;
+                continue;
+            }
+
+            if let Ok(s) = String::from_utf8(data[start..pos].to_vec()) {
+                strings.push(s);
+            }
+
+            pos += 1; // 跳过 null
+
+            // 防止无限循环
+            if strings.len() > 50000 {
+                break;
+            }
+        }
+
+        tracing::debug!("解析字符串表: {} 个字符串", strings.len());
+        Ok(strings)
+    }
+
+    // 从二进制 VDF 数据提取完整的 ufs 配置
+    fn extract_ufs_from_binary_vdf(
+        data: &[u8],
+        string_table: &[String],
+        version: u32,
+    ) -> Result<UfsConfig> {
+        let mut config = UfsConfig::default();
+
+        if version >= 29 && !string_table.is_empty() {
+            // 找到 "ufs" 在字符串表中的索引
+            let ufs_idx = match string_table.iter().position(|s| s == "ufs") {
+                Some(idx) => idx,
+                None => {
+                    config.raw_text = "未找到 ufs 配置 (字符串表中无 ufs)".to_string();
+                    return Ok(config);
+                }
+            };
+
+            // 搜索 ufs 节的起始位置: 0x00 (section type) + ufs_idx (4 bytes LE)
+            let ufs_pattern = [
+                0x00u8,
+                (ufs_idx & 0xFF) as u8,
+                ((ufs_idx >> 8) & 0xFF) as u8,
+                ((ufs_idx >> 16) & 0xFF) as u8,
+                ((ufs_idx >> 24) & 0xFF) as u8,
+            ];
+
+            tracing::debug!("搜索 ufs 节: idx={}, pattern={:02x?}", ufs_idx, ufs_pattern);
+
+            let ufs_start = match Self::find_pattern(data, &ufs_pattern) {
+                Some(pos) => {
+                    tracing::debug!("找到 ufs 节起始位置: {}", pos);
+                    pos + 5
+                }
+                None => {
+                    config.raw_text = format!("未找到 ufs 配置 (模式 {:02x?} 未匹配)", ufs_pattern);
+                    return Ok(config);
+                }
+            };
+
+            // 解析完整的 ufs 节
+            let mut cursor = Cursor::new(&data[ufs_start..]);
+            let mut lines = Vec::new();
+            lines.push("\"ufs\"".to_string());
+            lines.push("{".to_string());
+
+            Self::parse_vdf_section(&mut cursor, string_table, &mut lines, 1, &mut config);
+
+            lines.push("}".to_string());
+            config.raw_text = lines.join("\n");
+
+            tracing::debug!("解析 ufs 完成，共 {} 行", lines.len());
+        } else {
+            config.raw_text = "不支持的 appinfo.vdf 版本".to_string();
+        }
+
+        Ok(config)
+    }
+
+    // 递归解析 VDF 节
+    fn parse_vdf_section(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+        config: &mut UfsConfig,
+    ) {
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            match type_byte {
+                0x00 => {
+                    lines.push(format!("{}\"{}\"", indent_str, key));
+                    lines.push(format!("{}{{", indent_str));
+                    Self::parse_vdf_section(cursor, string_table, lines, indent + 1, config);
+                    lines.push(format!("{}}}", indent_str));
+                }
+                0x01 => {
+                    let value = Self::read_null_string(cursor);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                }
+                0x02 => {
+                    let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    if key == "quota" {
+                        config.quota = value as u64;
+                    } else if key == "maxnumfiles" {
+                        config.maxnumfiles = value as u32;
+                    }
+                }
+                0x07 => {
+                    let value = cursor.read_u64::<LittleEndian>().unwrap_or(0);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                }
+                _ => {
+                    tracing::debug!("未知 VDF 类型: 0x{:02x}, key={}", type_byte, key);
+                }
+            }
+        }
+    }
+
+    // 读取 null 结尾的字符串
+    fn read_null_string(cursor: &mut Cursor<&[u8]>) -> String {
+        let mut bytes = Vec::new();
+        loop {
+            match cursor.read_u8() {
+                Ok(0) => break,
+                Ok(b) => bytes.push(b),
+                Err(_) => break,
+            }
+        }
+        String::from_utf8(bytes).unwrap_or_default()
+    }
+
+    // 查找字节模式
+    fn find_pattern(data: &[u8], pattern: &[u8]) -> Option<usize> {
+        data.windows(pattern.len()).position(|w| w == pattern)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_ufs_config() {
+        // 测试需要 Steam 安装，跳过 CI
+        let parser = match VdfParser::new() {
+            Ok(p) => p,
+            Err(e) => {
+                println!("Steam not installed, skipping test: {}", e);
+                return;
+            }
+        };
+
+        // 测试多个游戏
+        let test_apps = [
+            (730, "CS2"),
+            (570, "Dota 2"),
+            (440, "TF2"),
+            (292030, "The Witcher 3"),
+            (337340, "Finding Paradise"),
+        ];
+
+        for (app_id, name) in test_apps {
+            match parser.get_ufs_config(app_id) {
+                Ok(config) => {
+                    println!("\n=== {} ({}) ===", name, app_id);
+                    println!("quota={}, maxnumfiles={}", config.quota, config.maxnumfiles);
+                    println!("{}", config.raw_text);
+                }
+                Err(_) => {
+                    println!("\n=== {} ({}) === Not installed", name, app_id);
+                }
+            }
+        }
     }
 }

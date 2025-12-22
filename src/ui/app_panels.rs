@@ -129,7 +129,7 @@ pub fn render_top_panel(
     event
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BottomPanelEvent {
     None,
     SelectAll,
@@ -141,6 +141,7 @@ pub enum BottomPanelEvent {
     Forget,
     ToggleCloud,
     CompareFiles,
+    ShowAppInfo(u32),
 }
 
 // 底部面板渲染
@@ -214,6 +215,8 @@ pub fn render_bottom_panel(
         (None, None)
     };
 
+    let app_id = connection.app_id_input.parse::<u32>().unwrap_or(0);
+
     let state = crate::ui::StatusPanelState {
         status_message: misc.status_message.clone(),
         cloud_enabled,
@@ -222,14 +225,19 @@ pub fn render_bottom_panel(
         account_enabled,
         app_enabled,
         quota_info: misc.quota_info,
+        app_id,
     };
 
     let action = crate::ui::draw_complete_status_panel(ui, &state, &misc.i18n);
 
-    if matches!(action, crate::ui::StatusPanelAction::ToggleCloudEnabled)
-        && event == BottomPanelEvent::None
-    {
-        event = BottomPanelEvent::ToggleCloud;
+    match action {
+        crate::ui::StatusPanelAction::ToggleCloudEnabled if event == BottomPanelEvent::None => {
+            event = BottomPanelEvent::ToggleCloud;
+        }
+        crate::ui::StatusPanelAction::ShowAppInfo(id) if event == BottomPanelEvent::None => {
+            event = BottomPanelEvent::ShowAppInfo(id);
+        }
+        _ => {}
     }
 
     event

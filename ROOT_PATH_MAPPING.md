@@ -1,16 +1,86 @@
 # Steam Cloud Root 路径映射表
 
-> **⚠️ 重要说明**  
-> 此映射表需要社区验证，欢迎通过 Issue 或 PR 提交日志来完善。
+> **📋 数据来源**  
+> 此映射表通过 **appinfo.vdf (ufs)** 和 **运行日志** 验证。
 
 ---
 
 ## 数据来源说明
 
-| 来源 | 包含信息 | 示例 |
-|------|----------|------|
-| **VDF** | `root` 数字 (0-12) | `VDF root=7` |
-| **CDP** | 文件夹名称字符串 | `CDP folder=MacAppSupport` |
+### 1. appinfo.vdf (ufs 配置)
+
+Steam 在本地缓存了每个游戏的云存储配置，位于：
+```
+{Steam安装目录}/appcache/appinfo.vdf
+```
+
+**查看方法**：
+1. 在 SteamCloudFileManager 中连接到游戏
+2. 点击状态栏的 **"显示 appinfo.vdf"** 按钮
+
+**ufs 配置示例** (The Witcher 3)：
+```vdf
+"ufs"
+{
+    "quota" "1000000000"
+    "maxnumfiles" "1000"
+    "savefiles"
+    {
+        "0"
+        {
+            "root" "WinMyDocuments"      // ← 字符串形式
+            "path" "/The Witcher 3/gamesaves/"
+            "pattern" "*"
+            "platforms"
+            {
+                "1" "Windows"
+            }
+        }
+    }
+}
+```
+
+> ⚠️ **注意**：appinfo.vdf 中的 `root` 是**字符串名称**（如 "WinMyDocuments"），需要与日志中的数字对照。
+
+### 2. 运行日志 (root 数字)
+
+运行程序时，日志会显示 root 的**数字编号**：
+
+```log
+[文件名] | VDF root=2 | CDP folder=WinMyDocuments | [大小] | [时间] | [本地路径]
+```
+
+**日志示例**：
+```
+The Witcher 3/gamesaves/save.sav | VDF root=2 | CDP folder=WinMyDocuments | 3.02 MB
+freebirdgames/findingparadise/Save4.rxdata | VDF root=7 | CDP folder=MacAppSupport | 316 KB
+```
+
+### 3. 数据来源对照表
+
+| 来源 | root 格式 | 示例 |
+|------|-----------|------|
+| **appinfo.vdf (ufs)** | 字符串名称 | `"root" "WinMyDocuments"` |
+| **remotecache.vdf** | 数字 | `"root" "2"` |
+| **运行日志** | 数字 + 名称 | `VDF root=2 \| CDP folder=WinMyDocuments` |
+
+### 4. 字符串名称与数字对照
+
+| 数字 | 字符串名称 | 说明 |
+|:----:|------------|------|
+| 0 | `SteamCloudDocuments` | Steam Cloud 默认 |
+| 1 | `GameInstall` | 游戏安装目录 |
+| 2 | `WinMyDocuments` | 文档 |
+| 3 | `WinAppDataRoaming` | AppData/Roaming |
+| 4 | `WinAppDataLocal` | AppData/Local |
+| 5 | `WinPictures` | 图片 |
+| 6 | `WinMusic` | 音乐 |
+| 7 | `MacAppSupport` / `WinVideos` | macOS: Application Support |
+| 8 | `LinuxXdgDataHome` | Linux: ~/.local/share |
+| 9 | `WinSavedGames` | Saved Games |
+| 10 | `WinDownloads` | 下载 |
+| 11 | `WinPublic` | Public |
+| 12 | `WinAppDataLocalLow` | AppData/LocalLow |
 
 ---
 
@@ -408,29 +478,42 @@
 
 ## 如何贡献验证数据
 
-### 1. 获取日志
+### 1. 获取验证数据
 
-运行 SteamCloudFileManager，选择游戏后复制日志：
+**方法 A - ufs 配置**：
+1. 运行 SteamCloudFileManager，连接到游戏
+2. 点击 **"显示 appinfo.vdf"** 按钮
+3. 复制 ufs 配置中的 `savefiles` 部分
 
-```
-========== 文件详情列表 (N 个文件) ==========
-格式: [序号] 文件名 | VDF root=数字 | CDP folder=名称 | 大小 | 时间 | 本地存在 | 同步 | 本地路径
-[  1] xxx.xxx | VDF root=X | CDP folder=XXX | X KB | XXXX-XX-XX XX:XX:XX | ✓ | 已同步 | /path/to/file
-========== 文件列表结束 ==========
-```
+**方法 B - 运行日志**：
+1. 运行程序 `RUST_LOG=info cargo run`
+2. 连接到游戏后查看日志输出
+3. 复制包含 `VDF root=X | CDP folder=XXX` 的行
 
 ### 2. 提交格式
 
-在对应的 Root 和平台下的 `\`\`\`日志` 代码块中填入：
+在对应的 Root 下添加验证案例（包含 ufs 和日志）：
 
-```日志
-<!-- 游戏: 游戏名称 | App ID: 123456 -->
-[  1] save.dat | VDF root=7 | CDP folder=MacAppSupport | 2 KB | 2025-12-07 21:05:30 | ✓ | 已同步 | ~/Library/Application Support/xxx/save.dat
+```
+游戏: The Witcher 3 | App ID: 292030 | 平台: Windows
+
+ufs 配置:
+"0"
+{
+    "root" "WinMyDocuments"
+    "path" "/The Witcher 3/gamesaves/"
+    "pattern" "*"
+}
+
+运行日志:
+The Witcher 3/gamesaves/save.sav | VDF root=2 | CDP folder=WinMyDocuments | 3.02 MB
+
+实际路径: C:\Users\XXX\Documents\The Witcher 3\gamesaves\
 ```
 
 ### 3. 更新验证状态
 
-验证成功后，将对应平台的 `⚠️ 未测试` 改为 `✅ 已验证`
+验证成功后，将对应 Root 的 `⚠️` 改为 `✅`
 
 ---
 
@@ -441,5 +524,5 @@
 
 ---
 
-**最后更新**: 2025-12-19  
+**最后更新**: 2025-12-22  
 **维护者**: [@Fldicoahkiin](https://github.com/Fldicoahkiin)

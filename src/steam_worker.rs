@@ -16,7 +16,6 @@ pub enum WorkerRequest {
     Connect { app_id: u32 },
     Disconnect,
     GetFiles,
-    GetQuota,
     ReadFile { filename: String },
     WriteFile { filename: String, data: Vec<u8> },
     DeleteFile { filename: String },
@@ -292,11 +291,11 @@ impl SteamWorkerManager {
         })
     }
 
-    pub fn get_quota(&mut self) -> Result<(u64, u64)> {
-        self.request(&WorkerRequest::GetQuota, |r| match r {
-            WorkerResponse::Quota { total, available } => Ok((total, available)),
-            other => Err(anyhow!("意外响应: {:?}", other)),
-        })
+    // 计算当前已用空间
+    pub fn calculate_used_space(&mut self) -> Result<u64> {
+        let files = self.get_files()?;
+        let total_size: u64 = files.iter().map(|f| f.size).sum();
+        Ok(total_size)
     }
 
     pub fn read_file(&mut self, filename: &str) -> Result<Vec<u8>> {
@@ -470,13 +469,6 @@ fn handle_worker_request(
                     files: worker_files,
                 }
             }
-            Err(e) => WorkerResponse::Error {
-                message: e.to_string(),
-            },
-        },
-
-        WorkerRequest::GetQuota => match manager.get_quota() {
-            Ok((total, available)) => WorkerResponse::Quota { total, available },
             Err(e) => WorkerResponse::Error {
                 message: e.to_string(),
             },

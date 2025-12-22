@@ -101,10 +101,32 @@ impl AppHandlers {
         Ok(())
     }
 
-    pub fn update_quota(&self, misc: &mut MiscState) {
-        if let Ok(mut manager) = self.steam_manager.lock() {
-            if let Ok((total, available)) = manager.get_quota() {
+    // 从 appinfo.vdf 获取配额信息
+    pub fn update_quota(&self, misc: &mut MiscState, app_id: u32) {
+        if app_id == 0 {
+            misc.quota_info = None;
+            return;
+        }
+
+        // 仅从 appinfo.vdf 获取配额
+        let quota_result =
+            crate::vdf_parser::VdfParser::new().and_then(|parser| parser.get_ufs_config(app_id));
+
+        match quota_result {
+            Ok(config) if config.quota > 0 => {
+                let total = config.quota;
+                // 计算已用空间
+                let used = if let Ok(mut manager) = self.steam_manager.lock() {
+                    manager.calculate_used_space().unwrap_or(0)
+                } else {
+                    0
+                };
+                let available = total.saturating_sub(used);
                 misc.quota_info = Some((total, available));
+            }
+            _ => {
+                // appinfo.vdf 无配额数据时，不显示配额信息
+                misc.quota_info = None;
             }
         }
     }
@@ -366,9 +388,11 @@ impl AppHandlers {
                 let count = files.len();
                 file_list.files = files;
                 file_list.selected_files.clear();
-                self.update_quota(misc);
 
-                if let Ok(app_id) = connection.app_id_input.parse::<u32>() {
+                let app_id = connection.app_id_input.parse::<u32>().unwrap_or(0);
+                self.update_quota(misc, app_id);
+
+                if app_id > 0 {
                     let parser_data = self
                         .ensure_vdf_parser()
                         .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));

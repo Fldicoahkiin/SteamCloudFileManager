@@ -146,6 +146,24 @@ impl SteamCloudApp {
             .compare_files(&mut self.file_list, &mut self.dialogs, app_id);
     }
 
+    fn show_appinfo(&mut self, app_id: u32) {
+        match crate::vdf_parser::VdfParser::new() {
+            Ok(parser) => match parser.get_ufs_config(app_id) {
+                Ok(config) => {
+                    self.dialogs.appinfo_dialog =
+                        Some(crate::ui::AppInfoDialog::new(app_id, config));
+                }
+                Err(e) => {
+                    self.dialogs.show_error(&format!("无法获取 appinfo: {}", e));
+                }
+            },
+            Err(e) => {
+                self.dialogs
+                    .show_error(&format!("VDF 解析器初始化失败: {}", e));
+            }
+        }
+    }
+
     fn scan_cloud_games(&mut self) {
         self.handlers.scan_cloud_games(
             &mut self.game_library,
@@ -404,6 +422,9 @@ impl eframe::App for SteamCloudApp {
                     }
                 }
             }
+            crate::ui::BottomPanelEvent::ShowAppInfo(app_id) => {
+                self.show_appinfo(app_id);
+            }
             crate::ui::BottomPanelEvent::None => {}
         }
 
@@ -425,6 +446,13 @@ impl eframe::App for SteamCloudApp {
             )
         {
             self.dialogs.show_error = false;
+        }
+
+        // AppInfo 对话框
+        if let Some(ref dialog) = self.dialogs.appinfo_dialog.clone() {
+            if !crate::ui::draw_appinfo_dialog(ctx, dialog, &self.misc.i18n) {
+                self.dialogs.appinfo_dialog = None;
+            }
         }
 
         if self.game_library.show_game_selector {
