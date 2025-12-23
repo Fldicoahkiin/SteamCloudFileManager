@@ -417,10 +417,10 @@ impl UpdateManager {
     #[cfg(target_os = "windows")]
     fn install_windows(
         &self,
-        download_path: &PathBuf,
-        current_exe: &PathBuf,
+        download_path: &std::path::Path,
+        current_exe: &std::path::Path,
         exe_dir: &std::path::Path,
-        temp_extract_dir: &PathBuf,
+        temp_extract_dir: &std::path::Path,
     ) -> Result<()> {
         tracing::info!("开始安装 Windows 更新...");
 
@@ -551,10 +551,10 @@ impl UpdateManager {
     #[cfg(target_os = "linux")]
     fn install_linux(
         &self,
-        download_path: &PathBuf,
-        current_exe: &PathBuf,
+        download_path: &std::path::Path,
+        current_exe: &std::path::Path,
         exe_dir: &std::path::Path,
-        temp_extract_dir: &PathBuf,
+        temp_extract_dir: &std::path::Path,
     ) -> Result<()> {
         tracing::info!("开始安装 Linux 更新...");
 
