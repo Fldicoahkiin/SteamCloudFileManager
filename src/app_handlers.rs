@@ -4,6 +4,7 @@ use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
 use anyhow::{anyhow, Result as AnyhowResult};
 use chrono::TimeZone;
+use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -739,6 +740,126 @@ impl AppHandlers {
                 {
                     dialogs.guide_dialog = Some(crate::ui::create_linux_manual_guide(i18n));
                 }
+            }
+        }
+    }
+
+    pub fn start_download(
+        &self,
+        tasks: Vec<crate::downloader::DownloadTask>,
+        dialogs: &mut DialogState,
+        async_handlers: &mut AsyncHandlers,
+    ) {
+        let total_files = tasks.len();
+        dialogs.download_progress = Some(crate::ui::DownloadProgressDialog::new(total_files));
+
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let steam_manager = self.steam_manager.clone();
+
+        async_handlers.download_rx = Some(result_rx);
+        async_handlers.download_progress_rx = Some(progress_rx);
+        async_handlers.download_cancel = Some(cancel_flag.clone());
+
+        std::thread::spawn(move || {
+            let downloader = crate::downloader::BatchDownloader::new(tasks)
+                .with_cancel_flag(cancel_flag)
+                .with_progress_sender(progress_tx)
+                .with_steam_manager(steam_manager);
+
+            let result = downloader.execute();
+            let _ = result_tx.send(result);
+        });
+    }
+
+    pub fn start_backup(
+        &self,
+        app_id: u32,
+        game_name: String,
+        files: Vec<crate::steam_api::CloudFile>,
+        dialogs: &mut DialogState,
+        async_handlers: &mut AsyncHandlers,
+    ) {
+        dialogs.backup_progress = Some(crate::ui::BackupProgressDialog::new(files.len()));
+
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
+        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+
+        async_handlers.backup_rx = Some(result_rx);
+        async_handlers.backup_progress_rx = Some(progress_rx);
+        async_handlers.backup_cancel = Some(cancel_flag.clone());
+
+        std::thread::spawn(move || {
+            let result = match crate::backup::BackupManager::new() {
+                Ok(manager) => {
+                    manager.create_backup(app_id, &game_name, &files, cancel_flag, |progress| {
+                        let _ = progress_tx.send(progress.clone());
+                    })
+                }
+                Err(e) => Err(e),
+            };
+
+            match result {
+                Ok(backup_result) => {
+                    let _ = result_tx.send(backup_result);
+                }
+                Err(e) => {
+                    let _ = result_tx.send(crate::backup::BackupResult {
+                        success: false,
+                        backup_path: std::path::PathBuf::new(),
+                        total_files: files.len(),
+                        success_count: 0,
+                        failed_files: vec![("backup".to_string(), e.to_string())],
+                    });
+                }
+            }
+        });
+    }
+
+    pub fn start_restart_steam(&self, ctx: &egui::Context, async_handlers: &mut AsyncHandlers) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        async_handlers.restart_rx = Some(rx);
+        let ctx_clone = ctx.clone();
+        std::thread::spawn(move || {
+            crate::steam_process::restart_steam_with_status(tx, move || {
+                ctx_clone.request_repaint();
+            });
+        });
+    }
+
+    pub fn handle_update_download_result(
+        &self,
+        result: Result<std::path::PathBuf, String>,
+        update_manager: &mut crate::update::UpdateManager,
+    ) {
+        match result {
+            Ok(download_path) => {
+                tracing::info!("下载完成: {}", download_path.display());
+
+                #[cfg(target_os = "macos")]
+                {
+                    if let Err(e) = std::process::Command::new("open")
+                        .arg("-R")
+                        .arg(&download_path)
+                        .spawn()
+                    {
+                        tracing::error!("无法打开 Finder: {}", e);
+                    }
+                    update_manager.reset();
+                }
+
+                #[cfg(not(target_os = "macos"))]
+                {
+                    if let Err(e) = update_manager.install_downloaded_update(&download_path) {
+                        update_manager.set_error(format!("安装失败: {}\n\n请手动下载更新", e));
+                    }
+                }
+            }
+            Err(err) => {
+                tracing::error!("下载失败: {}", err);
+                update_manager.set_error(format!("下载失败: {}\n\n请手动下载更新", err));
             }
         }
     }

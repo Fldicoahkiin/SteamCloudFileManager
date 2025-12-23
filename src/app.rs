@@ -108,7 +108,8 @@ impl SteamCloudApp {
             self.handlers
                 .prepare_download(&self.file_list, &mut self.dialogs, &self.misc.i18n)
         {
-            self.start_download(tasks);
+            self.handlers
+                .start_download(tasks, &mut self.dialogs, &mut self.async_handlers);
         }
     }
 
@@ -241,15 +242,116 @@ impl SteamCloudApp {
             }
         }
     }
-}
 
-impl eframe::App for SteamCloudApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        // 动态更新窗口标题
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(
-            self.misc.i18n.app_title().to_string(),
-        ));
+    fn poll_async_results(&mut self) {
+        // 连接结果
+        if let Some(result) = self.async_handlers.poll_connect() {
+            if self.handlers.handle_connect_result(
+                result,
+                &mut self.connection,
+                &mut self.misc,
+                &mut self.dialogs,
+            ) {
+                self.refresh_files();
+            }
+        }
 
+        // 文件加载结果
+        if let Some(result) = self.async_handlers.poll_loader() {
+            self.handlers.handle_loader_result(
+                result,
+                &mut self.connection,
+                &mut self.file_list,
+                &mut self.misc,
+                &mut self.dialogs,
+            );
+        }
+
+        // 游戏扫描结果
+        if let Some(result) = self.async_handlers.poll_scan_games() {
+            self.handlers.handle_scan_games_result(
+                result,
+                &mut self.game_library,
+                &mut self.misc,
+                &mut self.dialogs,
+            );
+        }
+
+        // 上传进度
+        if let Some(progress_data) = self.async_handlers.poll_upload_progress() {
+            self.handlers
+                .handle_upload_progress(progress_data, &mut self.dialogs);
+        }
+
+        // 上传结果
+        if let Some(result) = self.async_handlers.poll_upload_result() {
+            self.handlers
+                .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
+        }
+
+        // Hash 检测结果
+        self.handlers
+            .poll_hash_results(&mut self.file_list, &mut self.dialogs);
+
+        // 更新下载进度
+        self.update_manager.poll_progress();
+
+        // 更新下载结果
+        if let Some(result) = self.async_handlers.poll_update_download() {
+            self.handlers
+                .handle_update_download_result(result, &mut self.update_manager);
+        }
+
+        // 备份进度
+        if let Some(ref rx) = self.async_handlers.backup_progress_rx {
+            while let Ok(progress) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.backup_progress {
+                    dialog.progress = progress;
+                }
+            }
+        }
+
+        // 备份结果
+        if let Some(ref rx) = self.async_handlers.backup_rx {
+            if let Ok(result) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.backup_progress {
+                    dialog.set_result(result);
+                }
+                self.async_handlers.backup_rx = None;
+                self.async_handlers.backup_progress_rx = None;
+            }
+        }
+
+        // 下载进度
+        if let Some(ref rx) = self.async_handlers.download_progress_rx {
+            while let Ok(progress) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.download_progress {
+                    dialog.progress = progress;
+                }
+            }
+        }
+
+        // 下载结果
+        if let Some(ref rx) = self.async_handlers.download_rx {
+            if let Ok(result) = rx.try_recv() {
+                if let Some(ref mut dialog) = self.dialogs.download_progress {
+                    dialog.set_result(result);
+                }
+                self.async_handlers.download_rx = None;
+                self.async_handlers.download_progress_rx = None;
+            }
+        }
+
+        // Steam 重启状态
+        if let Some(status) = self.async_handlers.poll_restart() {
+            self.handlers
+                .handle_restart_status(status, &mut self.dialogs, &self.misc.i18n);
+        }
+    }
+
+    // ========== Steam 连接状态检查 ==========
+
+    fn check_steam_connection(&mut self) {
         if self.connection.is_connected {
             if let Ok(manager) = self.steam_manager.try_lock() {
                 manager.run_callbacks();
@@ -268,93 +370,21 @@ impl eframe::App for SteamCloudApp {
                 }
             }
         }
+    }
+}
 
-        if let Some(result) = self.async_handlers.poll_connect() {
-            if self.handlers.handle_connect_result(
-                result,
-                &mut self.connection,
-                &mut self.misc,
-                &mut self.dialogs,
-            ) {
-                self.refresh_files();
-            }
-        }
+impl eframe::App for SteamCloudApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // 动态更新窗口标题
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(
+            self.misc.i18n.app_title().to_string(),
+        ));
 
-        if let Some(result) = self.async_handlers.poll_loader() {
-            self.handlers.handle_loader_result(
-                result,
-                &mut self.connection,
-                &mut self.file_list,
-                &mut self.misc,
-                &mut self.dialogs,
-            );
-        }
+        // Steam 连接状态检查
+        self.check_steam_connection();
 
-        if let Some(result) = self.async_handlers.poll_scan_games() {
-            self.handlers.handle_scan_games_result(
-                result,
-                &mut self.game_library,
-                &mut self.misc,
-                &mut self.dialogs,
-            );
-        }
-
-        if let Some(progress_data) = self.async_handlers.poll_upload_progress() {
-            self.handlers
-                .handle_upload_progress(progress_data, &mut self.dialogs);
-        }
-
-        if let Some(result) = self.async_handlers.poll_upload_result() {
-            self.handlers
-                .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
-        }
-
-        // 轮询 Hash 检测结果并更新对比窗口
-        self.handlers
-            .poll_hash_results(&mut self.file_list, &mut self.dialogs);
-
-        // 轮询更新下载进度
-        self.update_manager.poll_progress();
-
-        // 处理更新下载结果
-        if let Some(result) = self.async_handlers.poll_update_download() {
-            match result {
-                Ok(download_path) => {
-                    tracing::info!("下载完成: {}", download_path.display());
-
-                    // macOS: 打开 Finder 显示文件
-                    #[cfg(target_os = "macos")]
-                    {
-                        if let Err(e) = std::process::Command::new("open")
-                            .arg("-R")
-                            .arg(&download_path)
-                            .spawn()
-                        {
-                            tracing::error!("无法打开 Finder: {}", e);
-                        }
-                        // macOS 下载完成后重置为 Idle 状态
-                        self.update_manager.reset();
-                    }
-
-                    // Windows/Linux: 自动安装
-                    #[cfg(not(target_os = "macos"))]
-                    {
-                        if let Err(e) = self
-                            .update_manager
-                            .install_downloaded_update(&download_path)
-                        {
-                            self.update_manager
-                                .set_error(format!("安装失败: {}\n\n请手动下载更新", e));
-                        }
-                    }
-                }
-                Err(err) => {
-                    tracing::error!("下载失败: {}", err);
-                    self.update_manager
-                        .set_error(format!("下载失败: {}\n\n请手动下载更新", err));
-                }
-            }
-        }
+        // 轮询所有异步结果
+        self.poll_async_results();
 
         // 渲染顶部面板
         let top_event = egui::TopBottomPanel::top("top_panel")
@@ -378,14 +408,8 @@ impl eframe::App for SteamCloudApp {
             crate::ui::TopPanelEvent::Disconnect => self.disconnect_from_steam(),
             crate::ui::TopPanelEvent::Refresh => self.open_cloud_url(),
             crate::ui::TopPanelEvent::Restart => {
-                let (tx, rx) = std::sync::mpsc::channel();
-                self.async_handlers.restart_rx = Some(rx);
-                let ctx_clone = ctx.clone();
-                std::thread::spawn(move || {
-                    crate::steam_process::restart_steam_with_status(tx, move || {
-                        ctx_clone.request_repaint();
-                    });
-                });
+                self.handlers
+                    .start_restart_steam(ctx, &mut self.async_handlers);
             }
             crate::ui::TopPanelEvent::None => {}
         }
@@ -484,11 +508,6 @@ impl eframe::App for SteamCloudApp {
                 tracing::info!("用户点击刷新游戏库");
                 self.scan_cloud_games();
             }
-        }
-
-        if let Some(status) = self.async_handlers.poll_restart() {
-            self.handlers
-                .handle_restart_status(status, &mut self.dialogs, &self.misc.i18n);
         }
 
         // 绘制引导对话框
@@ -647,7 +666,13 @@ impl eframe::App for SteamCloudApp {
                     self.dialogs.backup_preview = None;
 
                     // 启动备份任务
-                    self.start_backup(app_id, game_name, files);
+                    self.handlers.start_backup(
+                        app_id,
+                        game_name,
+                        files,
+                        &mut self.dialogs,
+                        &mut self.async_handlers,
+                    );
                 }
                 crate::ui::BackupAction::Cancel => {
                     self.dialogs.backup_preview = None;
@@ -658,15 +683,6 @@ impl eframe::App for SteamCloudApp {
                     }
                 }
                 crate::ui::BackupAction::None => {}
-            }
-        }
-
-        // 处理备份进度更新
-        if let Some(ref rx) = self.async_handlers.backup_progress_rx {
-            while let Ok(progress) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.backup_progress {
-                    dialog.progress = progress;
-                }
             }
         }
 
@@ -685,26 +701,6 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        // 处理备份结果
-        if let Some(ref rx) = self.async_handlers.backup_rx {
-            if let Ok(result) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.backup_progress {
-                    dialog.set_result(result);
-                }
-                self.async_handlers.backup_rx = None;
-                self.async_handlers.backup_progress_rx = None;
-            }
-        }
-
-        // 处理下载进度更新
-        if let Some(ref rx) = self.async_handlers.download_progress_rx {
-            while let Ok(progress) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.download_progress {
-                    dialog.progress = progress;
-                }
-            }
-        }
-
         // 绘制下载进度对话框
         if let Some(ref mut progress_dialog) = self.dialogs.download_progress {
             match progress_dialog.draw(ctx, &self.misc.i18n) {
@@ -720,86 +716,6 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        // 处理下载结果
-        if let Some(ref rx) = self.async_handlers.download_rx {
-            if let Ok(result) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.download_progress {
-                    dialog.set_result(result);
-                }
-                self.async_handlers.download_rx = None;
-                self.async_handlers.download_progress_rx = None;
-            }
-        }
-
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
-    }
-}
-
-impl SteamCloudApp {
-    fn start_download(&mut self, tasks: Vec<crate::downloader::DownloadTask>) {
-        let total_files = tasks.len();
-        self.dialogs.download_progress = Some(crate::ui::DownloadProgressDialog::new(total_files));
-
-        let (result_tx, result_rx) = std::sync::mpsc::channel();
-        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
-        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let steam_manager = self.handlers.steam_manager.clone();
-
-        self.async_handlers.download_rx = Some(result_rx);
-        self.async_handlers.download_progress_rx = Some(progress_rx);
-        self.async_handlers.download_cancel = Some(cancel_flag.clone());
-
-        std::thread::spawn(move || {
-            let downloader = crate::downloader::BatchDownloader::new(tasks)
-                .with_cancel_flag(cancel_flag)
-                .with_progress_sender(progress_tx)
-                .with_steam_manager(steam_manager);
-
-            let result = downloader.execute();
-            let _ = result_tx.send(result);
-        });
-    }
-
-    fn start_backup(
-        &mut self,
-        app_id: u32,
-        game_name: String,
-        files: Vec<crate::steam_api::CloudFile>,
-    ) {
-        self.dialogs.backup_progress = Some(crate::ui::BackupProgressDialog::new(files.len()));
-
-        let (result_tx, result_rx) = std::sync::mpsc::channel();
-        let (progress_tx, progress_rx) = std::sync::mpsc::channel();
-        let cancel_flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
-
-        self.async_handlers.backup_rx = Some(result_rx);
-        self.async_handlers.backup_progress_rx = Some(progress_rx);
-        self.async_handlers.backup_cancel = Some(cancel_flag.clone());
-
-        std::thread::spawn(move || {
-            let result = match crate::backup::BackupManager::new() {
-                Ok(manager) => {
-                    manager.create_backup(app_id, &game_name, &files, cancel_flag, |progress| {
-                        let _ = progress_tx.send(progress.clone());
-                    })
-                }
-                Err(e) => Err(e),
-            };
-
-            match result {
-                Ok(backup_result) => {
-                    let _ = result_tx.send(backup_result);
-                }
-                Err(e) => {
-                    let _ = result_tx.send(crate::backup::BackupResult {
-                        success: false,
-                        backup_path: std::path::PathBuf::new(),
-                        total_files: files.len(),
-                        success_count: 0,
-                        failed_files: vec![("backup".to_string(), e.to_string())],
-                    });
-                }
-            }
-        });
     }
 }
