@@ -373,14 +373,6 @@ fn draw_about_content(
 
         let mut should_open_page = false;
 
-        #[cfg(target_os = "macos")]
-        ui.label(
-            egui::RichText::new(i18n.new_version_macos_hint())
-                .size(11.0)
-                .color(text_subtle),
-        );
-
-        #[cfg(not(target_os = "macos"))]
         ui.label(
             egui::RichText::new(i18n.new_version_hint())
                 .size(11.0)
@@ -390,10 +382,6 @@ fn draw_about_content(
         ui.add_space(8.0);
 
         ui.horizontal(|ui| {
-            #[cfg(target_os = "macos")]
-            let button_text = i18n.download_package();
-
-            #[cfg(not(target_os = "macos"))]
             let button_text = i18n.download_and_install();
 
             if ui.button(button_text).clicked() {
@@ -420,7 +408,6 @@ fn draw_about_content(
             );
             ui.add(egui::ProgressBar::new(*progress).show_percentage());
         }
-        #[cfg(not(target_os = "macos"))]
         crate::update::UpdateStatus::Installing => {
             ui.add_space(12.0);
             ui.label(
@@ -429,7 +416,6 @@ fn draw_about_content(
                     .color(steam_blue),
             );
         }
-        #[cfg(not(target_os = "macos"))]
         crate::update::UpdateStatus::Success => {
             ui.add_space(12.0);
             ui.label(

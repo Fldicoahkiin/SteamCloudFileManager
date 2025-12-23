@@ -39,9 +39,7 @@ pub enum UpdateStatus {
     Available(ReleaseInfo),
     NoUpdate,
     Downloading(f32), // 下载进度 0.0-1.0
-    #[cfg(not(target_os = "macos"))]
     Installing,
-    #[cfg(not(target_os = "macos"))]
     Success,
     Error(String),
 }
@@ -317,9 +315,8 @@ impl UpdateManager {
         Ok(download_path)
     }
 
-    // 安装已下载的更新 (Windows/Linux 下使用)
-    #[cfg(not(target_os = "macos"))]
-    pub fn install_downloaded_update(&mut self, download_path: &PathBuf) -> Result<()> {
+    // 安装已下载的更新
+    pub fn install_downloaded_update(&mut self, download_path: &std::path::Path) -> Result<()> {
         self.status = UpdateStatus::Installing;
         self.install_update(download_path)?;
         self.status = UpdateStatus::Success;
@@ -332,6 +329,7 @@ impl UpdateManager {
         let platform = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
 
+        // macOS 自动更新使用 tar.gz，手动下载使用 dmg
         let pattern = match (platform, arch) {
             ("macos", "x86_64") => "macos-x86_64",
             ("macos", "aarch64") => "macos-aarch64",
@@ -340,9 +338,16 @@ impl UpdateManager {
             _ => return Err(anyhow!("不支持的平台: {} ({})", platform, arch)),
         };
 
+        // macOS 优先选择 tar.gz（自动更新用），Windows 选择 zip，Linux 选择 tar.gz
+        let extension = if platform == "macos" || platform == "linux" {
+            ".tar.gz"
+        } else {
+            ".zip"
+        };
+
         assets
             .iter()
-            .find(|a| a.name.contains(pattern))
+            .find(|a| a.name.contains(pattern) && a.name.ends_with(extension))
             .cloned()
             .ok_or_else(|| anyhow!("未找到适合当前平台的安装包"))
     }
@@ -376,175 +381,226 @@ impl UpdateManager {
         Ok(update_dir)
     }
 
-    // 安装更新 (Windows/Linux 下使用)
-    #[cfg(not(target_os = "macos"))]
-    fn install_update(&self, download_path: &PathBuf) -> Result<()> {
-        #[cfg(target_os = "macos")]
-        {
-            // macOS: DMG 需要手动安装，打开 Finder 显示文件
-            tracing::info!("macOS 更新已下载到: {}", download_path.display());
-            tracing::info!("请手动打开 DMG 文件并拖拽应用到 Applications 文件夹");
+    // 安装更新
+    fn install_update(&self, download_path: &std::path::Path) -> Result<()> {
+        let current_exe = std::env::current_exe()?;
+        let exe_dir = current_exe
+            .parent()
+            .ok_or_else(|| anyhow!("无法获取程序目录"))?;
+        let temp_extract_dir = exe_dir.join("update_temp");
 
-            // 打开 Finder 显示下载的 DMG
-            if let Err(e) = std::process::Command::new("open")
-                .arg("-R")
-                .arg(download_path)
-                .spawn()
-            {
-                tracing::error!("无法打开 Finder: {}", e);
-            }
-
-            Err(anyhow!("macOS 需要手动安装 DMG 文件"))
+        // 创建临时解压目录
+        if temp_extract_dir.exists() {
+            fs::remove_dir_all(&temp_extract_dir)?;
         }
+        fs::create_dir_all(&temp_extract_dir)?;
 
         #[cfg(target_os = "windows")]
         {
-            // Windows: 使用批处理脚本延迟替换 exe
-            tracing::info!("开始安装 Windows 更新...");
+            self.install_windows(download_path, &current_exe, exe_dir, &temp_extract_dir)?;
+        }
 
-            let current_exe = std::env::current_exe()?;
-            let exe_dir = current_exe
-                .parent()
-                .ok_or_else(|| anyhow!("无法获取程序目录"))?;
-            let temp_extract_dir = exe_dir.join("update_temp");
-            let update_script = exe_dir.join("update.bat");
-
-            // 创建临时解压目录
-            if temp_extract_dir.exists() {
-                fs::remove_dir_all(&temp_extract_dir)?;
-            }
-            fs::create_dir_all(&temp_extract_dir)?;
-
-            // 使用 PowerShell 解压 ZIP
-            tracing::info!("解压更新包...");
-            let output = std::process::Command::new("powershell")
-                .arg("-Command")
-                .arg(format!(
-                    "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
-                    download_path.display(),
-                    temp_extract_dir.display()
-                ))
-                .output()?;
-
-            if !output.status.success() {
-                return Err(anyhow!("解压 ZIP 失败"));
-            }
-
-            // 查找解压后的 exe 文件
-            let new_exe = temp_extract_dir.join("SteamCloudFileManager.exe");
-            if !new_exe.exists() {
-                return Err(anyhow!("未找到更新的程序文件"));
-            }
-
-            // 创建批处理脚本来延迟替换
-            let batch_content = format!(
-                concat!(
-                    "@echo off\n",
-                    "chcp 65001 >nul\n",
-                    "echo 正在更新 Steam Cloud File Manager...\n",
-                    "echo.\n",
-                    "echo 等待程序退出...\n",
-                    "timeout /t 2 /nobreak >nul\n",
-                    ":wait_loop\n",
-                    "tasklist /FI \"IMAGENAME eq SteamCloudFileManager.exe\" 2>NUL | find /I /N \"SteamCloudFileManager.exe\">NUL\n",
-                    "if \"%ERRORLEVEL%\"==\"0\" (\n",
-                    "    timeout /t 1 /nobreak >nul\n",
-                    "    goto wait_loop\n",
-                    ")\n",
-                    "echo 程序已退出，开始更新...\n",
-                    "copy /Y \"{}\" \"{}\"\n",
-                    "if errorlevel 1 (\n",
-                    "    echo 更新失败！请手动替换程序文件。\n",
-                    "    pause\n",
-                    "    exit /b 1\n",
-                    ")\n",
-                    "echo 更新完成！正在启动程序...\n",
-                    "rmdir /S /Q \"{}\"\n",
-                    "del \"{}\"\n",
-                    "start \"\" /B \"{}\"\n",
-                    "del \"%~f0\"\n",
-                ),
-                new_exe.display(),
-                current_exe.display(),
-                temp_extract_dir.display(),
-                download_path.display(),
-                current_exe.display()
-            );
-
-            fs::write(&update_script, batch_content)?;
-            tracing::info!("创建更新脚本: {}", update_script.display());
-
-            // 启动批处理脚本并退出当前程序
-            tracing::info!("启动更新脚本并退出程序...");
-            std::process::Command::new("cmd")
-                .args(["/C", "start", "", "/MIN", &update_script.to_string_lossy()])
-                .spawn()?;
-
-            // 退出当前程序
-            std::process::exit(0);
+        #[cfg(target_os = "macos")]
+        {
+            self.install_macos(download_path, &current_exe, &temp_extract_dir)?;
         }
 
         #[cfg(target_os = "linux")]
         {
-            // Linux: 使用系统命令解压 tar.gz 并替换二进制
-            tracing::info!("开始安装 Linux 更新...");
-
-            let current_exe = std::env::current_exe()?;
-            let exe_dir = current_exe
-                .parent()
-                .ok_or_else(|| anyhow!("无法获取程序目录"))?;
-            let backup_path = current_exe.with_extension("bak");
-            let temp_extract_dir = exe_dir.join("update_temp");
-
-            // 备份当前程序
-            if current_exe.exists() {
-                tracing::info!("备份当前程序到: {}", backup_path.display());
-                fs::copy(&current_exe, &backup_path)?;
-            }
-
-            // 创建临时解压目录
-            if temp_extract_dir.exists() {
-                fs::remove_dir_all(&temp_extract_dir)?;
-            }
-            fs::create_dir_all(&temp_extract_dir)?;
-
-            // 使用 tar 命令解压
-            let output = std::process::Command::new("tar")
-                .arg("-xzf")
-                .arg(download_path)
-                .arg("-C")
-                .arg(&temp_extract_dir)
-                .output()?;
-
-            if !output.status.success() {
-                return Err(anyhow!("解压 tar.gz 失败"));
-            }
-
-            // 查找解压后的二进制文件
-            let new_exe = temp_extract_dir.join("steam-cloud-file-manager");
-            if !new_exe.exists() {
-                return Err(anyhow!("未找到更新的程序文件"));
-            }
-
-            // 设置执行权限
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let mut perms = fs::metadata(&new_exe)?.permissions();
-                perms.set_mode(0o755);
-                fs::set_permissions(&new_exe, perms)?;
-            }
-
-            // 替换程序
-            fs::copy(&new_exe, &current_exe)?;
-
-            // 清理临时文件
-            let _ = fs::remove_dir_all(&temp_extract_dir);
-            let _ = fs::remove_file(download_path);
-
-            tracing::info!("更新安装完成");
-            Ok(())
+            self.install_linux(download_path, &current_exe, exe_dir, &temp_extract_dir)?;
         }
+
+        Ok(())
+    }
+
+    // Windows 安装逻辑
+    #[cfg(target_os = "windows")]
+    fn install_windows(
+        &self,
+        download_path: &PathBuf,
+        current_exe: &PathBuf,
+        exe_dir: &std::path::Path,
+        temp_extract_dir: &PathBuf,
+    ) -> Result<()> {
+        tracing::info!("开始安装 Windows 更新...");
+
+        // 使用 self_update 的 Extract 功能解压 ZIP
+        tracing::info!("解压更新包...");
+        self_update::Extract::from_source(download_path)
+            .extract_into(temp_extract_dir)
+            .map_err(|e| anyhow!("解压 ZIP 失败: {}", e))?;
+
+        // 查找解压后的文件
+        let new_exe = temp_extract_dir.join("SteamCloudFileManager.exe");
+        if !new_exe.exists() {
+            return Err(anyhow!("未找到更新的程序文件"));
+        }
+
+        // 查找 DLL
+        let new_dll = temp_extract_dir.join("steam_api64.dll");
+        let current_dll = exe_dir.join("steam_api64.dll");
+
+        let update_script = exe_dir.join("update.ps1");
+
+        // 使用模板脚本并替换占位符
+        let ps_content = include_str!("scripts/update_windows.ps1")
+            .replace("{{NEW_EXE}}", &new_exe.display().to_string())
+            .replace("{{CURRENT_EXE}}", &current_exe.display().to_string())
+            .replace("{{NEW_DLL}}", &new_dll.display().to_string())
+            .replace("{{CURRENT_DLL}}", &current_dll.display().to_string())
+            .replace("{{TEMP_DIR}}", &temp_extract_dir.display().to_string())
+            .replace("{{DOWNLOAD_PATH}}", &download_path.display().to_string());
+
+        // 写入 PowerShell 脚本（使用 UTF-8 with BOM）
+        let bom = [0xEF, 0xBB, 0xBF];
+        let mut content_with_bom = Vec::new();
+        content_with_bom.extend_from_slice(&bom);
+        content_with_bom.extend_from_slice(ps_content.as_bytes());
+        fs::write(&update_script, content_with_bom)?;
+
+        tracing::info!("创建更新脚本: {}", update_script.display());
+
+        // 启动 PowerShell 脚本并退出当前程序
+        tracing::info!("启动更新脚本并退出程序...");
+        std::process::Command::new("powershell")
+            .args([
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Normal",
+                "-File",
+                &update_script.to_string_lossy(),
+            ])
+            .spawn()?;
+
+        // 退出当前程序
+        std::process::exit(0);
+    }
+
+    // macOS 安装逻辑
+    #[cfg(target_os = "macos")]
+    fn install_macos(
+        &self,
+        download_path: &std::path::Path,
+        current_exe: &std::path::Path,
+        temp_extract_dir: &std::path::Path,
+    ) -> Result<()> {
+        tracing::info!("开始安装 macOS 更新...");
+
+        // 使用 self_update 解压 tar.gz
+        tracing::info!("解压更新包...");
+        self_update::Extract::from_source(download_path)
+            .extract_into(temp_extract_dir)
+            .map_err(|e| anyhow!("解压 tar.gz 失败: {}", e))?;
+
+        // 查找解压后的 .app bundle
+        let entries: Vec<_> = fs::read_dir(temp_extract_dir)?
+            .filter_map(|e| e.ok())
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "app")
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        let new_app = entries
+            .first()
+            .map(|e| e.path())
+            .ok_or_else(|| anyhow!("未找到 .app bundle"))?;
+
+        // 获取当前 .app bundle 路径
+        // current_exe 是 .app/Contents/MacOS/SteamCloudFileManager
+        let current_app = current_exe
+            .parent() // MacOS
+            .and_then(|p| p.parent()) // Contents
+            .and_then(|p| p.parent()) // .app
+            .ok_or_else(|| anyhow!("无法获取 .app bundle 路径"))?;
+
+        tracing::info!("当前 App: {}", current_app.display());
+        tracing::info!("新 App: {}", new_app.display());
+
+        // 使用模板脚本并替换占位符
+        let update_script = temp_extract_dir.join("update.sh");
+        let sh_content = include_str!("scripts/update_macos.sh")
+            .replace("{{CURRENT_APP}}", &current_app.display().to_string())
+            .replace("{{NEW_APP}}", &new_app.display().to_string())
+            .replace("{{TEMP_DIR}}", &temp_extract_dir.display().to_string())
+            .replace("{{DOWNLOAD_PATH}}", &download_path.display().to_string());
+
+        fs::write(&update_script, sh_content)?;
+
+        // 设置执行权限
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&update_script)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&update_script, perms)?;
+        }
+
+        tracing::info!("启动更新脚本并退出程序...");
+        std::process::Command::new("bash")
+            .arg(&update_script)
+            .spawn()?;
+
+        std::process::exit(0);
+    }
+
+    // Linux 安装逻辑
+    #[cfg(target_os = "linux")]
+    fn install_linux(
+        &self,
+        download_path: &PathBuf,
+        current_exe: &PathBuf,
+        exe_dir: &std::path::Path,
+        temp_extract_dir: &PathBuf,
+    ) -> Result<()> {
+        tracing::info!("开始安装 Linux 更新...");
+
+        // 使用 self_update 解压 tar.gz
+        tracing::info!("解压更新包...");
+        self_update::Extract::from_source(download_path)
+            .extract_into(temp_extract_dir)
+            .map_err(|e| anyhow!("解压 tar.gz 失败: {}", e))?;
+
+        // 查找解压后的二进制文件
+        let new_exe = temp_extract_dir.join("steam-cloud-file-manager");
+        if !new_exe.exists() {
+            return Err(anyhow!("未找到更新的程序文件"));
+        }
+
+        // 查找 SO 文件
+        let new_so = temp_extract_dir.join("libsteam_api.so");
+        let current_so = exe_dir.join("libsteam_api.so");
+
+        // 使用模板脚本并替换占位符
+        let update_script = temp_extract_dir.join("update.sh");
+        let sh_content = include_str!("scripts/update_linux.sh")
+            .replace("{{NEW_EXE}}", &new_exe.display().to_string())
+            .replace("{{CURRENT_EXE}}", &current_exe.display().to_string())
+            .replace("{{NEW_SO}}", &new_so.display().to_string())
+            .replace("{{CURRENT_SO}}", &current_so.display().to_string())
+            .replace("{{TEMP_DIR}}", &temp_extract_dir.display().to_string())
+            .replace("{{DOWNLOAD_PATH}}", &download_path.display().to_string());
+
+        fs::write(&update_script, sh_content)?;
+
+        // 设置执行权限
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&update_script)?.permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&update_script, perms)?;
+        }
+
+        tracing::info!("启动更新脚本并退出程序...");
+        std::process::Command::new("bash")
+            .arg(&update_script)
+            .spawn()?;
+
+        std::process::exit(0);
     }
 
     // 重置状态

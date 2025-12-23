@@ -1,6 +1,6 @@
 [package]
 name = "steam-cloud-file-manager"
-version = "0.8.0"
+version = "0.8.8"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
@@ -109,6 +109,13 @@ tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tungstenite = { version = "0.28.0", features = ["native-tls"] }
 ureq = "3.1.4"
 sha1 = "0.10.6"
+
+# Auto Update (https://crates.io/crates/self_update)
+self_update = { version = "0.42", default-features = false, features = [
+    "archive-tar",
+    "archive-zip",
+    "compression-flate2",
+] }
 
 [target.'cfg(windows)'.dependencies]
 winapi = { version = "0.3", features = [

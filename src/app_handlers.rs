@@ -838,23 +838,9 @@ impl AppHandlers {
             Ok(download_path) => {
                 tracing::info!("下载完成: {}", download_path.display());
 
-                #[cfg(target_os = "macos")]
-                {
-                    if let Err(e) = std::process::Command::new("open")
-                        .arg("-R")
-                        .arg(&download_path)
-                        .spawn()
-                    {
-                        tracing::error!("无法打开 Finder: {}", e);
-                    }
-                    update_manager.reset();
-                }
-
-                #[cfg(not(target_os = "macos"))]
-                {
-                    if let Err(e) = update_manager.install_downloaded_update(&download_path) {
-                        update_manager.set_error(format!("安装失败: {}\n\n请手动下载更新", e));
-                    }
+                // 三平台统一使用自动安装
+                if let Err(e) = update_manager.install_downloaded_update(&download_path) {
+                    update_manager.set_error(format!("安装失败: {}\n\n请手动下载更新", e));
                 }
             }
             Err(err) => {

@@ -147,6 +147,26 @@ jobs:
             "$DMG_NAME" \
             "$APP_PATH" \
             || hdiutil create -volname "Steam Cloud File Manager" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_NAME"
+      - name: Create macOS tar.gz for auto-update
+        if: matrix.use_bundle
+        run: |
+          APP_PATH=$(find target/${{ matrix.target }}/release/bundle/osx -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: .app bundle not found"
+            exit 1
+          fi
+
+          PLATFORM_SUFFIX=""
+          if [[ "${{ matrix.target }}" == *"aarch64"* ]]; then
+            PLATFORM_SUFFIX="macos-aarch64"
+          else
+            PLATFORM_SUFFIX="macos-x86_64"
+          fi
+
+          # 创建 tar.gz 供自动更新使用
+          TAR_NAME="SteamCloudFileManager-${{ env.VERSION }}-${PLATFORM_SUFFIX}.tar.gz"
+          tar -czvf "$TAR_NAME" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
+          echo "Created: $TAR_NAME"
       - name: Prepare Windows/Linux artifact
         if: "!matrix.use_bundle"
         shell: bash
@@ -320,6 +340,9 @@ jobs:
           echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64.tar.gz" >> $GITHUB_OUTPUT
           echo "artifacts/SteamCloudFileManager-macos-x86_64/SteamCloudFileManager-${VERSION}-macos-x86_64.dmg" >> $GITHUB_OUTPUT
           echo "artifacts/SteamCloudFileManager-macos-aarch64/SteamCloudFileManager-${VERSION}-macos-aarch64.dmg" >> $GITHUB_OUTPUT
+          # macOS tar.gz for auto-update
+          echo "artifacts/SteamCloudFileManager-macos-x86_64/SteamCloudFileManager-${VERSION}-macos-x86_64.tar.gz" >> $GITHUB_OUTPUT
+          echo "artifacts/SteamCloudFileManager-macos-aarch64/SteamCloudFileManager-${VERSION}-macos-aarch64.tar.gz" >> $GITHUB_OUTPUT
 
           # 查找所有的 .deb 和 .rpm 包
           find artifacts -path "*/debian/*.deb" -print | sort | while IFS= read -r deb; do

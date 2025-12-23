@@ -389,15 +389,6 @@ impl I18n {
         }
     }
 
-    #[cfg(target_os = "macos")]
-    pub fn new_version_macos_hint(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "发现新版本，macOS 需要手动安装：",
-            Language::English => "New version found, manual installation required on macOS:",
-        }
-    }
-
-    #[cfg(not(target_os = "macos"))]
     pub fn new_version_hint(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "发现新版本，点击下载并安装：",
@@ -405,19 +396,10 @@ impl I18n {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn download_and_install(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "📥 下载并安装",
             Language::English => "📥 Download & Install",
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    pub fn download_package(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "📥 下载安装包",
-            Language::English => "📥 Download Package",
         }
     }
 
@@ -435,7 +417,6 @@ impl I18n {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn installing_update(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "⚙️ 正在安装更新...",
@@ -443,7 +424,6 @@ impl I18n {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn update_success(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "✅ 更新安装成功！",
@@ -451,7 +431,6 @@ impl I18n {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn restart_to_apply(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "请重启应用以使用新版本",
@@ -459,7 +438,6 @@ impl I18n {
         }
     }
 
-    #[cfg(not(target_os = "macos"))]
     pub fn restart_now(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "🔄 立即重启",
