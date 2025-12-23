@@ -308,24 +308,7 @@ jobs:
             echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           fi
       - name: Prepare Release Notes
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
-
-          # What's Changed - 使用 git log 生成 commit 列表，带可点击链接
-          echo "## What's Changed" > release-notes.md
-          echo "" >> release-notes.md
-          git log --pretty=format:"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )" $PREVIOUS_TAG..HEAD >> release-notes.md
-          echo "" >> release-notes.md
-          echo "" >> release-notes.md
-
-          # Full Changelog
-          PREVIOUS_SHORT=$(git rev-parse --short=7 $PREVIOUS_TAG)
-          echo "## Full Changelog" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${VERSION}" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "https://github.com/${{ github.repository }}/commits/${VERSION}" >> release-notes.md
+        run: "VERSION=${GITHUB_REF#refs/tags/v}\nTAG=${GITHUB_REF#refs/tags/}\nPREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}\nREPO=\"${{ github.repository }}\"\n\n# 1. 生成 Changelog 内容\ngit log --pretty=format:\"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )\" $PREVIOUS_TAG..HEAD > changelog.txt\n# 确保 changelog.txt 结尾有换行\necho \"\" >> changelog.txt\n\n# 2. 读取模板并替换简单变量\nif [ -f \".github/release-template.md\" ]; then\n  sed \"s|{{REPO}}|${REPO}|g; s|{{VERSION}}|${VERSION}|g; s|{{TAG}}|${TAG}|g; s|{{PREVIOUS_TAG}}|${PREVIOUS_TAG}|g\" .github/release-template.md > release-notes-temp.md\n  \n  # 3. 替换 {{CHANGELOG_LIST}} 为 changelog.txt 内容\n  # 使用 awk 将 changelog.txt 插入到 release-notes-temp.md 中\n  awk 'FNR==NR{a=a$0\"\\n\";next} /{{CHANGELOG_LIST}}/{printf \"%s\", a; next} 1' changelog.txt release-notes-temp.md > release-notes.md\nelse\n  echo \"Warning: .github/release-template.md not found, using default notes.\" > release-notes.md\n  echo \"## What's Changed\" >> release-notes.md\n  cat changelog.txt >> release-notes.md\n  echo \"\" >> release-notes.md\n  echo \"## Full Changelog\" >> release-notes.md\n  echo \"https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG}\" >> release-notes.md\nfi\n"
       - name: Prepare ordered release files list
         id: prepare_files
         run: |
