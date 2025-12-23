@@ -3,6 +3,7 @@ use crate::async_handlers::AsyncHandlers;
 use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
 use anyhow::{anyhow, Result as AnyhowResult};
+use chrono::TimeZone;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -398,12 +399,80 @@ impl AppHandlers {
                         .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
                     if let Some((steam_path, user_id)) = parser_data {
-                        file_list.local_save_paths = crate::path_resolver::collect_local_save_paths(
-                            &file_list.files,
+                        // 从 appinfo.vdf 获取 savefiles 配置
+                        let savefiles = self
+                            .ensure_vdf_parser()
+                            .and_then(|p| p.get_ufs_config(app_id).ok())
+                            .map(|c| c.savefiles)
+                            .unwrap_or_default();
+
+                        // 基于 appinfo.vdf 收集本地存档路径（默认包含 root=0）
+                        file_list.local_save_paths =
+                            crate::path_resolver::collect_local_save_paths_from_ufs(
+                                &savefiles,
+                                &steam_path,
+                                &user_id,
+                                app_id,
+                            );
+
+                        // 如果没有 savefiles 配置，默认扫描 root=0 (SteamRemote)
+                        let scan_savefiles = if savefiles.is_empty() {
+                            tracing::debug!("appinfo.vdf 无 savefiles 配置，默认扫描 SteamRemote");
+                            vec![crate::path_resolver::SaveFileConfig {
+                                root: "0".to_string(),
+                                root_type: Some(crate::path_resolver::RootType::SteamRemote),
+                                path: String::new(),
+                                pattern: "*".to_string(),
+                                platforms: vec![],
+                                recursive: true,
+                            }]
+                        } else {
+                            savefiles
+                        };
+
+                        let cloud_filenames: std::collections::HashSet<_> =
+                            file_list.files.iter().map(|f| f.name.as_str()).collect();
+
+                        let scanned = crate::path_resolver::scan_local_files_from_ufs(
+                            &scan_savefiles,
                             &steam_path,
                             &user_id,
                             app_id,
                         );
+
+                        // 过滤出云端没有的文件，转换为 CloudFile 并添加到主列表
+                        let local_only: Vec<_> = scanned
+                            .into_iter()
+                            .filter(|f| !cloud_filenames.contains(f.relative_path.as_str()))
+                            .collect();
+
+                        if !local_only.is_empty() {
+                            tracing::info!("发现 {} 个本地独有文件 (云端无)", local_only.len());
+
+                            // 转换为 CloudFile 并添加到文件列表
+                            for local_file in local_only {
+                                let timestamp = local_file
+                                    .modified
+                                    .duration_since(std::time::UNIX_EPOCH)
+                                    .map(|d| d.as_secs() as i64)
+                                    .unwrap_or(0);
+
+                                let cloud_file = crate::steam_api::CloudFile {
+                                    name: local_file.relative_path,
+                                    size: local_file.size,
+                                    timestamp: chrono::Local
+                                        .timestamp_opt(timestamp, 0)
+                                        .single()
+                                        .unwrap_or_default(),
+                                    is_persisted: false,
+                                    exists: true, // 本地存在
+                                    root: 0,
+                                    root_description: crate::path_resolver::get_root_description(0),
+                                    conflict: false,
+                                };
+                                file_list.files.push(cloud_file);
+                            }
+                        }
                     } else {
                         file_list.local_save_paths.clear();
                     }

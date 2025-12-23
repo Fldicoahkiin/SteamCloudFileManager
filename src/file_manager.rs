@@ -143,7 +143,11 @@ impl FileService {
                             let url = parts.first().unwrap_or(&"");
                             let cdp_folder = parts.get(1).unwrap_or(&"");
 
-                            f.root_description = cdp_file.root_description.clone();
+                            // 只有当 CDP folder 不为空时才覆盖 root_description
+                            // 否则保留 VDF 的 root_description
+                            if !cdp_folder.is_empty() {
+                                f.root_description = cdp_file.root_description.clone();
+                            }
 
                             tracing::trace!(
                                 "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",

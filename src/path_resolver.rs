@@ -52,6 +52,11 @@ impl RootType {
             _ => None,
         }
     }
+
+    // 转换为 u32
+    pub fn to_u32(self) -> u32 {
+        self as u32
+    }
 }
 
 use anyhow::{anyhow, Result};
@@ -372,8 +377,14 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
 }
 
 // 收集本地存档路径（使用根基础路径）
-pub fn collect_local_save_paths(
-    files: &[crate::steam_api::CloudFile],
+/// 基于 appinfo.vdf savefiles 配置收集本地存档路径
+///
+/// 逻辑：
+/// 1. 默认添加 root=0 (SteamRemote) 目录
+/// 2. 根据 savefiles 配置添加其他 root 类型目录
+/// 3. 过滤平台不匹配的配置
+pub fn collect_local_save_paths_from_ufs(
+    savefiles: &[SaveFileConfig],
     steam_path: &Path,
     user_id: &str,
     app_id: u32,
@@ -381,56 +392,71 @@ pub fn collect_local_save_paths(
     use std::collections::HashMap;
 
     tracing::debug!(
-        "开始收集本地存档路径: app_id={}, 文件数={}",
+        "开始收集本地存档路径 (基于 appinfo.vdf): app_id={}, savefiles配置数={}",
         app_id,
-        files.len()
+        savefiles.len()
     );
 
+    let mut path_map: HashMap<u32, (String, PathBuf)> = HashMap::new();
+
+    // 1. 默认添加 root=0 (SteamRemote) 目录
+    let remote_path = steam_path
+        .join("userdata")
+        .join(user_id)
+        .join(app_id.to_string())
+        .join("remote");
+
+    if remote_path.exists() {
+        let desc = get_root_description(0);
+        tracing::debug!("✓ {} (默认): {}", desc, remote_path.display());
+        path_map.insert(0, (desc, remote_path));
+    }
+
+    // 2. 根据 savefiles 配置添加其他 root 类型目录
     // 预先缓存 game_install_dir，避免重复查找
     let game_install_dir_cache = get_game_install_dir(steam_path, app_id).ok();
 
-    // 按 root 类型收集基础路径
-    let mut path_map: HashMap<u32, (String, PathBuf)> = HashMap::new();
-
-    for file in files {
-        // 跳过已经处理过的 root 类型
-        if path_map.contains_key(&file.root) {
+    for config in savefiles {
+        // 检查平台是否匹配
+        if !platform_matches_current(&config.platforms) {
+            tracing::debug!(
+                "跳过不匹配平台的配置: root={}, platforms={:?}",
+                config.root,
+                config.platforms
+            );
             continue;
         }
 
-        // 获取该 root 类型的基础路径
-        let base_path = if file.root == 1 {
+        // 获取 root 类型
+        let root_type = match &config.root_type {
+            Some(rt) => *rt,
+            None => {
+                tracing::debug!("无法解析 root 类型: {}", config.root);
+                continue;
+            }
+        };
+
+        let root_num = root_type.to_u32();
+
+        // 跳过已经处理过的 root 类型
+        if path_map.contains_key(&root_num) {
+            continue;
+        }
+
+        // 解析基础路径
+        let base_path = if root_num == 1 {
             // GameInstallDir 使用缓存
             game_install_dir_cache.clone()
-        } else if let Some(root_type) = RootType::from_u32(file.root) {
-            resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
         } else {
-            None
+            resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
         };
 
         if let Some(base_path) = base_path {
-            // 验证完整路径是否存在
-            let full_path = base_path.join(&file.name);
-            if full_path.exists() || base_path.exists() {
-                let desc = get_root_description(file.root);
-                tracing::debug!("✓ {}: {}", desc, base_path.display());
-                path_map.insert(file.root, (desc, base_path));
+            if base_path.exists() {
+                let desc = get_root_description(root_num);
+                tracing::debug!("✓ {} (appinfo.vdf): {}", desc, base_path.display());
+                path_map.insert(root_num, (desc, base_path));
             }
-        }
-    }
-
-    // 如果没有找到任何路径，但有 root=0 的文件，尝试添加 remote 目录
-    if path_map.is_empty() && files.iter().any(|f| f.root == 0) {
-        let remote_path = steam_path
-            .join("userdata")
-            .join(user_id)
-            .join(app_id.to_string())
-            .join("remote");
-
-        if remote_path.exists() {
-            let desc = get_root_description(0);
-            tracing::info!("添加 Steam Cloud remote 目录: {}", remote_path.display());
-            path_map.insert(0, (desc, remote_path));
         }
     }
 
@@ -472,4 +498,229 @@ pub fn get_root_type_name(root: u32) -> &'static str {
         12 => "AppDataLocalLow",
         _ => "Unknown",
     }
+}
+
+// 从 appinfo.vdf 的 root 字符串名称转换为 RootType
+pub fn root_name_to_type(name: &str) -> Option<RootType> {
+    match name {
+        "SteamCloudDocuments" | "0" => Some(RootType::SteamRemote),
+        "GameInstall" | "1" => Some(RootType::GameInstallDir),
+        "WinMyDocuments" | "2" => Some(RootType::Documents),
+        "WinAppDataRoaming" | "3" => Some(RootType::AppDataRoaming),
+        "WinAppDataLocal" | "4" => Some(RootType::AppDataLocal),
+        "WinPictures" | "5" => Some(RootType::Pictures),
+        "WinMusic" | "6" => Some(RootType::Music),
+        "WinVideos" | "MacAppSupport" | "7" => Some(RootType::Videos),
+        "LinuxXdgDataHome" | "8" => Some(RootType::Desktop),
+        "WinSavedGames" | "9" => Some(RootType::SavedGames),
+        "WinDownloads" | "10" => Some(RootType::Downloads),
+        "WinPublic" | "11" => Some(RootType::PublicShared),
+        "WinAppDataLocalLow" | "12" => Some(RootType::AppDataLocalLow),
+        _ => None,
+    }
+}
+
+// 检查平台是否匹配当前系统
+pub fn platform_matches_current(platforms: &[String]) -> bool {
+    if platforms.is_empty() {
+        return true; // 没有平台限制 = 所有平台
+    }
+
+    let current_platform = get_current_platform();
+    platforms.iter().any(|p| {
+        let p_lower = p.to_lowercase();
+        match current_platform {
+            "windows" => p_lower.contains("windows") || p_lower.contains("win"),
+            "macos" => {
+                p_lower.contains("macos") || p_lower.contains("mac") || p_lower.contains("osx")
+            }
+            "linux" => p_lower.contains("linux"),
+            _ => false,
+        }
+    })
+}
+
+// 获取当前平台名称
+pub fn get_current_platform() -> &'static str {
+    #[cfg(target_os = "windows")]
+    {
+        "windows"
+    }
+    #[cfg(target_os = "macos")]
+    {
+        "macos"
+    }
+    #[cfg(target_os = "linux")]
+    {
+        "linux"
+    }
+}
+
+// 从 ufs savefiles 配置中的路径配置
+#[derive(Debug, Clone, Default)]
+pub struct SaveFileConfig {
+    pub root: String,                // root 字符串名称 (如 "WinMyDocuments")
+    pub root_type: Option<RootType>, // 解析后的 RootType
+    pub path: String,                // 子目录路径
+    pub pattern: String,             // 文件匹配模式 (glob)
+    pub platforms: Vec<String>,      // 支持的平台
+    pub recursive: bool,             // 是否递归 (默认 true)
+}
+
+// 扫描到的本地文件信息
+#[derive(Debug, Clone)]
+pub struct ScannedLocalFile {
+    pub relative_path: String, // 相对于 root 的路径 (用于与云端文件名匹配)
+    pub size: u64,
+    pub modified: std::time::SystemTime,
+}
+
+// 根据 ufs savefiles 配置扫描本地文件
+pub fn scan_local_files_from_ufs(
+    savefiles: &[SaveFileConfig],
+    steam_path: &Path,
+    user_id: &str,
+    app_id: u32,
+) -> Vec<ScannedLocalFile> {
+    let mut results = Vec::new();
+
+    for config in savefiles {
+        // 检查平台是否匹配
+        if !platform_matches_current(&config.platforms) {
+            tracing::debug!(
+                "跳过不匹配平台的配置: root={}, platforms={:?}",
+                config.root,
+                config.platforms
+            );
+            continue;
+        }
+
+        // 获取 root 类型
+        let root_type = match config.root_type {
+            Some(rt) => rt,
+            None => {
+                tracing::warn!("无法解析 root 类型: {}", config.root);
+                continue;
+            }
+        };
+
+        // 解析基础路径
+        let base_path = match resolve_root_base_path(root_type, steam_path, user_id, app_id) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::debug!("无法解析 root 路径: {} - {}", config.root, e);
+                continue;
+            }
+        };
+
+        // 构建完整扫描路径
+        let scan_path = if config.path.is_empty() {
+            base_path.clone()
+        } else {
+            // 移除路径开头的斜杠
+            let clean_path = config.path.trim_start_matches('/').trim_start_matches('\\');
+            base_path.join(clean_path)
+        };
+
+        if !scan_path.exists() {
+            tracing::debug!("扫描目录不存在: {}", scan_path.display());
+            continue;
+        }
+
+        tracing::debug!(
+            "扫描本地目录: {} (pattern={})",
+            scan_path.display(),
+            config.pattern
+        );
+
+        // 扫描目录
+        let files = scan_directory_with_pattern(&scan_path, &config.pattern, config.recursive);
+
+        for (full_path, relative_to_scan) in files {
+            // 计算相对于 base_path 的路径 (用于匹配云端文件名)
+            let relative_path = if config.path.is_empty() {
+                relative_to_scan
+            } else {
+                let clean_path = config.path.trim_start_matches('/').trim_start_matches('\\');
+                format!("{}/{}", clean_path, relative_to_scan)
+            };
+
+            if let Ok(metadata) = std::fs::metadata(&full_path) {
+                results.push(ScannedLocalFile {
+                    relative_path,
+                    size: metadata.len(),
+                    modified: metadata
+                        .modified()
+                        .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
+                });
+            }
+        }
+    }
+
+    tracing::info!("从 ufs 配置扫描到 {} 个本地文件", results.len());
+    results
+}
+
+// 根据 pattern 扫描目录
+fn scan_directory_with_pattern(
+    dir: &Path,
+    pattern: &str,
+    recursive: bool,
+) -> Vec<(PathBuf, String)> {
+    let mut results = Vec::new();
+
+    fn scan_dir(
+        dir: &Path,
+        base: &Path,
+        pattern: &str,
+        recursive: bool,
+        results: &mut Vec<(PathBuf, String)>,
+    ) {
+        let entries = match std::fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+
+            if path.is_dir() && recursive {
+                scan_dir(&path, base, pattern, recursive, results);
+            } else if path.is_file() {
+                // 检查文件名是否匹配 pattern
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                    if pattern_matches(filename, pattern) {
+                        // 计算相对路径
+                        if let Ok(rel) = path.strip_prefix(base) {
+                            let rel_str = rel.to_string_lossy().replace('\\', "/");
+                            results.push((path.clone(), rel_str));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    scan_dir(dir, dir, pattern, recursive, &mut results);
+    results
+}
+
+// 简单的 glob pattern 匹配
+fn pattern_matches(filename: &str, pattern: &str) -> bool {
+    if pattern == "*" || pattern == "*.*" {
+        return true;
+    }
+
+    // 简单的 *.ext 匹配
+    if let Some(ext) = pattern.strip_prefix("*.") {
+        return filename.ends_with(&format!(".{}", ext));
+    }
+
+    // 简单的前缀* 匹配
+    if let Some(prefix) = pattern.strip_suffix('*') {
+        return filename.starts_with(prefix);
+    }
+
+    // 精确匹配
+    filename == pattern
 }

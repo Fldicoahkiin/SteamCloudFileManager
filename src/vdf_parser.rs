@@ -36,6 +36,7 @@ pub struct UfsConfig {
     pub quota: u64,
     pub maxnumfiles: u32,
     pub raw_text: String,
+    pub savefiles: Vec<crate::path_resolver::SaveFileConfig>, // 解析后的 savefiles 配置
 }
 
 #[derive(Debug, Clone)]
@@ -566,6 +567,18 @@ impl VdfParser {
         indent: usize,
         config: &mut UfsConfig,
     ) {
+        Self::parse_vdf_section_inner(cursor, string_table, lines, indent, config, "");
+    }
+
+    // 递归解析 VDF 节 (内部实现)
+    fn parse_vdf_section_inner(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+        config: &mut UfsConfig,
+        parent_key: &str,
+    ) {
         let indent_str = "    ".repeat(indent);
 
         while let Ok(type_byte) = cursor.read_u8() {
@@ -587,7 +600,22 @@ impl VdfParser {
                 0x00 => {
                     lines.push(format!("{}\"{}\"", indent_str, key));
                     lines.push(format!("{}{{", indent_str));
-                    Self::parse_vdf_section(cursor, string_table, lines, indent + 1, config);
+
+                    // 检查是否进入 savefiles 的子条目 (如 "0", "1", ...)
+                    if parent_key == "savefiles" && key.chars().all(|c| c.is_ascii_digit()) {
+                        let savefile =
+                            Self::parse_savefile_entry(cursor, string_table, lines, indent + 1);
+                        config.savefiles.push(savefile);
+                    } else {
+                        Self::parse_vdf_section_inner(
+                            cursor,
+                            string_table,
+                            lines,
+                            indent + 1,
+                            config,
+                            &key,
+                        );
+                    }
                     lines.push(format!("{}}}", indent_str));
                 }
                 0x01 => {
@@ -610,6 +638,133 @@ impl VdfParser {
                 _ => {
                     tracing::debug!("未知 VDF 类型: 0x{:02x}, key={}", type_byte, key);
                 }
+            }
+        }
+    }
+
+    // 解析单个 savefile 条目
+    fn parse_savefile_entry(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+    ) -> crate::path_resolver::SaveFileConfig {
+        let mut savefile = crate::path_resolver::SaveFileConfig {
+            recursive: true,
+            ..Default::default()
+        };
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            match type_byte {
+                0x00 => {
+                    lines.push(format!("{}\"{}\"", indent_str, key));
+                    lines.push(format!("{}{{", indent_str));
+                    // 解析 platforms 子节
+                    if key == "platforms" {
+                        Self::parse_platforms(
+                            cursor,
+                            string_table,
+                            lines,
+                            indent + 1,
+                            &mut savefile.platforms,
+                        );
+                    } else {
+                        Self::skip_section(cursor);
+                    }
+                    lines.push(format!("{}}}", indent_str));
+                }
+                0x01 => {
+                    let value = Self::read_null_string(cursor);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    match key.as_str() {
+                        "root" => savefile.root = value,
+                        "path" => savefile.path = value,
+                        "pattern" => savefile.pattern = value,
+                        _ => {}
+                    }
+                }
+                0x02 => {
+                    let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                }
+                _ => {
+                    tracing::debug!("savefile 未知类型: 0x{:02x}", type_byte);
+                }
+            }
+        }
+
+        savefile.root_type = crate::path_resolver::root_name_to_type(&savefile.root);
+        savefile
+    }
+
+    // 解析 platforms 子节
+    fn parse_platforms(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+        platforms: &mut Vec<String>,
+    ) {
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            if type_byte == 0x01 {
+                let value = Self::read_null_string(cursor);
+                lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                platforms.push(value);
+            }
+        }
+    }
+
+    // 跳过一个 section
+    fn skip_section(cursor: &mut Cursor<&[u8]>) {
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+            // 跳过 key index
+            let _ = cursor.read_u32::<LittleEndian>();
+            match type_byte {
+                0x00 => Self::skip_section(cursor),
+                0x01 => {
+                    Self::read_null_string(cursor);
+                }
+                0x02 => {
+                    let _ = cursor.read_i32::<LittleEndian>();
+                }
+                0x07 => {
+                    let _ = cursor.read_u64::<LittleEndian>();
+                }
+                _ => {}
             }
         }
     }
@@ -662,6 +817,13 @@ mod tests {
                 Ok(config) => {
                     println!("\n=== {} ({}) ===", name, app_id);
                     println!("quota={}, maxnumfiles={}", config.quota, config.maxnumfiles);
+                    println!("savefiles count: {}", config.savefiles.len());
+                    for (i, sf) in config.savefiles.iter().enumerate() {
+                        println!(
+                            "  [{}] root={}, path={}, pattern={}, platforms={:?}",
+                            i, sf.root, sf.path, sf.pattern, sf.platforms
+                        );
+                    }
                     println!("{}", config.raw_text);
                 }
                 Err(_) => {
