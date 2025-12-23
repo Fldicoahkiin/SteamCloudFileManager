@@ -303,7 +303,11 @@ impl AppHandlers {
         use crate::file_manager::FileOperationResult;
 
         let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
-        let result = file_ops.delete_by_indices(&file_list.files, &file_list.selected_files);
+        let result = file_ops.delete_by_indices(
+            &file_list.files,
+            &file_list.selected_files,
+            &file_list.local_save_paths,
+        );
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {

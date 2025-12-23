@@ -78,23 +78,23 @@ pub fn draw_file_action_buttons(
         if ui
             .add_enabled(
                 can_operate && has_selection,
-                egui::Button::new(i18n.delete()),
-            )
-            .on_hover_text(i18n.delete_hint())
-            .clicked()
-        {
-            action = FileAction::DeleteSelected;
-        }
-
-        if ui
-            .add_enabled(
-                can_operate && has_selection,
                 egui::Button::new(i18n.sync_to_cloud()),
             )
             .on_hover_text(i18n.sync_to_cloud_hint())
             .clicked()
         {
             action = FileAction::SyncToCloud;
+        }
+
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.delete()),
+            )
+            .on_hover_text(i18n.delete_hint())
+            .clicked()
+        {
+            action = FileAction::DeleteSelected;
         }
 
         if ui
