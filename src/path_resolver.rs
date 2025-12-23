@@ -377,12 +377,12 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
 }
 
 // 收集本地存档路径（使用根基础路径）
-/// 基于 appinfo.vdf savefiles 配置收集本地存档路径
-///
-/// 逻辑：
-/// 1. 默认添加 root=0 (SteamRemote) 目录
-/// 2. 根据 savefiles 配置添加其他 root 类型目录
-/// 3. 过滤平台不匹配的配置
+// 基于 appinfo.vdf savefiles 配置收集本地存档路径
+//
+// 逻辑：
+// 1. 默认添加 root=0 (SteamRemote) 目录
+// 2. 根据 savefiles 配置添加其他 root 类型目录
+// 3. 过滤平台不匹配的配置
 pub fn collect_local_save_paths_from_ufs(
     savefiles: &[SaveFileConfig],
     steam_path: &Path,
@@ -399,7 +399,7 @@ pub fn collect_local_save_paths_from_ufs(
 
     let mut path_map: HashMap<u32, (String, PathBuf)> = HashMap::new();
 
-    // 1. 默认添加 root=0 (SteamRemote) 目录
+    // 默认添加 root=0 (SteamRemote) 目录
     let remote_path = steam_path
         .join("userdata")
         .join(user_id)
@@ -412,7 +412,7 @@ pub fn collect_local_save_paths_from_ufs(
         path_map.insert(0, (desc, remote_path));
     }
 
-    // 2. 根据 savefiles 配置添加其他 root 类型目录
+    // 根据 savefiles 配置添加其他 root 类型目录
     // 预先缓存 game_install_dir，避免重复查找
     let game_install_dir_cache = get_game_install_dir(steam_path, app_id).ok();
 
@@ -480,9 +480,9 @@ pub fn get_root_description(root: u32) -> String {
     format!("{} ({})", type_name, root)
 }
 
-/// 解析 CDP 格式的 root_description
-/// 格式: "CDP:<url>|<folder>"
-/// 返回: (url, folder)
+// 解析 CDP 格式的 root_description
+// 格式: "CDP:<url>|<folder>"
+// 返回: (url, folder)
 pub fn parse_cdp_root_description(root_description: &str) -> (Option<&str>, &str) {
     if let Some(content) = root_description.strip_prefix("CDP:") {
         let mut parts = content.split('|');
