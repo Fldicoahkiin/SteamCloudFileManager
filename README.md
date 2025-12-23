@@ -346,6 +346,55 @@ Root 路径是 Steam 云存档系统中的文件存储位置类型。不同的�
   <img src="https://contrib.rocks/image?repo=Fldicoahkiin/SteamCloudFileManager" />
 </a>
 
+## 项目结构
+
+```
+src/
+├── main.rs                 # 入口：初始化日志、启动 eframe
+├── app.rs                  # 主应用：状态持有、UI 渲染循环
+├── app_state.rs            # 状态结构定义
+├── app_handlers.rs         # 业务逻辑处理器
+├── async_handlers.rs       # 异步任务管理（channel 持有）
+│
+├── steam_api.rs            # Steam API 封装（CloudFile 结构）
+├── steam_worker.rs         # 外部进程通信（JSON RPC）
+├── steam_process.rs        # Steam 进程管理（启动/关闭）
+│
+├── file_manager.rs         # 文件操作（上传/下载/删除）
+├── file_tree.rs            # 文件树结构
+├── downloader.rs           # 批量下载器
+├── backup.rs               # 备份功能
+├── conflict.rs             # 冲突检测
+│
+├── vdf_parser.rs           # VDF 文件解析（appinfo.vdf, loginusers.vdf）
+├── path_resolver.rs        # 路径解析（savefiles 配置 → 实际路径）
+├── cdp_client.rs           # CDP 网页解析（获取远程文件列表）
+├── game_scanner.rs         # 游戏扫描（合并 VDF + CDP）
+├── user_manager.rs         # 用户管理
+│
+├── update.rs               # 自动更新
+├── logger.rs               # 日志系统
+├── i18n.rs                 # 国际化
+├── version.rs              # 版本信息
+│
+└── ui/
+    ├── mod.rs              # UI 模块导出
+    ├── app_panels.rs       # 顶部/底部面板
+    ├── app_views.rs        # 中心面板
+    ├── controls.rs         # 控件渲染
+    ├── file_list.rs        # 文件列表（表格/树状）
+    ├── action_buttons.rs   # 操作按钮
+    ├── status_bar.rs       # 状态栏
+    ├── windows.rs          # 窗口（游戏选择、用户选择）
+    ├── settings.rs         # 设置窗口
+    ├── upload_dialog.rs    # 上传对话框
+    ├── backup_dialog.rs    # 备份对话框
+    ├── conflict_dialog.rs  # 冲突对话框
+    ├── guide_dialog.rs     # 引导对话框
+    ├── appinfo_dialog.rs   # AppInfo 对话框
+    └── font_loader.rs      # 字体加载
+```
+
 ## 许可证
 
 本项目采用 GPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件

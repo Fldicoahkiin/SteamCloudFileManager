@@ -349,8 +349,6 @@ impl SteamCloudApp {
         }
     }
 
-    // ========== Steam 连接状态检查 ==========
-
     fn check_steam_connection(&mut self) {
         if self.connection.is_connected {
             if let Ok(manager) = self.steam_manager.try_lock() {

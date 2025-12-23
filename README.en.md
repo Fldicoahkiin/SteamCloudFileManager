@@ -349,6 +349,55 @@ Currently supported languages:
   <img src="https://contrib.rocks/image?repo=Fldicoahkiin/SteamCloudFileManager" />
 </a>
 
+## Project Structure
+
+```
+src/
+├── main.rs                 # Entry: initialize logger, start eframe
+├── app.rs                  # Main app: state holder, UI render loop
+├── app_state.rs            # State structure definitions
+├── app_handlers.rs         # Business logic handlers
+├── async_handlers.rs       # Async task management (channel holders)
+│
+├── steam_api.rs            # Steam API wrapper (CloudFile struct)
+├── steam_worker.rs         # External process communication (JSON RPC)
+├── steam_process.rs        # Steam process management (start/stop)
+│
+├── file_manager.rs         # File operations (upload/download/delete)
+├── file_tree.rs            # File tree structure
+├── downloader.rs           # Batch downloader
+├── backup.rs               # Backup functionality
+├── conflict.rs             # Conflict detection
+│
+├── vdf_parser.rs           # VDF file parsing (appinfo.vdf, loginusers.vdf)
+├── path_resolver.rs        # Path resolution (savefiles config → actual paths)
+├── cdp_client.rs           # CDP web parsing (fetch remote file list)
+├── game_scanner.rs         # Game scanning (merge VDF + CDP)
+├── user_manager.rs         # User management
+│
+├── update.rs               # Auto update
+├── logger.rs               # Logging system
+├── i18n.rs                 # Internationalization
+├── version.rs              # Version info
+│
+└── ui/
+    ├── mod.rs              # UI module exports
+    ├── app_panels.rs       # Top/bottom panels
+    ├── app_views.rs        # Center panel
+    ├── controls.rs         # Control rendering
+    ├── file_list.rs        # File list (table/tree view)
+    ├── action_buttons.rs   # Action buttons
+    ├── status_bar.rs       # Status bar
+    ├── windows.rs          # Windows (game selector, user selector)
+    ├── settings.rs         # Settings window
+    ├── upload_dialog.rs    # Upload dialog
+    ├── backup_dialog.rs    # Backup dialog
+    ├── conflict_dialog.rs  # Conflict dialog
+    ├── guide_dialog.rs     # Guide dialog
+    ├── appinfo_dialog.rs   # AppInfo dialog
+    └── font_loader.rs      # Font loader
+```
+
 ## License
 
 This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details.
