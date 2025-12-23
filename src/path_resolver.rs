@@ -480,6 +480,20 @@ pub fn get_root_description(root: u32) -> String {
     format!("{} ({})", type_name, root)
 }
 
+/// 解析 CDP 格式的 root_description
+/// 格式: "CDP:<url>|<folder>"
+/// 返回: (url, folder)
+pub fn parse_cdp_root_description(root_description: &str) -> (Option<&str>, &str) {
+    if let Some(content) = root_description.strip_prefix("CDP:") {
+        let mut parts = content.split('|');
+        let url = parts.next().filter(|s| !s.is_empty());
+        let folder = parts.next().unwrap_or(root_description);
+        (url, folder)
+    } else {
+        (None, root_description)
+    }
+}
+
 // 获取 Root 类型名称
 pub fn get_root_type_name(root: u32) -> &'static str {
     match root {

@@ -28,8 +28,6 @@ pub enum HashStatus {
     Match,    // Hash 匹配
     Mismatch, // Hash 不匹配
     Error,    // 检测出错
-    #[allow(dead_code)]
-    Skipped, // 跳过（预留）
 }
 
 // 各项差异标记
@@ -177,7 +175,6 @@ impl FileComparison {
             HashStatus::Match => "✓ 一致",
             HashStatus::Mismatch => "✗ 不一致",
             HashStatus::Error => "⚠ 错误",
-            HashStatus::Skipped => "- 跳过",
         }
     }
 }
@@ -192,17 +189,12 @@ pub fn detect_all(
     let comparisons: Vec<FileComparison> = cloud_files
         .iter()
         .map(|cf| {
-            let local_base_path = find_local_path(cf, local_save_paths);
+            let local_base_path = find_local_path_for_file(cf, local_save_paths);
 
             // 提取下载 URL
-            let download_url = if cf.root_description.starts_with("CDP:") {
-                cf.root_description
-                    .strip_prefix("CDP:")
-                    .and_then(|s| s.split('|').next())
-                    .map(|s| s.to_string())
-            } else {
-                None
-            };
+            let (download_url, _) =
+                crate::path_resolver::parse_cdp_root_description(&cf.root_description);
+            let download_url = download_url.map(|s| s.to_string());
 
             // 计算完整本地路径
             let full_local_path = local_base_path.as_ref().map(|p| p.join(&cf.name));
@@ -260,26 +252,12 @@ pub fn detect_all(
     comparisons
 }
 
-fn find_local_path(
-    cloud_file: &crate::steam_api::CloudFile,
-    local_save_paths: &[(String, PathBuf)],
-) -> Option<PathBuf> {
-    find_local_path_for_file(cloud_file, local_save_paths)
-}
-
 pub fn find_local_path_for_file(
     cloud_file: &crate::steam_api::CloudFile,
     local_save_paths: &[(String, PathBuf)],
 ) -> Option<PathBuf> {
-    let file_root_desc = if cloud_file.root_description.starts_with("CDP:") {
-        cloud_file
-            .root_description
-            .split('|')
-            .nth(1)
-            .unwrap_or(&cloud_file.root_description)
-    } else {
-        &cloud_file.root_description
-    };
+    let (_, file_root_desc) =
+        crate::path_resolver::parse_cdp_root_description(&cloud_file.root_description);
 
     for (desc, base_path) in local_save_paths {
         if desc == file_root_desc || file_root_desc.contains(desc) {

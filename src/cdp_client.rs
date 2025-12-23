@@ -329,7 +329,6 @@ impl CdpClient {
                         exists: true,
                         root: 0,
                         root_description,
-                        conflict: false,
                     });
                 }
             }

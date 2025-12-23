@@ -20,8 +20,6 @@ pub struct CloudFile {
     pub exists: bool,
     pub root: u32,
     pub root_description: String,
-    #[allow(dead_code)]
-    pub conflict: bool,
 }
 
 impl SteamCloudManager {
@@ -229,7 +227,6 @@ impl SteamCloudManager {
             exists: file_handle.exists(),
             root: 0,
             root_description: crate::path_resolver::get_root_description(0),
-            conflict: false,
         }
     }
 

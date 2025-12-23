@@ -420,6 +420,7 @@ fn draw_about_content(
             );
             ui.add(egui::ProgressBar::new(*progress).show_percentage());
         }
+        #[cfg(not(target_os = "macos"))]
         crate::update::UpdateStatus::Installing => {
             ui.add_space(12.0);
             ui.label(
@@ -428,6 +429,7 @@ fn draw_about_content(
                     .color(steam_blue),
             );
         }
+        #[cfg(not(target_os = "macos"))]
         crate::update::UpdateStatus::Success => {
             ui.add_space(12.0);
             ui.label(

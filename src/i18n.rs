@@ -25,7 +25,6 @@ pub struct I18n {
     lang: Language,
 }
 
-#[allow(dead_code)]
 impl I18n {
     pub fn new(lang: Language) -> Self {
         Self { lang }
@@ -54,13 +53,6 @@ impl I18n {
         }
     }
 
-    pub fn confirm(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "确认",
-            Language::English => "Confirm",
-        }
-    }
-
     pub fn cancel(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "取消",
@@ -82,56 +74,6 @@ impl I18n {
         }
     }
 
-    // 连接面板
-    pub fn steam_client_status(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "Steam 客户端",
-            Language::English => "Steam Client",
-        }
-    }
-
-    pub fn running(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "运行中",
-            Language::English => "Running",
-        }
-    }
-
-    pub fn not_running(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "未运行",
-            Language::English => "Not Running",
-        }
-    }
-
-    pub fn api_connection(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "API 连接",
-            Language::English => "API Connection",
-        }
-    }
-
-    pub fn connected(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "已连接",
-            Language::English => "Connected",
-        }
-    }
-
-    pub fn disconnected(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "未连接",
-            Language::English => "Disconnected",
-        }
-    }
-
-    pub fn login_status(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "登录状态",
-            Language::English => "Login Status",
-        }
-    }
-
     pub fn logged_in(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "已登录",
@@ -143,20 +85,6 @@ impl I18n {
         match self.lang {
             Language::Chinese => "未登录",
             Language::English => "Not Logged In",
-        }
-    }
-
-    pub fn open_cloud_page(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "打开云存储页",
-            Language::English => "Open Cloud Page",
-        }
-    }
-
-    pub fn restart_steam(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "重启 Steam",
-            Language::English => "Restart Steam",
         }
     }
 
@@ -217,42 +145,7 @@ impl I18n {
         }
     }
 
-    pub fn current_game(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "当前游戏",
-            Language::English => "Current Game",
-        }
-    }
-
-    pub fn load_files(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "加载文件",
-            Language::English => "Load Files",
-        }
-    }
-
     // 文件操作
-    pub fn file_list(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "文件列表",
-            Language::English => "File List",
-        }
-    }
-
-    pub fn list_view(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "列表",
-            Language::English => "List",
-        }
-    }
-
-    pub fn tree_view(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "树状",
-            Language::English => "Tree",
-        }
-    }
-
     pub fn select_all(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "全选",
@@ -323,34 +216,6 @@ impl I18n {
         }
     }
 
-    pub fn timestamp(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "时间戳",
-            Language::English => "Timestamp",
-        }
-    }
-
-    pub fn platforms(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "平台",
-            Language::English => "Platforms",
-        }
-    }
-
-    pub fn no_files(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "无文件",
-            Language::English => "No files",
-        }
-    }
-
-    pub fn files_count(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("{} 个文件", count),
-            Language::English => format!("{} file{}", count, if count != 1 { "s" } else { "" }),
-        }
-    }
-
     pub fn selected_count(&self, count: usize) -> String {
         match self.lang {
             Language::Chinese => format!("已选择 {} 个", count),
@@ -359,24 +224,10 @@ impl I18n {
     }
 
     // 窗口标题
-    pub fn select_account_title(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "选择账户",
-            Language::English => "Select Account",
-        }
-    }
-
     pub fn select_game_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "选择游戏",
             Language::English => "Select Game",
-        }
-    }
-
-    pub fn about_title(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "关于",
-            Language::English => "About",
         }
     }
 
@@ -409,13 +260,6 @@ impl I18n {
     }
 
     // About 窗口内容
-    pub fn version(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "版本",
-            Language::English => "Version",
-        }
-    }
-
     pub fn author(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "作者:",
@@ -430,184 +274,11 @@ impl I18n {
         }
     }
 
-    pub fn description(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "描述",
-            Language::English => "Description",
-        }
-    }
-
-    pub fn app_description(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "一个用于管理 Steam 云存档的工具",
-            Language::English => "A tool for managing Steam cloud saves",
-        }
-    }
-
-    // 游戏选择器
-    pub fn game_name(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "游戏名称",
-            Language::English => "Game Name",
-        }
-    }
-
-    pub fn app_id(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "应用 ID",
-            Language::English => "App ID",
-        }
-    }
-
-    pub fn file_count(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "文件数",
-            Language::English => "Files",
-        }
-    }
-
-    pub fn total_size(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "总大小",
-            Language::English => "Total Size",
-        }
-    }
-
-    pub fn last_played(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "最后游玩",
-            Language::English => "Last Played",
-        }
-    }
-
-    pub fn search_placeholder(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "搜索游戏...",
-            Language::English => "Search games...",
-        }
-    }
-
-    pub fn no_games_found(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "未找到游戏",
-            Language::English => "No games found",
-        }
-    }
-
-    // 引导对话框
-    pub fn guide_title(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "操作引导",
-            Language::English => "Guide",
-        }
-    }
-
-    pub fn steam_restart_guide_title(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "重启 Steam 引导",
-            Language::English => "Steam Restart Guide",
-        }
-    }
-
-    pub fn manual_operation_guide_title(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "手动操作引导",
-            Language::English => "Manual Operation Guide",
-        }
-    }
-
     // 状态消息
-    pub fn loading(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "加载中...",
-            Language::English => "Loading...",
-        }
-    }
-
     pub fn connecting(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "连接中...",
             Language::English => "Connecting...",
-        }
-    }
-
-    pub fn downloading(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "下载中...",
-            Language::English => "Downloading...",
-        }
-    }
-
-    pub fn uploading(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "上传中...",
-            Language::English => "Uploading...",
-        }
-    }
-
-    pub fn deleting(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "删除中...",
-            Language::English => "Deleting...",
-        }
-    }
-
-    pub fn processing(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "处理中...",
-            Language::English => "Processing...",
-        }
-    }
-
-    pub fn success(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "成功",
-            Language::English => "Success",
-        }
-    }
-
-    pub fn failed(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "失败",
-            Language::English => "Failed",
-        }
-    }
-
-    // 操作确认
-    pub fn confirm_delete(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("确认删除 {} 个文件?", count),
-            Language::English => format!(
-                "Confirm delete {} file{}?",
-                count,
-                if count != 1 { "s" } else { "" }
-            ),
-        }
-    }
-
-    pub fn confirm_forget(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("确认将 {} 个文件移出云端？\n（本地副本将保留）", count),
-            Language::English => format!(
-                "Forget {} file{} from cloud?\n(Local copy will be kept)",
-                count,
-                if count != 1 { "s" } else { "" }
-            ),
-        }
-    }
-
-    // 文件夹相关
-    pub fn folder(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "文件夹",
-            Language::English => "Folder",
-        }
-    }
-
-    pub fn file(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "文件",
-            Language::English => "File",
         }
     }
 
@@ -651,75 +322,11 @@ impl I18n {
         }
     }
 
-    pub fn never_played(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "从未游玩",
-            Language::English => "Never played",
-        }
-    }
-
-    // About 窗口
-    pub fn check_update(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "检查更新",
-            Language::English => "Check Update",
-        }
-    }
-
-    pub fn checking(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "检查中...",
-            Language::English => "Checking...",
-        }
-    }
-
-    pub fn up_to_date(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "已是最新版本",
-            Language::English => "Up to date",
-        }
-    }
-
-    pub fn new_version_available(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "发现新版本",
-            Language::English => "New version available",
-        }
-    }
-
-    pub fn download_update(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "下载更新",
-            Language::English => "Download Update",
-        }
-    }
-
-    pub fn view_release_notes(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "查看更新说明",
-            Language::English => "View Release Notes",
-        }
-    }
-
-    pub fn license(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "许可证",
-            Language::English => "License",
-        }
-    }
-
     // 用户选择器
     pub fn select_user(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "选择用户",
             Language::English => "Select User",
-        }
-    }
-
-    pub fn user_name(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "用户名",
-            Language::English => "Username",
         }
     }
 
@@ -782,6 +389,7 @@ impl I18n {
         }
     }
 
+    #[cfg(target_os = "macos")]
     pub fn new_version_macos_hint(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "发现新版本，macOS 需要手动安装：",
@@ -789,24 +397,27 @@ impl I18n {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn new_version_hint(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "发现新版本，可以进行更新操作：",
-            Language::English => "New version available, you can update now:",
+            Language::Chinese => "发现新版本，点击下载并安装：",
+            Language::English => "New version found, click to download and install:",
         }
     }
 
-    pub fn download_package(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "📥 下载安装包",
-            Language::English => "📥 Download Package",
-        }
-    }
-
+    #[cfg(not(target_os = "macos"))]
     pub fn download_and_install(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "📥 下载并安装",
             Language::English => "📥 Download & Install",
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn download_package(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "📥 下载安装包",
+            Language::English => "📥 Download Package",
         }
     }
 
@@ -817,13 +428,6 @@ impl I18n {
         }
     }
 
-    pub fn download_location(&self, path: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!("下载位置: {}", path),
-            Language::English => format!("Download location: {}", path),
-        }
-    }
-
     pub fn downloading_update(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "📥 正在下载更新...",
@@ -831,6 +435,7 @@ impl I18n {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn installing_update(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "⚙️ 正在安装更新...",
@@ -838,6 +443,7 @@ impl I18n {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn update_success(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "✅ 更新安装成功！",
@@ -845,6 +451,7 @@ impl I18n {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn restart_to_apply(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "请重启应用以使用新版本",
@@ -852,17 +459,11 @@ impl I18n {
         }
     }
 
+    #[cfg(not(target_os = "macos"))]
     pub fn restart_now(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "🔄 立即重启",
             Language::English => "🔄 Restart Now",
-        }
-    }
-
-    pub fn retry(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "🔄 重试",
-            Language::English => "🔄 Retry",
         }
     }
 
@@ -923,6 +524,7 @@ impl I18n {
         }
     }
 
+    #[cfg(target_os = "macos")]
     pub fn manual_restart_macos_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "手动重启 Steam (macOS)",
@@ -930,6 +532,7 @@ impl I18n {
         }
     }
 
+    #[cfg(target_os = "windows")]
     pub fn manual_restart_windows_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "手动重启 Steam (Windows)",
@@ -937,6 +540,7 @@ impl I18n {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub fn manual_restart_linux_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "手动重启 Steam (Linux)",
@@ -1133,13 +737,6 @@ impl I18n {
         }
     }
 
-    pub fn select(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "选择",
-            Language::English => "Select",
-        }
-    }
-
     // Steam 重启状态消息
     pub fn closing_steam(&self) -> &'static str {
         match self.lang {
@@ -1192,20 +789,6 @@ impl I18n {
         }
     }
 
-    pub fn status_connecting(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "正在连接...",
-            Language::English => "Connecting...",
-        }
-    }
-
-    pub fn status_connected(&self, app_id: u32) -> String {
-        match self.lang {
-            Language::Chinese => format!("已连接到 App ID: {}", app_id),
-            Language::English => format!("Connected to App ID: {}", app_id),
-        }
-    }
-
     pub fn status_loading_files(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "正在加载文件列表...",
@@ -1230,38 +813,6 @@ impl I18n {
         }
     }
 
-    // 下载相关
-    pub fn download_success(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("成功下载 {} 个文件", count),
-            Language::English => format!(
-                "Successfully downloaded {} file{}",
-                count,
-                if count != 1 { "s" } else { "" }
-            ),
-        }
-    }
-
-    pub fn download_partial(&self, success: usize, failed: usize, files: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!(
-                "下载完成：成功 {} 个，失败 {} 个\n失败文件：{}",
-                success, failed, files
-            ),
-            Language::English => format!(
-                "Download complete: {} succeeded, {} failed\nFailed files: {}",
-                success, failed, files
-            ),
-        }
-    }
-
-    pub fn download_failed(&self, err: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!("下载失败: {}", err),
-            Language::English => format!("Download failed: {}", err),
-        }
-    }
-
     pub fn error_no_files_selected(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "请选择要操作的文件",
@@ -1273,36 +824,6 @@ impl I18n {
         match self.lang {
             Language::Chinese => "未连接到 Steam",
             Language::English => "Not connected to Steam",
-        }
-    }
-
-    pub fn error_select_files(&self, err: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!("选择文件失败: {}", err),
-            Language::English => format!("Failed to select files: {}", err),
-        }
-    }
-
-    // 删除和遗忘相关
-    pub fn forget_success(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("已取消 {} 个文件的云同步", count),
-            Language::English => format!(
-                "Removed {} file{} from cloud sync",
-                count,
-                if count != 1 { "s" } else { "" }
-            ),
-        }
-    }
-
-    pub fn delete_success(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("已删除 {} 个文件", count),
-            Language::English => format!(
-                "Deleted {} file{}",
-                count,
-                if count != 1 { "s" } else { "" }
-            ),
         }
     }
 
@@ -1529,13 +1050,6 @@ impl I18n {
         }
     }
 
-    pub fn upload_tooltip(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "上传文件或文件夹",
-            Language::English => "Upload file or folder",
-        }
-    }
-
     // 按钮悬停提示
     pub fn select_all_hint(&self) -> &'static str {
         match self.lang {
@@ -1604,13 +1118,6 @@ impl I18n {
         match self.lang {
             Language::Chinese => "断开与 Steam 的连接",
             Language::English => "Disconnect from Steam",
-        }
-    }
-
-    pub fn about_hint(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "查看软件版本和作者信息",
-            Language::English => "View software version and author info",
         }
     }
 
@@ -1833,80 +1340,10 @@ impl I18n {
         }
     }
 
-    pub fn action_upload_to_cloud(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "上传到云端",
-            Language::English => "Upload to Cloud",
-        }
-    }
-
-    pub fn action_upload_hint(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "用本地文件覆盖云端版本",
-            Language::English => "Overwrite cloud version with local file",
-        }
-    }
-
-    pub fn action_download_to_local(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "下载到本地",
-            Language::English => "Download to Local",
-        }
-    }
-
-    pub fn action_download_hint(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "用云端文件覆盖本地版本",
-            Language::English => "Overwrite local version with cloud file",
-        }
-    }
-
-    pub fn action_keep_both(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "保留两者",
-            Language::English => "Keep Both",
-        }
-    }
-
-    pub fn action_keep_both_hint(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "重命名本地文件并保留云端版本",
-            Language::English => "Rename local file and keep cloud version",
-        }
-    }
-
     pub fn conflicts_warning(&self, count: usize) -> String {
         match self.lang {
             Language::Chinese => format!("检测到 {} 个冲突，请手动解决", count),
             Language::English => format!("{} conflicts detected, please resolve manually", count),
-        }
-    }
-
-    pub fn upload_all_local_newer(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "上传所有本地较新",
-            Language::English => "Upload All Local Newer",
-        }
-    }
-
-    pub fn upload_all_hint(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("将 {} 个本地较新的文件上传到云端", count),
-            Language::English => format!("Upload {} local newer files to cloud", count),
-        }
-    }
-
-    pub fn download_all_cloud_newer(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "下载所有云端较新",
-            Language::English => "Download All Cloud Newer",
-        }
-    }
-
-    pub fn download_all_hint(&self, count: usize) -> String {
-        match self.lang {
-            Language::Chinese => format!("将 {} 个云端较新的文件下载到本地", count),
-            Language::English => format!("Download {} cloud newer files to local", count),
         }
     }
 
@@ -2021,13 +1458,6 @@ impl I18n {
         match self.lang {
             Language::Chinese => "失败的文件:",
             Language::English => "Failed files:",
-        }
-    }
-
-    pub fn backup_no_files(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "没有可备份的文件",
-            Language::English => "No files to backup",
         }
     }
 

@@ -278,8 +278,8 @@ impl UploadPreviewDialog {
     }
 
     fn has_warnings(&self) -> bool {
-        // TODO: 检测冲突
-        false
+        // 有文件待上传时显示覆盖警告
+        !self.queue.tasks.is_empty()
     }
 }
 

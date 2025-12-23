@@ -499,7 +499,6 @@ impl AppHandlers {
                                     exists: true, // 本地存在
                                     root: 0,
                                     root_description: crate::path_resolver::get_root_description(0),
-                                    conflict: false,
                                 };
                                 file_list.files.push(cloud_file);
                             }

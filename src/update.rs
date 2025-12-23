@@ -39,7 +39,9 @@ pub enum UpdateStatus {
     Available(ReleaseInfo),
     NoUpdate,
     Downloading(f32), // 下载进度 0.0-1.0
+    #[cfg(not(target_os = "macos"))]
     Installing,
+    #[cfg(not(target_os = "macos"))]
     Success,
     Error(String),
 }
@@ -315,8 +317,8 @@ impl UpdateManager {
         Ok(download_path)
     }
 
-    // 安装已下载的更新
-    #[allow(dead_code)]
+    // 安装已下载的更新 (Windows/Linux 下使用)
+    #[cfg(not(target_os = "macos"))]
     pub fn install_downloaded_update(&mut self, download_path: &PathBuf) -> Result<()> {
         self.status = UpdateStatus::Installing;
         self.install_update(download_path)?;
@@ -374,8 +376,8 @@ impl UpdateManager {
         Ok(update_dir)
     }
 
-    // 安装更新
-    #[allow(dead_code)]
+    // 安装更新 (Windows/Linux 下使用)
+    #[cfg(not(target_os = "macos"))]
     fn install_update(&self, download_path: &PathBuf) -> Result<()> {
         #[cfg(target_os = "macos")]
         {

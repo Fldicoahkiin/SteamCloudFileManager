@@ -95,7 +95,6 @@ impl FileService {
                 exists: f.exists,
                 root: f.root,
                 root_description: f.root_description,
-                conflict: false,
             })
             .collect())
     }
@@ -303,7 +302,6 @@ fn build_cloud_file_from_vdf(
         root: entry.root,
         root_description: root_desc,
         exists,
-        conflict: false,
     }
 }
 

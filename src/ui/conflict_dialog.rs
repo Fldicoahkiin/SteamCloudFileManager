@@ -332,9 +332,6 @@ pub fn draw_conflict_dialog(
                                         ("✗", egui::Color32::RED)
                                     }
                                     crate::conflict::HashStatus::Error => ("⚠", egui::Color32::RED),
-                                    crate::conflict::HashStatus::Skipped => {
-                                        ("-", egui::Color32::GRAY)
-                                    }
                                 };
                                 ui.colored_label(hash_color, hash_text);
 
