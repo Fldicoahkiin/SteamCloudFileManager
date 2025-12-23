@@ -302,6 +302,13 @@ impl I18n {
         }
     }
 
+    pub fn sync_to_cloud(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "同步云端",
+            Language::English => "Sync",
+        }
+    }
+
     pub fn file_name(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "文件名",
@@ -1576,6 +1583,13 @@ impl I18n {
         match self.lang {
             Language::Chinese => "仅从云端移除，保留本地文件",
             Language::English => "Remove from cloud only, keep local files",
+        }
+    }
+
+    pub fn sync_to_cloud_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "将本地文件同步到云端",
+            Language::English => "Sync local files to cloud",
         }
     }
 

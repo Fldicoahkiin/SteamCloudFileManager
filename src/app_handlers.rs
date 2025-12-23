@@ -267,6 +267,33 @@ impl AppHandlers {
         }
     }
 
+    pub fn sync_to_cloud(
+        &self,
+        file_list: &FileListState,
+        misc: &mut MiscState,
+        dialogs: &mut DialogState,
+    ) -> bool {
+        use crate::file_manager::FileOperationResult;
+
+        let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
+        let result = file_ops.sync_to_cloud_by_indices(
+            &file_list.files,
+            &file_list.selected_files,
+            &file_list.local_save_paths,
+        );
+
+        match result {
+            FileOperationResult::SuccessWithRefresh(msg) => {
+                misc.status_message = msg;
+                true
+            }
+            FileOperationResult::Error(msg) => {
+                dialogs.show_error(&msg);
+                false
+            }
+        }
+    }
+
     pub fn delete_files(
         &self,
         file_list: &FileListState,

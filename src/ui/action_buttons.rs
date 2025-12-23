@@ -11,6 +11,7 @@ pub enum FileAction {
     Upload,
     DeleteSelected,
     ForgetSelected,
+    SyncToCloud,
     CompareFiles,
 }
 
@@ -83,6 +84,17 @@ pub fn draw_file_action_buttons(
             .clicked()
         {
             action = FileAction::DeleteSelected;
+        }
+
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.sync_to_cloud()),
+            )
+            .on_hover_text(i18n.sync_to_cloud_hint())
+            .clicked()
+        {
+            action = FileAction::SyncToCloud;
         }
 
         if ui

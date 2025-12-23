@@ -139,6 +139,7 @@ pub enum BottomPanelEvent {
     Upload,
     Delete,
     Forget,
+    SyncToCloud,
     ToggleCloud,
     CompareFiles,
     ShowAppInfo(u32),
@@ -188,6 +189,7 @@ pub fn render_bottom_panel(
         crate::ui::FileAction::Upload => BottomPanelEvent::Upload,
         crate::ui::FileAction::DeleteSelected => BottomPanelEvent::Delete,
         crate::ui::FileAction::ForgetSelected => BottomPanelEvent::Forget,
+        crate::ui::FileAction::SyncToCloud => BottomPanelEvent::SyncToCloud,
         crate::ui::FileAction::CompareFiles => BottomPanelEvent::CompareFiles,
         crate::ui::FileAction::None => BottomPanelEvent::None,
     };

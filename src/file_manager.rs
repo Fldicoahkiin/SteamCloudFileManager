@@ -338,6 +338,15 @@ impl FileOperations {
         manager.forget_file(filename)
     }
 
+    // 写入文件到云端
+    pub fn write_file(&self, filename: &str, data: &[u8]) -> anyhow::Result<bool> {
+        let mut manager = self
+            .steam_manager
+            .lock()
+            .map_err(|e| anyhow!("Steam 管理器锁错误: {}", e))?;
+        manager.write_file(filename, data)
+    }
+
     pub fn batch_operation<F>(&self, filenames: &[String], operation: F) -> (usize, Vec<String>)
     where
         F: Fn(&str) -> anyhow::Result<bool>,
@@ -478,6 +487,79 @@ impl FileOperations {
             FileOperationResult::SuccessWithRefresh(format!("已删除 {} 个文件", deleted_count))
         } else {
             FileOperationResult::Error("没有文件被删除".to_string())
+        }
+    }
+
+    // 同步本地文件到云端（针对本地独有文件）
+    pub fn sync_to_cloud_by_indices(
+        &self,
+        files: &[CloudFile],
+        selected_files: &[usize],
+        local_save_paths: &[(String, PathBuf)],
+    ) -> FileOperationResult {
+        if selected_files.is_empty() {
+            return FileOperationResult::Error("请选择要同步的文件".to_string());
+        }
+
+        let mut synced_count = 0;
+        let mut failed_files = Vec::new();
+
+        for &index in selected_files {
+            if let Some(file) = files.get(index) {
+                // 只同步本地独有文件（云端不存在的）
+                if file.is_persisted {
+                    continue; // 已在云端，跳过
+                }
+
+                // 查找本地文件路径
+                let local_path = crate::conflict::find_local_path_for_file(file, local_save_paths);
+
+                if let Some(base_path) = local_path {
+                    let full_path = base_path.join(&file.name);
+
+                    if full_path.exists() {
+                        // 读取本地文件内容
+                        match std::fs::read(&full_path) {
+                            Ok(data) => {
+                                // 上传到云端
+                                match self.write_file(&file.name, &data) {
+                                    Ok(_) => {
+                                        tracing::info!("同步文件到云端: {}", file.name);
+                                        synced_count += 1;
+                                    }
+                                    Err(e) => {
+                                        tracing::error!("同步失败: {} - {}", file.name, e);
+                                        failed_files.push(file.name.clone());
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("读取文件失败: {} - {}", full_path.display(), e);
+                                failed_files.push(file.name.clone());
+                            }
+                        }
+                    } else {
+                        tracing::warn!("本地文件不存在: {}", full_path.display());
+                        failed_files.push(file.name.clone());
+                    }
+                } else {
+                    tracing::warn!("无法找到本地路径: {}", file.name);
+                    failed_files.push(file.name.clone());
+                }
+            }
+        }
+
+        if !failed_files.is_empty() {
+            return FileOperationResult::Error(format!(
+                "部分文件同步失败: {}",
+                failed_files.join(", ")
+            ));
+        }
+
+        if synced_count > 0 {
+            FileOperationResult::SuccessWithRefresh(format!("已同步 {} 个文件到云端", synced_count))
+        } else {
+            FileOperationResult::Error("没有文件被同步（可能已在云端）".to_string())
         }
     }
 }

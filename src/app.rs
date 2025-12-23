@@ -131,6 +131,15 @@ impl SteamCloudApp {
         }
     }
 
+    fn sync_to_cloud(&mut self) {
+        if self
+            .handlers
+            .sync_to_cloud(&self.file_list, &mut self.misc, &mut self.dialogs)
+        {
+            self.refresh_files();
+        }
+    }
+
     fn delete(&mut self) {
         if self
             .handlers
@@ -414,6 +423,7 @@ impl eframe::App for SteamCloudApp {
             crate::ui::BottomPanelEvent::Upload => self.upload(),
             crate::ui::BottomPanelEvent::Delete => self.delete(),
             crate::ui::BottomPanelEvent::Forget => self.forget(),
+            crate::ui::BottomPanelEvent::SyncToCloud => self.sync_to_cloud(),
             crate::ui::BottomPanelEvent::CompareFiles => self.compare_files(),
             crate::ui::BottomPanelEvent::ToggleCloud => {
                 if let Ok(mut manager) = self.steam_manager.lock() {

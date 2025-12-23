@@ -264,6 +264,13 @@ fn find_local_path(
     cloud_file: &crate::steam_api::CloudFile,
     local_save_paths: &[(String, PathBuf)],
 ) -> Option<PathBuf> {
+    find_local_path_for_file(cloud_file, local_save_paths)
+}
+
+pub fn find_local_path_for_file(
+    cloud_file: &crate::steam_api::CloudFile,
+    local_save_paths: &[(String, PathBuf)],
+) -> Option<PathBuf> {
     let file_root_desc = if cloud_file.root_description.starts_with("CDP:") {
         cloud_file
             .root_description
