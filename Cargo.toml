@@ -1,6 +1,6 @@
 [package]
 name = "steam-cloud-file-manager"
-version = "0.8.8"
+version = "0.8.9-beta"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
