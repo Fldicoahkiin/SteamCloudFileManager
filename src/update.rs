@@ -462,16 +462,20 @@ impl UpdateManager {
 
         // 启动 PowerShell 脚本并退出当前程序
         tracing::info!("启动更新脚本并退出程序...");
-        std::process::Command::new("powershell")
-            .args([
-                "-ExecutionPolicy",
-                "Bypass",
-                "-WindowStyle",
-                "Normal",
-                "-File",
-                &update_script.to_string_lossy(),
-            ])
-            .spawn()?;
+        {
+            use std::os::windows::process::CommandExt;
+            std::process::Command::new("powershell")
+                .args([
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-WindowStyle",
+                    "Minimized",
+                    "-File",
+                    &update_script.to_string_lossy(),
+                ])
+                .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+                .spawn()?;
+        }
 
         // 退出当前程序
         std::process::exit(0);

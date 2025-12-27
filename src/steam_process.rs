@@ -261,6 +261,8 @@ fn close_steam_windows() -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn start_steam_windows() -> Result<()> {
+    use std::os::windows::process::CommandExt;
+
     let steam_dir = crate::vdf_parser::VdfParser::find_steam_path()?;
     let steam_exe = steam_dir.join("steam.exe");
 
@@ -273,6 +275,7 @@ fn start_steam_windows() -> Result<()> {
         .args(["/C", "start", ""])
         .arg(&steam_exe)
         .arg("-cef-enable-debugging")
+        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 

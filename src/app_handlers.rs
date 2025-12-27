@@ -145,8 +145,10 @@ impl AppHandlers {
             }
             #[cfg(target_os = "windows")]
             {
+                use std::os::windows::process::CommandExt;
                 let _ = std::process::Command::new("cmd")
                     .args(["/C", "start", "", &steam_url])
+                    .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
                     .spawn();
             }
             #[cfg(target_os = "linux")]
@@ -338,9 +340,13 @@ impl AppHandlers {
             #[cfg(target_os = "macos")]
             let _ = std::process::Command::new("open").arg(steam_url).spawn();
             #[cfg(target_os = "windows")]
-            let _ = std::process::Command::new("cmd")
-                .args(["/C", "start", "", steam_url])
-                .spawn();
+            {
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new("cmd")
+                    .args(["/C", "start", "", steam_url])
+                    .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+                    .spawn();
+            }
             #[cfg(target_os = "linux")]
             let _ = std::process::Command::new("xdg-open")
                 .arg(steam_url)
@@ -390,9 +396,13 @@ impl AppHandlers {
                 #[cfg(target_os = "macos")]
                 let _ = std::process::Command::new("open").arg(&steam_url).spawn();
                 #[cfg(target_os = "windows")]
-                let _ = std::process::Command::new("cmd")
-                    .args(["/C", "start", "", &steam_url])
-                    .spawn();
+                {
+                    use std::os::windows::process::CommandExt;
+                    let _ = std::process::Command::new("cmd")
+                        .args(["/C", "start", "", &steam_url])
+                        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+                        .spawn();
+                }
                 #[cfg(target_os = "linux")]
                 let _ = std::process::Command::new("xdg-open")
                     .arg(&steam_url)
