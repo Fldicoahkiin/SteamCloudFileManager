@@ -92,23 +92,9 @@ fn detect_system_dark_mode() -> bool {
 // 全局主题模式状态
 static CURRENT_MODE: std::sync::OnceLock<std::sync::RwLock<ThemeMode>> = std::sync::OnceLock::new();
 
-// 获取当前主题模式
-pub fn current_mode() -> ThemeMode {
-    CURRENT_MODE
-        .get_or_init(|| std::sync::RwLock::new(ThemeMode::default()))
-        .read()
-        .map(|m| *m)
-        .unwrap_or_default()
-}
-
 // 判断当前是否为深色模式
-pub fn is_dark_mode(_ctx: &egui::Context) -> bool {
-    let mode = current_mode();
-    match mode {
-        ThemeMode::Dark => true,
-        ThemeMode::Light => false,
-        ThemeMode::System => detect_system_dark_mode(),
-    }
+pub fn is_dark_mode(ctx: &egui::Context) -> bool {
+    ctx.style().visuals.dark_mode
 }
 
 // 应用主题到 egui Context
