@@ -57,6 +57,7 @@ fn detect_system_dark_mode() -> bool {
         // Windows: 检查注册表
         // HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize
         // AppsUseLightTheme = 0 表示深色模式
+        use std::os::windows::process::CommandExt;
         use std::process::Command;
         if let Ok(output) = Command::new("reg")
             .args([
@@ -65,6 +66,7 @@ fn detect_system_dark_mode() -> bool {
                 "/v",
                 "AppsUseLightTheme",
             ])
+            .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
             .output()
         {
             let stdout = String::from_utf8_lossy(&output.stdout);

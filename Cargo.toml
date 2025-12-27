@@ -154,6 +154,8 @@ winapi = { version = "0.3", features = [
     "shlobj",
     "knownfolders",
     "winbase",
+    "tlhelp32",
+    "handleapi",
 ] }
 
 # Windows specific

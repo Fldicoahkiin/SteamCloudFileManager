@@ -466,10 +466,12 @@ impl UpdateManager {
             use std::os::windows::process::CommandExt;
             std::process::Command::new("powershell")
                 .args([
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-WindowStyle",
+                    "Hidden",
                     "-ExecutionPolicy",
                     "Bypass",
-                    "-WindowStyle",
-                    "Minimized",
                     "-File",
                     &update_script.to_string_lossy(),
                 ])

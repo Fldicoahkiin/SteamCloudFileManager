@@ -13,6 +13,45 @@ pub enum RestartStatus {
 
 // 检测 Steam 是否正在运行
 pub fn is_steam_running() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        // 使用 WinAPI
+        unsafe {
+            use std::ffi::CStr;
+            use winapi::um::handleapi::CloseHandle;
+            use winapi::um::tlhelp32::{
+                CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+                TH32CS_SNAPPROCESS,
+            };
+
+            let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+            if snapshot == winapi::um::handleapi::INVALID_HANDLE_VALUE {
+                return false;
+            }
+
+            let mut entry: PROCESSENTRY32 = std::mem::zeroed();
+            entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
+
+            if Process32First(snapshot, &mut entry) != 0 {
+                loop {
+                    // 转换 szExeFile 为字符串
+                    let exe_name = CStr::from_ptr(entry.szExeFile.as_ptr()).to_string_lossy();
+                    if exe_name.eq_ignore_ascii_case("steam.exe") {
+                        CloseHandle(snapshot);
+                        return true;
+                    }
+
+                    if Process32Next(snapshot, &mut entry) == 0 {
+                        break;
+                    }
+                }
+            }
+
+            CloseHandle(snapshot);
+            false
+        }
+    }
+
     #[cfg(target_os = "macos")]
     {
         let result = Command::new("pgrep")
@@ -31,20 +70,6 @@ pub fn is_steam_running() -> bool {
             .arg("steam_osx")
             .output()
             .map(|o| o.status.success())
-            .unwrap_or(false)
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("tasklist")
-            .args(["/FI", "IMAGENAME eq steam.exe", "/NH"])
-            .output()
-            .map(|o| {
-                let output = String::from_utf8_lossy(&o.stdout);
-                output.to_lowercase().contains("steam.exe")
-                    && !output.contains("INFO:")
-                    && !output.contains("没有运行")
-            })
             .unwrap_or(false)
     }
 
@@ -248,8 +273,10 @@ fn start_steam_macos() -> Result<()> {
 #[cfg(target_os = "windows")]
 fn close_steam_windows() -> Result<()> {
     tracing::info!("正在关闭 Windows 上的 Steam 进程...");
+    use std::os::windows::process::CommandExt;
     Command::new("taskkill")
         .args(["/F", "/IM", "steam.exe"])
+        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
         .status()
         .ok();
 
@@ -261,8 +288,6 @@ fn close_steam_windows() -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn start_steam_windows() -> Result<()> {
-    use std::os::windows::process::CommandExt;
-
     let steam_dir = crate::vdf_parser::VdfParser::find_steam_path()?;
     let steam_exe = steam_dir.join("steam.exe");
 
@@ -271,11 +296,8 @@ fn start_steam_windows() -> Result<()> {
     }
 
     tracing::info!(path = ?steam_exe, "正在启动 Steam，添加参数: -cef-enable-debugging");
-    Command::new("cmd")
-        .args(["/C", "start", ""])
-        .arg(&steam_exe)
+    Command::new(&steam_exe)
         .arg("-cef-enable-debugging")
-        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
         .spawn()
         .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
