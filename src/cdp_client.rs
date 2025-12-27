@@ -335,9 +335,14 @@ impl CdpClient {
 
             // 下一页检测
             let next_index = index + 50;
-            // 检查是否存在下一页的链接
+            // 使用 JS 遍历查找链接，比 querySelector 更稳健
             let check_next_script = format!(
-                "document.querySelector('a[href*=\"index={}\"]') !== null",
+                r#"
+                (function() {{
+                    const links = Array.from(document.querySelectorAll('a'));
+                    return links.some(a => a.href.includes('index={0}'));
+                }})()
+                "#,
                 next_index
             );
             let has_next = self
