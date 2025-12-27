@@ -74,29 +74,6 @@ pub fn draw_settings_window(
 
                     ui.add_space(4.0);
 
-                    // 关于
-                    let about_selected = state.tab == SettingsTab::About;
-                    let about_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.settings_about()).color(
-                            if about_selected {
-                                steam_blue
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if about_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            egui::Color32::TRANSPARENT
-                        }),
-                    );
-                    if about_response.clicked() {
-                        state.tab = SettingsTab::About;
-                    }
-
-                    ui.add_space(4.0);
-
                     // 备份
                     let backup_selected = state.tab == SettingsTab::Backup;
                     let backup_response = ui.add_sized(
@@ -116,6 +93,29 @@ pub fn draw_settings_window(
                     );
                     if backup_response.clicked() {
                         state.tab = SettingsTab::Backup;
+                    }
+
+                    ui.add_space(4.0);
+
+                    // 关于
+                    let about_selected = state.tab == SettingsTab::About;
+                    let about_response = ui.add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new(egui::RichText::new(i18n.settings_about()).color(
+                            if about_selected {
+                                steam_blue
+                            } else {
+                                ui.style().visuals.text_color()
+                            },
+                        ))
+                        .fill(if about_selected {
+                            ui.style().visuals.selection.bg_fill
+                        } else {
+                            egui::Color32::TRANSPARENT
+                        }),
+                    );
+                    if about_response.clicked() {
+                        state.tab = SettingsTab::About;
                     }
                 });
 
