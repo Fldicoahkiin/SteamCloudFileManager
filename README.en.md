@@ -17,16 +17,13 @@
 [![Build](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml)
 [![Release](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml)
 
-![Windows](https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-0078D6?logo=microsoft&logoColor=white)
 ![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)
 ![Debian](https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white)
 ![Fedora](https://img.shields.io/badge/Fedora-51A2DA?logo=fedora&logoColor=white)
 ![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?logo=archlinux&logoColor=white)
-![AppImage](https://img.shields.io/badge/AppImage-2c9784?logo=appimage&logoColor=white)
-![openSUSE](https://img.shields.io/badge/openSUSE-73ba25?logo=opensuse&logoColor=white)
-![Red Hat](https://img.shields.io/badge/Red%20Hat-EE0000?logo=redhat&logoColor=white)
-![CentOS](https://img.shields.io/badge/CentOS-262577?logo=centos&logoColor=white)
+![AppImage](https://img.shields.io/badge/AppImage-2c9784?logo=linux&logoColor=white)
 
 > Cross-platform Steam Cloud file management utility built with Rust and egui.
 
@@ -393,6 +390,7 @@ src/
     ├── file_list.rs        # File list (table/tree view)
     ├── windows.rs          # Windows (game selector, user selector)
     ├── settings.rs         # Settings window
+    ├── theme.rs            # Theme system (dark/light mode)
     ├── upload_dialog.rs    # Upload dialog
     ├── backup_dialog.rs    # Backup dialog
     ├── conflict_dialog.rs  # Conflict dialog
@@ -446,4 +444,10 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Fldicoahkiin/SteamCloudFileManager&type=Date)](https://star-history.com/#Fldicoahkiin/SteamCloudFileManager&Date)
+<a href="https://star-history.com/#Fldicoahkiin/SteamCloudFileManager&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Fldicoahkiin/SteamCloudFileManager&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Fldicoahkiin/SteamCloudFileManager&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Fldicoahkiin/SteamCloudFileManager&type=Date" />
+  </picture>
+</a>
