@@ -388,12 +388,9 @@ src/
 │
 └── ui/
     ├── mod.rs              # UI module exports
-    ├── app_panels.rs       # Top/bottom panels
-    ├── app_views.rs        # Center panel
+    ├── app_panels.rs       # Panel rendering (top/bottom/center, action buttons, status bar)
     ├── controls.rs         # Control rendering
     ├── file_list.rs        # File list (table/tree view)
-    ├── action_buttons.rs   # Action buttons
-    ├── status_bar.rs       # Status bar
     ├── windows.rs          # Windows (game selector, user selector)
     ├── settings.rs         # Settings window
     ├── upload_dialog.rs    # Upload dialog

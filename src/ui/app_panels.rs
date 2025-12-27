@@ -1,9 +1,46 @@
 use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryState, MiscState};
 use crate::async_handlers::AsyncHandlers;
+use crate::i18n::I18n;
 use crate::steam_worker::SteamWorkerManager;
 use eframe::egui;
 use std::sync::{Arc, Mutex};
 
+// 文件操作类型
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FileAction {
+    None,
+    SelectAll,
+    InvertSelection,
+    ClearSelection,
+    DownloadSelected,
+    Upload,
+    DeleteSelected,
+    ForgetSelected,
+    SyncToCloud,
+    CompareFiles,
+}
+
+// 状态面板的用户操作
+#[derive(Debug, Clone, PartialEq)]
+pub enum StatusPanelAction {
+    None,
+    ToggleCloudEnabled,
+    ShowAppInfo(u32),
+}
+
+// 状态面板的状态数据
+pub struct StatusPanelState {
+    pub status_message: String,
+    pub cloud_enabled: Option<bool>,
+    pub is_connected: bool,
+    pub remote_ready: bool,
+    pub account_enabled: Option<bool>,
+    pub app_enabled: Option<bool>,
+    pub quota_info: Option<(u64, u64)>,
+    pub app_id: u32,
+}
+
+// 顶部面板事件
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TopPanelEvent {
     None,
@@ -12,6 +49,23 @@ pub enum TopPanelEvent {
     Disconnect,
     Refresh,
     Restart,
+}
+
+// 底部面板事件
+#[derive(Debug, Clone, PartialEq)]
+pub enum BottomPanelEvent {
+    None,
+    SelectAll,
+    InvertSelection,
+    ClearSelection,
+    Download,
+    Upload,
+    Delete,
+    Forget,
+    SyncToCloud,
+    ToggleCloud,
+    CompareFiles,
+    ShowAppInfo(u32),
 }
 
 // 顶部面板渲染
@@ -129,22 +183,6 @@ pub fn render_top_panel(
     event
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum BottomPanelEvent {
-    None,
-    SelectAll,
-    InvertSelection,
-    ClearSelection,
-    Download,
-    Upload,
-    Delete,
-    Forget,
-    SyncToCloud,
-    ToggleCloud,
-    CompareFiles,
-    ShowAppInfo(u32),
-}
-
 // 底部面板渲染
 pub fn render_bottom_panel(
     ui: &mut egui::Ui,
@@ -171,7 +209,7 @@ pub fn render_bottom_panel(
         .map(|f| f.size)
         .sum();
 
-    let action = crate::ui::draw_file_action_buttons(
+    let action = draw_file_action_buttons(
         ui,
         can_ops,
         has_selection,
@@ -182,16 +220,16 @@ pub fn render_bottom_panel(
     );
 
     let mut event = match action {
-        crate::ui::FileAction::SelectAll => BottomPanelEvent::SelectAll,
-        crate::ui::FileAction::InvertSelection => BottomPanelEvent::InvertSelection,
-        crate::ui::FileAction::ClearSelection => BottomPanelEvent::ClearSelection,
-        crate::ui::FileAction::DownloadSelected => BottomPanelEvent::Download,
-        crate::ui::FileAction::Upload => BottomPanelEvent::Upload,
-        crate::ui::FileAction::DeleteSelected => BottomPanelEvent::Delete,
-        crate::ui::FileAction::ForgetSelected => BottomPanelEvent::Forget,
-        crate::ui::FileAction::SyncToCloud => BottomPanelEvent::SyncToCloud,
-        crate::ui::FileAction::CompareFiles => BottomPanelEvent::CompareFiles,
-        crate::ui::FileAction::None => BottomPanelEvent::None,
+        FileAction::SelectAll => BottomPanelEvent::SelectAll,
+        FileAction::InvertSelection => BottomPanelEvent::InvertSelection,
+        FileAction::ClearSelection => BottomPanelEvent::ClearSelection,
+        FileAction::DownloadSelected => BottomPanelEvent::Download,
+        FileAction::Upload => BottomPanelEvent::Upload,
+        FileAction::DeleteSelected => BottomPanelEvent::Delete,
+        FileAction::ForgetSelected => BottomPanelEvent::Forget,
+        FileAction::SyncToCloud => BottomPanelEvent::SyncToCloud,
+        FileAction::CompareFiles => BottomPanelEvent::CompareFiles,
+        FileAction::None => BottomPanelEvent::None,
     };
 
     // 状态面板
@@ -219,7 +257,7 @@ pub fn render_bottom_panel(
 
     let app_id = connection.app_id_input.parse::<u32>().unwrap_or(0);
 
-    let state = crate::ui::StatusPanelState {
+    let state = StatusPanelState {
         status_message: misc.status_message.clone(),
         cloud_enabled,
         is_connected: connection.is_connected,
@@ -230,19 +268,242 @@ pub fn render_bottom_panel(
         app_id,
     };
 
-    let action = crate::ui::draw_complete_status_panel(ui, &state, &misc.i18n);
+    let action = draw_complete_status_panel(ui, &state, &misc.i18n);
 
     match action {
-        crate::ui::StatusPanelAction::ToggleCloudEnabled if event == BottomPanelEvent::None => {
+        StatusPanelAction::ToggleCloudEnabled if event == BottomPanelEvent::None => {
             event = BottomPanelEvent::ToggleCloud;
         }
-        crate::ui::StatusPanelAction::ShowAppInfo(id) if event == BottomPanelEvent::None => {
+        StatusPanelAction::ShowAppInfo(id) if event == BottomPanelEvent::None => {
             event = BottomPanelEvent::ShowAppInfo(id);
         }
         _ => {}
     }
 
     event
+}
+
+// 绘制文件操作按钮栏
+fn draw_file_action_buttons(
+    ui: &mut egui::Ui,
+    can_operate: bool,
+    has_selection: bool,
+    selected_count: usize,
+    _total_count: usize,
+    selected_total_size: u64,
+    i18n: &I18n,
+) -> FileAction {
+    let mut action = FileAction::None;
+
+    ui.horizontal(|ui| {
+        // 选择操作
+        if ui
+            .button(i18n.select_all())
+            .on_hover_text(i18n.select_all_hint())
+            .clicked()
+        {
+            action = FileAction::SelectAll;
+        }
+
+        if ui
+            .button(i18n.invert_selection())
+            .on_hover_text(i18n.invert_selection_hint())
+            .clicked()
+        {
+            action = FileAction::InvertSelection;
+        }
+
+        if ui
+            .button(i18n.clear_selection())
+            .on_hover_text(i18n.clear_selection_hint())
+            .clicked()
+        {
+            action = FileAction::ClearSelection;
+        }
+
+        ui.separator();
+
+        // 文件操作
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.download()),
+            )
+            .on_hover_text(i18n.download_hint())
+            .clicked()
+        {
+            action = FileAction::DownloadSelected;
+        }
+
+        if ui
+            .add_enabled(can_operate, egui::Button::new(i18n.upload()))
+            .on_hover_text(i18n.upload_hint())
+            .clicked()
+        {
+            action = FileAction::Upload;
+        }
+
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.sync_to_cloud()),
+            )
+            .on_hover_text(i18n.sync_to_cloud_hint())
+            .clicked()
+        {
+            action = FileAction::SyncToCloud;
+        }
+
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.delete()),
+            )
+            .on_hover_text(i18n.delete_hint())
+            .clicked()
+        {
+            action = FileAction::DeleteSelected;
+        }
+
+        if ui
+            .add_enabled(
+                can_operate && has_selection,
+                egui::Button::new(i18n.forget()),
+            )
+            .on_hover_text(i18n.forget_hint())
+            .clicked()
+        {
+            action = FileAction::ForgetSelected;
+        }
+
+        ui.separator();
+
+        // 文件对比
+        if ui
+            .add_enabled(can_operate, egui::Button::new(i18n.compare_files()))
+            .on_hover_text(i18n.compare_files_hint())
+            .clicked()
+        {
+            action = FileAction::CompareFiles;
+        }
+
+        // 右侧统计信息
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.label(i18n.selected_count(selected_count));
+
+            if selected_count > 0 {
+                let size_str = crate::file_manager::format_size(selected_total_size);
+                ui.label(i18n.total_size_label(&size_str));
+            }
+        });
+    });
+
+    action
+}
+
+// 绘制完整的状态面板
+fn draw_complete_status_panel(
+    ui: &mut egui::Ui,
+    state: &StatusPanelState,
+    i18n: &I18n,
+) -> StatusPanelAction {
+    let mut action = StatusPanelAction::None;
+
+    ui.separator();
+
+    // 状态消息栏
+    let toggled = draw_status_message(ui, &state.status_message, state.cloud_enabled, i18n);
+    if toggled {
+        action = StatusPanelAction::ToggleCloudEnabled;
+    }
+
+    // 云存储状态
+    if state.is_connected {
+        if state.remote_ready {
+            draw_cloud_status(ui, state.account_enabled, state.app_enabled, i18n);
+        } else {
+            ui.horizontal(|ui| {
+                let text = match i18n.language() {
+                    crate::i18n::Language::Chinese => "云存储状态: 未就绪",
+                    crate::i18n::Language::English => "Cloud Status: Not Ready",
+                };
+                ui.label(text);
+            });
+        }
+    }
+
+    // 配额信息
+    if let Some((total, available)) = state.quota_info {
+        draw_quota_info(ui, total, available, i18n);
+    }
+
+    // 显示 appinfo.vdf 按钮
+    if state.is_connected && state.app_id > 0 {
+        ui.horizontal(|ui| {
+            if ui.button(i18n.show_appinfo_vdf()).clicked() {
+                action = StatusPanelAction::ShowAppInfo(state.app_id);
+            }
+        });
+    }
+
+    action
+}
+
+// 绘制状态消息栏
+fn draw_status_message(
+    ui: &mut egui::Ui,
+    status_message: &str,
+    cloud_enabled: Option<bool>,
+    i18n: &I18n,
+) -> bool {
+    let mut toggled = false;
+    ui.horizontal(|ui| {
+        ui.label(i18n.status_label());
+        ui.label(status_message);
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if let Some(enabled) = cloud_enabled {
+                let cloud_status = if enabled {
+                    i18n.cloud_on()
+                } else {
+                    i18n.cloud_off()
+                };
+                if ui.selectable_label(false, cloud_status).clicked() {
+                    toggled = true;
+                }
+            }
+        });
+    });
+    toggled
+}
+
+// 绘制云存储状态信息
+fn draw_cloud_status(
+    ui: &mut egui::Ui,
+    account_enabled: Option<bool>,
+    _app_enabled: Option<bool>,
+    i18n: &I18n,
+) {
+    ui.horizontal(|ui| {
+        ui.label(format!("{}:", i18n.account_cloud_status()));
+        match account_enabled {
+            Some(true) => ui.label(format!("✅ {}", i18n.logged_in())),
+            Some(false) => ui.label(format!("❌ {}", i18n.not_logged_in())),
+            None => ui.label("❓ Unknown"),
+        };
+    });
+}
+
+// 绘制配额信息
+fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64, i18n: &I18n) {
+    ui.horizontal(|ui| {
+        let used = total - available;
+        let usage_percent = (used as f32 / total as f32 * 100.0).round();
+        let used_str = crate::file_manager::format_size(used);
+        let total_str = crate::file_manager::format_size(total);
+        let text = i18n.quota_usage(usage_percent, &used_str, &total_str);
+        ui.label(text);
+    });
 }
 
 // 中心面板渲染
@@ -254,9 +515,9 @@ pub fn render_center_panel(
 ) {
     // 文件列表
     if !connection.is_connected && !connection.is_connecting {
-        crate::ui::draw_disconnected_view(ui, &misc.i18n);
+        draw_disconnected_view(ui, &misc.i18n);
     } else if connection.is_connecting || (connection.is_connected && !connection.remote_ready) {
-        crate::ui::draw_loading_view(ui, connection.is_connecting, &misc.i18n);
+        draw_loading_view(ui, connection.is_connecting, &misc.i18n);
     } else if let Some(tree) = &mut file_list.file_tree {
         let mut state = crate::ui::TreeViewState {
             search_query: &mut file_list.search_query,
@@ -277,6 +538,42 @@ pub fn render_center_panel(
             },
         );
     } else {
-        crate::ui::draw_no_files_view(ui, &misc.i18n);
+        draw_no_files_view(ui, &misc.i18n);
     }
+}
+
+// 绘制未连接状态的提示
+fn draw_disconnected_view(ui: &mut egui::Ui, i18n: &I18n) {
+    ui.vertical_centered(|ui| {
+        ui.add_space(ui.available_height() / 2.0 - 80.0);
+        ui.heading(i18n.status_enter_app_id());
+        ui.add_space(20.0);
+        ui.label(i18n.hint_you_can());
+        ui.label(i18n.hint_select_game());
+        ui.label(i18n.hint_enter_app_id());
+    });
+}
+
+// 绘制连接中/加载中状态
+fn draw_loading_view(ui: &mut egui::Ui, is_connecting: bool, i18n: &I18n) {
+    ui.vertical_centered(|ui| {
+        ui.add_space(ui.available_height() / 2.0 - 40.0);
+        ui.spinner();
+        ui.add_space(10.0);
+        if is_connecting {
+            ui.label(i18n.connecting());
+        } else {
+            ui.label(i18n.status_loading_files());
+        }
+    });
+}
+
+// 绘制无文件状态
+fn draw_no_files_view(ui: &mut egui::Ui, i18n: &I18n) {
+    ui.vertical_centered(|ui| {
+        ui.add_space(ui.available_height() / 2.0 - 50.0);
+        ui.heading(i18n.no_cloud_files());
+        ui.add_space(10.0);
+        ui.label(i18n.no_cloud_files_hint());
+    });
 }

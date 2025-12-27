@@ -385,12 +385,9 @@ src/
 │
 └── ui/
     ├── mod.rs              # UI 模块导出
-    ├── app_panels.rs       # 顶部/底部面板
-    ├── app_views.rs        # 中心面板
+    ├── app_panels.rs       # 面板渲染（顶部/底部/中心、操作按钮、状态栏）
     ├── controls.rs         # 控件渲染
     ├── file_list.rs        # 文件列表（表格/树状）
-    ├── action_buttons.rs   # 操作按钮
-    ├── status_bar.rs       # 状态栏
     ├── windows.rs          # 窗口（游戏选择、用户选择）
     ├── settings.rs         # 设置窗口
     ├── upload_dialog.rs    # 上传对话框

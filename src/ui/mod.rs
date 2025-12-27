@@ -1,6 +1,4 @@
-pub mod action_buttons;
 pub mod app_panels;
-pub mod app_views;
 pub mod appinfo_dialog;
 pub mod backup_dialog;
 pub mod conflict_dialog;
@@ -9,13 +7,10 @@ pub mod file_list;
 pub mod font_loader;
 pub mod guide_dialog;
 pub mod settings;
-pub mod status_bar;
 pub mod upload_dialog;
 pub mod windows;
 
-pub use action_buttons::*;
 pub use app_panels::*;
-pub use app_views::*;
 pub use appinfo_dialog::*;
 pub use backup_dialog::*;
 pub use conflict_dialog::*;
@@ -24,6 +19,5 @@ pub use file_list::{render_file_tree, FileTreeRenderParams, TreeViewState};
 pub use font_loader::setup_fonts;
 pub use guide_dialog::*;
 pub use settings::*;
-pub use status_bar::*;
 pub use upload_dialog::*;
 pub use windows::*;
