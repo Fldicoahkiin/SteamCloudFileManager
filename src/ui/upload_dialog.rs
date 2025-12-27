@@ -1,6 +1,6 @@
 use crate::file_manager::{format_size, UploadQueue};
 use crate::i18n::I18n;
-use egui::{Color32, RichText};
+use egui::RichText;
 
 // 上传对话框的操作结果
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,7 +77,10 @@ impl UploadPreviewDialog {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if !self.queue.tasks.is_empty()
                             && ui
-                                .button(RichText::new(i18n.clear_all()).color(Color32::GRAY))
+                                .button(
+                                    RichText::new(i18n.clear_all())
+                                        .color(crate::ui::theme::muted_color(ctx)),
+                                )
                                 .clicked()
                         {
                             self.queue.tasks.clear();
@@ -95,7 +98,7 @@ impl UploadPreviewDialog {
                         ui.add_space(40.0);
                         ui.label(
                             RichText::new(i18n.no_files_to_upload())
-                                .color(Color32::GRAY)
+                                .color(crate::ui::theme::muted_color(ctx))
                                 .size(14.0),
                         );
                         ui.add_space(40.0);
@@ -112,7 +115,7 @@ impl UploadPreviewDialog {
 
                 // 警告信息
                 if self.has_warnings() {
-                    ui.colored_label(Color32::from_rgb(255, 193, 7), i18n.warning());
+                    ui.colored_label(crate::ui::theme::warning_color(ctx), i18n.warning());
                     ui.label(i18n.overwrite_warning());
                     ui.add_space(8.0);
                 }
@@ -166,7 +169,7 @@ impl UploadPreviewDialog {
             ui.horizontal(|ui| {
                 // 删除按钮
                 if ui
-                    .button(RichText::new("✕").color(Color32::from_rgb(220, 53, 69)))
+                    .button(RichText::new("✕").color(crate::ui::theme::error_color(ui.ctx())))
                     .on_hover_text(i18n.remove_file())
                     .clicked()
                 {
@@ -238,7 +241,7 @@ impl UploadPreviewDialog {
 
                     // 编辑按钮
                     if ui
-                        .button(RichText::new("✎").color(Color32::GRAY))
+                        .button(RichText::new("✎").color(crate::ui::theme::muted_color(ui.ctx())))
                         .on_hover_text(i18n.edit_path())
                         .clicked()
                     {
@@ -249,7 +252,10 @@ impl UploadPreviewDialog {
 
                 // 文件大小
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    ui.label(RichText::new(format_size(task.size)).color(Color32::GRAY));
+                    ui.label(
+                        RichText::new(format_size(task.size))
+                            .color(crate::ui::theme::muted_color(ui.ctx())),
+                    );
                 });
             });
 
@@ -319,7 +325,7 @@ impl UploadProgressDialog {
             .show(ctx, |ui| {
                 ui.vertical_centered(|ui| {
                     // 进度条（蓝色主题）
-                    let progress_color = Color32::from_rgb(33, 150, 243); // #2196F3
+                    let progress_color = crate::ui::theme::accent_color(ctx);
                     ui.add(
                         egui::ProgressBar::new(self.progress)
                             .fill(progress_color)
@@ -409,7 +415,7 @@ impl UploadCompleteDialog {
                         ui.label(
                             RichText::new(i18n.upload_success(self.success_count))
                                 .size(16.0)
-                                .color(Color32::from_rgb(76, 175, 80)),
+                                .color(crate::ui::theme::success_color(ctx)),
                         );
                     } else {
                         ui.label(
@@ -417,7 +423,7 @@ impl UploadCompleteDialog {
                                 i18n.upload_partial(self.success_count, self.failed_count),
                             )
                             .size(16.0)
-                            .color(Color32::from_rgb(255, 193, 7)),
+                            .color(crate::ui::theme::warning_color(ctx)),
                         );
                     }
 
@@ -438,7 +444,7 @@ impl UploadCompleteDialog {
                         ui.separator();
                         ui.label(
                             RichText::new(i18n.failed_files())
-                                .color(Color32::from_rgb(244, 67, 54)),
+                                .color(crate::ui::theme::error_color(ctx)),
                         );
 
                         egui::ScrollArea::vertical()
@@ -447,12 +453,15 @@ impl UploadCompleteDialog {
                                 for (filename, error) in &self.failed_files {
                                     ui.horizontal(|ui| {
                                         ui.label("✖");
-                                        ui.label(RichText::new(filename).color(Color32::GRAY));
+                                        ui.label(
+                                            RichText::new(filename)
+                                                .color(crate::ui::theme::muted_color(ctx)),
+                                        );
                                     });
                                     ui.label(
                                         RichText::new(i18n.reason(error))
                                             .size(12.0)
-                                            .color(Color32::DARK_GRAY),
+                                            .color(crate::ui::theme::muted_color(ctx)),
                                     );
                                     ui.add_space(5.0);
                                 }

@@ -2,7 +2,7 @@ use crate::backup::{BackupProgress, BackupResult};
 use crate::file_manager::format_size;
 use crate::i18n::I18n;
 use crate::steam_api::CloudFile;
-use egui::{Color32, RichText};
+use egui::RichText;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum BackupAction {
@@ -70,7 +70,7 @@ impl BackupPreviewDialog {
                     ui.add_space(4.0);
                     ui.label(
                         RichText::new(i18n.backup_cdp_warning(total_files - cdp_files))
-                            .color(Color32::from_rgb(255, 165, 0))
+                            .color(crate::ui::theme::warning_color(ctx))
                             .size(11.0),
                     );
                 }
@@ -92,9 +92,9 @@ impl BackupPreviewDialog {
                                 let has_url = file.root_description.starts_with("CDP:");
                                 let icon = if has_url { "✓" } else { "⚠" };
                                 let color = if has_url {
-                                    Color32::from_rgb(100, 200, 100)
+                                    crate::ui::theme::success_color(ctx)
                                 } else {
-                                    Color32::from_rgb(255, 165, 0)
+                                    crate::ui::theme::warning_color(ctx)
                                 };
                                 ui.label(RichText::new(icon).color(color));
 
@@ -107,7 +107,7 @@ impl BackupPreviewDialog {
                                     |ui| {
                                         ui.label(
                                             RichText::new(format_size(file.size))
-                                                .color(Color32::GRAY),
+                                                .color(crate::ui::theme::muted_color(ctx)),
                                         );
                                     },
                                 );
@@ -133,9 +133,9 @@ impl BackupPreviewDialog {
                                 can_backup,
                                 egui::Button::new(RichText::new(i18n.backup_start()).color(
                                     if can_backup {
-                                        Color32::WHITE
+                                        crate::ui::theme::primary_button_text_color(ui.ctx())
                                     } else {
-                                        Color32::GRAY
+                                        crate::ui::theme::muted_color(ui.ctx())
                                     },
                                 )),
                             )
@@ -202,13 +202,13 @@ impl BackupProgressDialog {
                     if result.success {
                         ui.label(
                             RichText::new(i18n.backup_complete())
-                                .color(Color32::from_rgb(100, 200, 100))
+                                .color(crate::ui::theme::success_color(ui.ctx()))
                                 .size(16.0),
                         );
                     } else {
                         ui.label(
                             RichText::new(i18n.backup_partial())
-                                .color(Color32::from_rgb(255, 165, 0))
+                                .color(crate::ui::theme::warning_color(ui.ctx()))
                                 .size(16.0),
                         );
                     }
@@ -221,7 +221,7 @@ impl BackupProgressDialog {
                         ui.add_space(8.0);
                         ui.label(
                             RichText::new(i18n.backup_failed_files())
-                                .color(Color32::from_rgb(255, 100, 100)),
+                                .color(crate::ui::theme::error_color(ui.ctx())),
                         );
 
                         egui::ScrollArea::vertical()
@@ -237,7 +237,7 @@ impl BackupProgressDialog {
                     ui.label(
                         RichText::new(format!("{}", result.backup_path.display()))
                             .size(11.0)
-                            .color(Color32::GRAY),
+                            .color(crate::ui::theme::muted_color(ui.ctx())),
                     );
 
                     ui.add_space(12.0);
@@ -278,7 +278,7 @@ impl BackupProgressDialog {
                         ui.label(
                             RichText::new(&self.progress.current_file)
                                 .size(11.0)
-                                .color(Color32::GRAY),
+                                .color(crate::ui::theme::muted_color(ui.ctx())),
                         );
                     }
 
@@ -358,13 +358,13 @@ impl DownloadProgressDialog {
                     if result.success {
                         ui.label(
                             RichText::new(i18n.download_complete())
-                                .color(Color32::from_rgb(100, 200, 100))
+                                .color(crate::ui::theme::success_color(ui.ctx()))
                                 .size(16.0),
                         );
                     } else {
                         ui.label(
                             RichText::new(i18n.download_partial_status())
-                                .color(Color32::from_rgb(255, 165, 0))
+                                .color(crate::ui::theme::warning_color(ui.ctx()))
                                 .size(16.0),
                         );
                     }
@@ -377,7 +377,7 @@ impl DownloadProgressDialog {
                         ui.add_space(8.0);
                         ui.label(
                             RichText::new(i18n.download_failed_files())
-                                .color(Color32::from_rgb(255, 100, 100)),
+                                .color(crate::ui::theme::error_color(ui.ctx())),
                         );
 
                         egui::ScrollArea::vertical()
@@ -393,7 +393,7 @@ impl DownloadProgressDialog {
                     ui.label(
                         RichText::new(format!("{}", result.target_dir.display()))
                             .size(11.0)
-                            .color(Color32::GRAY),
+                            .color(crate::ui::theme::muted_color(ui.ctx())),
                     );
 
                     ui.add_space(12.0);
@@ -434,7 +434,7 @@ impl DownloadProgressDialog {
                         ui.label(
                             RichText::new(&self.progress.current_file)
                                 .size(11.0)
-                                .color(Color32::GRAY),
+                                .color(crate::ui::theme::muted_color(ui.ctx())),
                         );
                     }
 

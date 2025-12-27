@@ -51,7 +51,7 @@ pub fn draw_game_selector_window(
                     // 显示 VDF/CDP 数量
                     ui.label(
                         egui::RichText::new(format!("(VDF: {} | CDP: {})", vdf_count, cdp_count))
-                            .color(egui::Color32::GRAY),
+                            .color(crate::ui::theme::muted_color(ui.ctx())),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // 刷新按钮
@@ -99,10 +99,13 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Optio
                     }
 
                     if game.is_installed {
-                        ui.colored_label(egui::Color32::from_rgb(0, 200, 0), i18n.installed());
+                        ui.colored_label(
+                            crate::ui::theme::installed_color(ui.ctx()),
+                            i18n.installed(),
+                        );
                     } else {
                         ui.colored_label(
-                            egui::Color32::from_rgb(150, 150, 150),
+                            crate::ui::theme::muted_color(ui.ctx()),
                             i18n.not_installed(),
                         );
                     }

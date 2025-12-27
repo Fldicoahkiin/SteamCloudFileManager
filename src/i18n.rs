@@ -252,6 +252,20 @@ impl I18n {
         }
     }
 
+    pub fn settings_appearance(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "外观",
+            Language::English => "Appearance",
+        }
+    }
+
+    pub fn theme_mode_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "主题模式:",
+            Language::English => "Theme Mode:",
+        }
+    }
+
     pub fn error_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "错误",
@@ -1252,6 +1266,41 @@ impl I18n {
         match self.lang {
             Language::Chinese => "已同步",
             Language::English => "Synced",
+        }
+    }
+
+    pub fn status_local_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地新",
+            Language::English => "Local↑",
+        }
+    }
+
+    pub fn status_cloud_newer(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端新",
+            Language::English => "Cloud↓",
+        }
+    }
+
+    pub fn status_conflict(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "冲突",
+            Language::English => "Conflict",
+        }
+    }
+
+    pub fn status_local_only(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "仅本地",
+            Language::English => "Local",
+        }
+    }
+
+    pub fn status_cloud_only(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "仅云端",
+            Language::English => "Cloud",
         }
     }
 

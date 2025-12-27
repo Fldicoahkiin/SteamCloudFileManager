@@ -5,6 +5,7 @@ use egui;
 pub enum SettingsTab {
     #[default]
     Log,
+    Appearance,
     Backup,
     About,
 }
@@ -12,6 +13,7 @@ pub enum SettingsTab {
 pub struct SettingsWindowState {
     pub tab: SettingsTab,
     pub about_icon_texture: Option<egui::TextureHandle>,
+    pub theme_mode: crate::ui::theme::ThemeMode,
 }
 
 impl Default for SettingsWindowState {
@@ -19,6 +21,7 @@ impl Default for SettingsWindowState {
         Self {
             tab: SettingsTab::Log,
             about_icon_texture: None,
+            theme_mode: crate::ui::theme::ThemeMode::default(),
         }
     }
 }
@@ -33,7 +36,7 @@ pub fn draw_settings_window(
 ) -> Option<crate::update::ReleaseInfo> {
     let mut download_release = None;
 
-    let steam_blue = egui::Color32::from_rgb(102, 192, 244);
+    let accent_color = crate::ui::theme::accent_color(ctx);
 
     egui::Window::new(i18n.settings_title())
         .open(show)
@@ -57,7 +60,7 @@ pub fn draw_settings_window(
                         [ui.available_width(), 28.0],
                         egui::Button::new(egui::RichText::new(i18n.settings_log()).color(
                             if log_selected {
-                                steam_blue
+                                accent_color
                             } else {
                                 ui.style().visuals.text_color()
                             },
@@ -65,11 +68,34 @@ pub fn draw_settings_window(
                         .fill(if log_selected {
                             ui.style().visuals.selection.bg_fill
                         } else {
-                            egui::Color32::TRANSPARENT
+                            crate::ui::theme::transparent_color()
                         }),
                     );
                     if log_response.clicked() {
                         state.tab = SettingsTab::Log;
+                    }
+
+                    ui.add_space(4.0);
+
+                    // 外观
+                    let appearance_selected = state.tab == SettingsTab::Appearance;
+                    let appearance_response = ui.add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new(egui::RichText::new(i18n.settings_appearance()).color(
+                            if appearance_selected {
+                                accent_color
+                            } else {
+                                ui.style().visuals.text_color()
+                            },
+                        ))
+                        .fill(if appearance_selected {
+                            ui.style().visuals.selection.bg_fill
+                        } else {
+                            crate::ui::theme::transparent_color()
+                        }),
+                    );
+                    if appearance_response.clicked() {
+                        state.tab = SettingsTab::Appearance;
                     }
 
                     ui.add_space(4.0);
@@ -80,7 +106,7 @@ pub fn draw_settings_window(
                         [ui.available_width(), 28.0],
                         egui::Button::new(egui::RichText::new(i18n.backup()).color(
                             if backup_selected {
-                                steam_blue
+                                accent_color
                             } else {
                                 ui.style().visuals.text_color()
                             },
@@ -88,7 +114,7 @@ pub fn draw_settings_window(
                         .fill(if backup_selected {
                             ui.style().visuals.selection.bg_fill
                         } else {
-                            egui::Color32::TRANSPARENT
+                            crate::ui::theme::transparent_color()
                         }),
                     );
                     if backup_response.clicked() {
@@ -103,7 +129,7 @@ pub fn draw_settings_window(
                         [ui.available_width(), 28.0],
                         egui::Button::new(egui::RichText::new(i18n.settings_about()).color(
                             if about_selected {
-                                steam_blue
+                                accent_color
                             } else {
                                 ui.style().visuals.text_color()
                             },
@@ -111,7 +137,7 @@ pub fn draw_settings_window(
                         .fill(if about_selected {
                             ui.style().visuals.selection.bg_fill
                         } else {
-                            egui::Color32::TRANSPARENT
+                            crate::ui::theme::transparent_color()
                         }),
                     );
                     if about_response.clicked() {
@@ -131,6 +157,9 @@ pub fn draw_settings_window(
                             match state.tab {
                                 SettingsTab::Log => {
                                     draw_log_settings(ui, i18n);
+                                }
+                                SettingsTab::Appearance => {
+                                    draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
                                 }
                                 SettingsTab::Backup => {
                                     draw_backup_settings(ui, i18n);
@@ -166,7 +195,7 @@ fn draw_log_settings(ui: &mut egui::Ui, i18n: &I18n) {
         ui.label(
             egui::RichText::new(tip_text)
                 .size(11.0)
-                .color(egui::Color32::from_rgb(255, 165, 0)),
+                .color(crate::ui::theme::warning_color(ui.ctx())),
         );
         ui.add_space(12.0);
     }
@@ -205,6 +234,36 @@ fn draw_log_settings(ui: &mut egui::Ui, i18n: &I18n) {
     }
 }
 
+// 外观设置内容
+fn draw_appearance_settings(
+    ctx: &egui::Context,
+    ui: &mut egui::Ui,
+    theme_mode: &mut crate::ui::theme::ThemeMode,
+    i18n: &I18n,
+) {
+    // 主题选择
+    ui.horizontal(|ui| {
+        ui.label(i18n.theme_mode_label());
+
+        let current_mode = *theme_mode;
+        egui::ComboBox::from_id_salt("theme_mode_selector")
+            .selected_text(current_mode.display_name(i18n))
+            .width(120.0)
+            .show_ui(ui, |ui| {
+                for mode in crate::ui::theme::ThemeMode::all() {
+                    let is_selected = current_mode == *mode;
+                    if ui
+                        .selectable_label(is_selected, mode.display_name(i18n))
+                        .clicked()
+                    {
+                        *theme_mode = *mode;
+                        crate::ui::theme::apply_theme(ctx, *mode);
+                    }
+                }
+            });
+    });
+}
+
 // 备份设置内容
 fn draw_backup_settings(ui: &mut egui::Ui, i18n: &I18n) {
     let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
@@ -236,7 +295,7 @@ fn draw_about_content(
     update_manager: &mut crate::update::UpdateManager,
     i18n: &I18n,
 ) -> Option<crate::update::ReleaseInfo> {
-    let steam_blue = egui::Color32::from_rgb(102, 192, 244);
+    let steam_blue = crate::ui::theme::accent_color(ui.ctx());
     let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
     let text_normal = ui.style().visuals.text_color();
 
@@ -343,21 +402,21 @@ fn draw_about_content(
                 ui.label(
                     egui::RichText::new(i18n.already_latest())
                         .size(11.0)
-                        .color(egui::Color32::from_rgb(76, 175, 80)),
+                        .color(crate::ui::theme::success_color(ui.ctx())),
                 );
             }
             crate::update::UpdateStatus::Available(release) => {
                 ui.label(
                     egui::RichText::new(i18n.new_version_found(&release.tag_name))
                         .size(11.0)
-                        .color(egui::Color32::from_rgb(255, 152, 0)),
+                        .color(crate::ui::theme::warning_color(ui.ctx())),
                 );
             }
             crate::update::UpdateStatus::Error(err) => {
                 ui.label(
                     egui::RichText::new(format!("❌ {}", err))
                         .size(10.0)
-                        .color(egui::Color32::from_rgb(244, 67, 54)),
+                        .color(crate::ui::theme::error_color(ui.ctx())),
                 );
             }
             _ => {}
@@ -421,7 +480,7 @@ fn draw_about_content(
             ui.label(
                 egui::RichText::new(i18n.update_success())
                     .size(12.0)
-                    .color(egui::Color32::from_rgb(76, 175, 80)),
+                    .color(crate::ui::theme::success_color(ui.ctx())),
             );
             ui.label(
                 egui::RichText::new(i18n.restart_to_apply())

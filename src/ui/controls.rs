@@ -17,7 +17,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui, i18n: &I18n) -> (bool, bool, boo
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new(i18n.debug_mode_not_enabled())
-                    .color(egui::Color32::from_rgb(255, 200, 0))
+                    .color(crate::ui::theme::warning_color(ui.ctx()))
                     .size(16.0)
                     .strong(),
             );
@@ -28,13 +28,13 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui, i18n: &I18n) -> (bool, bool, boo
             if steam_running {
                 ui.label(
                     egui::RichText::new(i18n.steam_running())
-                        .color(egui::Color32::from_rgb(100, 200, 100))
+                        .color(crate::ui::theme::success_color(ui.ctx()))
                         .size(13.0),
                 );
             } else {
                 ui.label(
                     egui::RichText::new(i18n.steam_not_running())
-                        .color(egui::Color32::from_rgb(200, 100, 100))
+                        .color(crate::ui::theme::error_color(ui.ctx()))
                         .size(13.0),
                 );
             }
@@ -43,7 +43,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui, i18n: &I18n) -> (bool, bool, boo
         // 说明文字
         ui.label(
             egui::RichText::new(i18n.debug_mode_hint())
-                .color(egui::Color32::LIGHT_GRAY)
+                .color(crate::ui::theme::muted_color(ui.ctx()))
                 .size(13.0),
         );
 
@@ -89,7 +89,7 @@ pub fn draw_debug_warning_ui(ui: &mut egui::Ui, i18n: &I18n) -> (bool, bool, boo
                 .button(
                     egui::RichText::new(i18n.dismiss_temporarily())
                         .size(14.0)
-                        .color(egui::Color32::GRAY),
+                        .color(crate::ui::theme::muted_color(ui.ctx())),
                 )
                 .on_hover_text(i18n.dismiss_hint())
                 .clicked()
@@ -215,7 +215,7 @@ pub fn draw_connection_controls(
         // 连接时提示：断开后 Steam 将自动同步
         ui.label(
             egui::RichText::new(i18n.disconnect_sync_hint())
-                .color(egui::Color32::from_rgb(102, 192, 244)),
+                .color(crate::ui::theme::accent_color(ui.ctx())),
         );
     } else if ui
         .button(i18n.connect())

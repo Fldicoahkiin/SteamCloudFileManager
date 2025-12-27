@@ -9,7 +9,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 const INDENT_WIDTH: f32 = 20.0; // 每层缩进宽度
-const LINE_COLOR: egui::Color32 = egui::Color32::from_gray(100); // 线条颜色
 
 // 树状视图状态
 pub struct TreeViewState<'a> {
@@ -42,6 +41,7 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
         return 0.0;
     }
 
+    let line_color = crate::ui::theme::muted_color(ui.ctx());
     let painter = ui.painter();
     let rect = ui.available_rect_before_wrap();
     let y_mid = rect.center().y; // 行的中心点
@@ -53,7 +53,7 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
             let x = base_x + (level as f32 + 0.5) * INDENT_WIDTH;
             painter.line_segment(
                 [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-                egui::Stroke::new(1.0, LINE_COLOR),
+                egui::Stroke::new(1.0, line_color),
             );
         }
     }
@@ -67,13 +67,13 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
         // 最后一个节点
         painter.line_segment(
             [egui::pos2(x, rect.min.y), egui::pos2(x, y_mid)],
-            egui::Stroke::new(1.0, LINE_COLOR),
+            egui::Stroke::new(1.0, line_color),
         );
     } else {
         // 非最后节点
         painter.line_segment(
             [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-            egui::Stroke::new(1.0, LINE_COLOR),
+            egui::Stroke::new(1.0, line_color),
         );
     }
 
@@ -81,7 +81,7 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
     let h_end = base_x + depth as f32 * INDENT_WIDTH;
     painter.line_segment(
         [egui::pos2(x, y_mid), egui::pos2(h_end, y_mid)],
-        egui::Stroke::new(1.0, LINE_COLOR),
+        egui::Stroke::new(1.0, line_color),
     );
 
     depth as f32 * INDENT_WIDTH
@@ -307,7 +307,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
         .column(Column::exact(140.0)) // 写入日期
         .column(Column::exact(40.0)) // 本地
         .column(Column::exact(40.0)) // 云端
-        .column(Column::exact(60.0)) // 状态
+        .column(Column::exact(70.0)) // 状态
         .max_scroll_height(available_height)
         .header(20.0, |mut header| {
             header.col(|ui| {
@@ -583,35 +583,53 @@ fn render_tree_body_recursive(
 
                     // 本地列
                     row.col(|ui| {
+                        let ctx = ui.ctx();
                         if file.exists {
-                            ui.colored_label(egui::Color32::from_rgb(0, 200, 0), "✓");
+                            ui.colored_label(crate::ui::theme::local_exists_color(ctx), "✓");
                         } else {
-                            ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "✗");
+                            ui.colored_label(crate::ui::theme::muted_color(ctx), "✗");
                         }
                     });
 
                     // 云端列
                     row.col(|ui| {
+                        let ctx = ui.ctx();
                         if file.is_persisted {
-                            ui.colored_label(egui::Color32::from_rgb(0, 150, 255), "✓");
+                            ui.colored_label(crate::ui::theme::cloud_exists_color(ctx), "✓");
                         } else {
-                            ui.colored_label(egui::Color32::from_rgb(150, 150, 150), "✗");
+                            ui.colored_label(crate::ui::theme::muted_color(ctx), "✗");
                         }
                     });
 
                     // 状态列（最右边）
                     row.col(|ui| {
                         if let Some(status) = sync_status {
-                            let (icon, color) = match status {
-                                SyncStatus::Synced => ("☁", egui::Color32::GREEN), // 云标志表示已同步
-                                SyncStatus::LocalNewer => ("↑", egui::Color32::LIGHT_BLUE),
-                                SyncStatus::CloudNewer => ("↓", egui::Color32::YELLOW),
-                                SyncStatus::Conflict => ("⚠", egui::Color32::RED),
-                                SyncStatus::LocalOnly => ("📁", egui::Color32::GRAY),
-                                SyncStatus::CloudOnly => ("☁", egui::Color32::KHAKI),
-                                SyncStatus::Unknown => ("?", egui::Color32::GRAY),
+                            let ctx = ui.ctx();
+                            let i18n = crate::i18n::I18n::new(crate::i18n::Language::default());
+                            let (text, color) = match status {
+                                SyncStatus::Synced => {
+                                    (i18n.filter_synced(), crate::ui::theme::success_color(ctx))
+                                }
+                                SyncStatus::LocalNewer => {
+                                    (i18n.status_local_newer(), crate::ui::theme::info_color(ctx))
+                                }
+                                SyncStatus::CloudNewer => (
+                                    i18n.status_cloud_newer(),
+                                    crate::ui::theme::warning_color(ctx),
+                                ),
+                                SyncStatus::Conflict => {
+                                    (i18n.status_conflict(), crate::ui::theme::error_color(ctx))
+                                }
+                                SyncStatus::LocalOnly => {
+                                    (i18n.status_local_only(), crate::ui::theme::muted_color(ctx))
+                                }
+                                SyncStatus::CloudOnly => (
+                                    i18n.status_cloud_only(),
+                                    crate::ui::theme::cloud_only_color(ctx),
+                                ),
+                                SyncStatus::Unknown => ("?", crate::ui::theme::muted_color(ctx)),
                             };
-                            ui.colored_label(color, icon);
+                            ui.colored_label(color, text);
                         }
                     });
                 });

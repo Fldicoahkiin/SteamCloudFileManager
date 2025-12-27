@@ -327,7 +327,8 @@ fn render_file_table(
                         let comparison = &item.comparison;
 
                         // 状态图标
-                        let (status_text, status_color) = get_status_display(comparison.status);
+                        let (status_text, status_color) =
+                            get_status_display(comparison.status, ui.ctx());
 
                         if ui
                             .selectable_label(
@@ -384,7 +385,8 @@ fn render_file_table(
                         ui.label(&cloud_time);
 
                         // Hash 状态
-                        let (hash_text, hash_color) = get_hash_display(comparison.hash_status);
+                        let (hash_text, hash_color) =
+                            get_hash_display(comparison.hash_status, ui.ctx());
                         ui.colored_label(hash_color, hash_text);
 
                         ui.end_row();
@@ -442,16 +444,16 @@ fn render_detail_panel(
             ui.horizontal(|ui| {
                 ui.label("差异项:");
                 if flags.exists_diff {
-                    ui.colored_label(egui::Color32::RED, "存在");
+                    ui.colored_label(crate::ui::theme::error_color(ui.ctx()), "存在");
                 }
                 if flags.persisted_diff {
-                    ui.colored_label(egui::Color32::YELLOW, "同步");
+                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), "同步");
                 }
                 if flags.size_diff {
-                    ui.colored_label(egui::Color32::YELLOW, "大小");
+                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), "大小");
                 }
                 if flags.time_diff {
-                    ui.colored_label(egui::Color32::LIGHT_BLUE, "时间");
+                    ui.colored_label(crate::ui::theme::info_color(ui.ctx()), "时间");
                 }
             });
         }
@@ -477,7 +479,7 @@ fn render_detail_panel(
                 if let Some(ref hash) = local.hash {
                     ui.monospace(hash);
                 } else {
-                    ui.colored_label(egui::Color32::GRAY, "未计算");
+                    ui.colored_label(crate::ui::theme::muted_color(ui.ctx()), "未计算");
                 }
             });
         }
@@ -487,7 +489,7 @@ fn render_detail_panel(
                 if let Some(ref hash) = cloud.hash {
                     ui.monospace(hash);
                 } else {
-                    ui.colored_label(egui::Color32::GRAY, "未计算");
+                    ui.colored_label(crate::ui::theme::muted_color(ui.ctx()), "未计算");
                 }
             });
         }
@@ -503,7 +505,8 @@ fn render_footer(ui: &mut egui::Ui, conflicts: usize, i18n: &I18n) -> bool {
     ui.horizontal(|ui| {
         if conflicts > 0 {
             ui.label(
-                egui::RichText::new(i18n.conflicts_warning(conflicts)).color(egui::Color32::RED),
+                egui::RichText::new(i18n.conflicts_warning(conflicts))
+                    .color(crate::ui::theme::error_color(ui.ctx())),
             );
         }
 
@@ -518,25 +521,28 @@ fn render_footer(ui: &mut egui::Ui, conflicts: usize, i18n: &I18n) -> bool {
 }
 
 // 获取同步状态的显示文本和颜色
-fn get_status_display(status: SyncStatus) -> (&'static str, egui::Color32) {
+fn get_status_display(status: SyncStatus, ctx: &egui::Context) -> (&'static str, egui::Color32) {
     match status {
-        SyncStatus::Synced => ("✓", egui::Color32::GREEN),
-        SyncStatus::LocalNewer => ("↑", egui::Color32::LIGHT_BLUE),
-        SyncStatus::CloudNewer => ("↓", egui::Color32::YELLOW),
-        SyncStatus::Conflict => ("⚠", egui::Color32::RED),
-        SyncStatus::LocalOnly => ("📁", egui::Color32::GRAY),
-        SyncStatus::CloudOnly => ("☁", egui::Color32::GRAY),
-        SyncStatus::Unknown => ("?", egui::Color32::GRAY),
+        SyncStatus::Synced => ("✓", crate::ui::theme::success_color(ctx)),
+        SyncStatus::LocalNewer => ("↑", crate::ui::theme::info_color(ctx)),
+        SyncStatus::CloudNewer => ("↓", crate::ui::theme::warning_color(ctx)),
+        SyncStatus::Conflict => ("⚠", crate::ui::theme::error_color(ctx)),
+        SyncStatus::LocalOnly => ("📁", crate::ui::theme::muted_color(ctx)),
+        SyncStatus::CloudOnly => ("☁", crate::ui::theme::muted_color(ctx)),
+        SyncStatus::Unknown => ("?", crate::ui::theme::muted_color(ctx)),
     }
 }
 
 // 获取 Hash 状态的显示文本和颜色
-fn get_hash_display(status: crate::conflict::HashStatus) -> (&'static str, egui::Color32) {
+fn get_hash_display(
+    status: crate::conflict::HashStatus,
+    ctx: &egui::Context,
+) -> (&'static str, egui::Color32) {
     match status {
-        crate::conflict::HashStatus::Pending => ("⏳", egui::Color32::GRAY),
-        crate::conflict::HashStatus::Checking => ("🔄", egui::Color32::YELLOW),
-        crate::conflict::HashStatus::Match => ("✓", egui::Color32::GREEN),
-        crate::conflict::HashStatus::Mismatch => ("✗", egui::Color32::RED),
-        crate::conflict::HashStatus::Error => ("⚠", egui::Color32::RED),
+        crate::conflict::HashStatus::Pending => ("⏳", crate::ui::theme::muted_color(ctx)),
+        crate::conflict::HashStatus::Checking => ("🔄", crate::ui::theme::warning_color(ctx)),
+        crate::conflict::HashStatus::Match => ("✓", crate::ui::theme::success_color(ctx)),
+        crate::conflict::HashStatus::Mismatch => ("✗", crate::ui::theme::error_color(ctx)),
+        crate::conflict::HashStatus::Error => ("⚠", crate::ui::theme::error_color(ctx)),
     }
 }

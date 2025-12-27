@@ -14,6 +14,9 @@ pub fn setup_fonts(ctx: &egui::Context) {
     load_cjk_fonts(&mut fonts);
 
     ctx.set_fonts(fonts);
+
+    // 应用默认主题
+    crate::ui::theme::apply_theme(ctx, crate::ui::theme::ThemeMode::default());
 }
 
 // 加载符号字体

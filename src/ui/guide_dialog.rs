@@ -59,7 +59,7 @@ impl GuideDialog {
                     ui.add_space(10.0);
 
                     if *is_error {
-                        ui.colored_label(egui::Color32::from_rgb(220, 80, 80), status);
+                        ui.colored_label(crate::ui::theme::error_color(ctx), status);
                     } else if *is_success {
                         ui.heading(status);
                     } else {

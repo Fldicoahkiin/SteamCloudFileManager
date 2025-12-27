@@ -7,6 +7,7 @@ pub mod file_list;
 pub mod font_loader;
 pub mod guide_dialog;
 pub mod settings;
+pub mod theme;
 pub mod upload_dialog;
 pub mod windows;
 
