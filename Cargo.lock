@@ -4404,7 +4404,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "steam-cloud-file-manager"
-version = "0.8.9-beta"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -6369,10 +6369,12 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "displaydoc",
+ "flate2",
  "indexmap",
  "memchr",
  "thiserror 2.0.17",
  "time",
+ "zopfli",
 ]
 
 [[package]]
@@ -6384,6 +6386,18 @@ dependencies = [
  "base64",
  "ed25519-dalek",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "zopfli"
+version = "0.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f05cd8797d63865425ff89b5c4a48804f35ba0ce8d125800027ad6017d2b5249"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
 ]
 
 [[package]]
