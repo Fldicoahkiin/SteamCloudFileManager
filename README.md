@@ -40,29 +40,18 @@
 - **软链接同步**：支持将非原生支持的本地文件通过软链接挂载至 Steam Cloud（实验性）。
 - **多平台支持**：Windows / macOS / Linux。
 
-## 平台支持
+## 平台兼容性
 
-### x64 (Intel/AMD)
+支持 **Windows (x64)**、**macOS (Intel & Apple Silicon)** 以及 **Linux (x64)**。
+构建产物包含常规的安装包及免安装版本（Generic Binary / AppImage）。
 
-| 平台 | 状态 | 打包格式 |
-|:----:|:----:|----------|
-| Windows | ✅ | `.zip` |
-| macOS | ✅ | `.dmg` |
-| Linux | ✅ | `.deb` `.rpm` `.AppImage` `.tar.gz` |
-
-### ARM64
-
-| 平台 | 状态 | 说明 |
-|:----:|:----:|------|
-| macOS (Apple Silicon) | ✅ | 原生支持 |
-| Windows | ❌ | Steam SDK 不支持 |
-| Linux | ❌ | Steam SDK 不支持 |
+> *注：由于 Steamworks SDK 的上游限制，目前无法构建 Windows 和 Linux 的 ARM64 版本。*
 
 ## 安装
 
 ### Windows
 
-1. 从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `SteamCloudFileManager-windows-x86_64.zip`
+1. 下载 [![Portable-x64](https://img.shields.io/badge/Portable-x64-0078D6.svg?logo=windows)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 2. 解压到任意位置
 3. 双击 `SteamCloudFileManager.exe` 运行
 
@@ -74,44 +63,49 @@
 
 ### macOS
 
-1. 从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载对应版本：
-   - Intel 芯片：`SteamCloudFileManager-macos-x86_64.dmg`
-   - Apple Silicon：`SteamCloudFileManager-macos-aarch64.dmg`
+1. 下载对应版本：
+   - Intel 芯片：[![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+   - Apple Silicon：[![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 2. 打开 DMG 文件
 3. 将应用拖入 Applications 文件夹
+4. 如遇 "损坏" 或 "无法打开" 提示，请在终端执行以下命令修复签名：
+   
+   ```bash
+   xattr -c "/Applications/Steam Cloud File Manager.app"
+   ```
 
 ### Linux
 
 #### Debian/Ubuntu
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.deb` 包，然后安装：
+下载 [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后安装：
 
 ```bash
 # 安装
-sudo dpkg -i steamcloudfilemanager_*.deb
+sudo dpkg -i steam-cloud-file-manager_*.deb
 sudo apt-get install -f
 
 # 运行
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### Fedora/RHEL/openSUSE
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.rpm` 包，然后安装：
+下载 [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后安装：
 
 ```bash
 # 安装
-sudo dnf install ./steamcloudfilemanager-*.rpm
+sudo dnf install ./steam-cloud-file-manager-*.rpm
 # 或
-sudo rpm -i steamcloudfilemanager-*.rpm
+sudo rpm -i steam-cloud-file-manager-*.rpm
 
 # 运行
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### AppImage（通用）
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.AppImage` 文件，然后运行：
+下载 [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后运行：
 
 ```bash
 # 添加执行权限
@@ -123,7 +117,7 @@ chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
 #### Arch Linux (AUR)
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 AUR 包，然后构建安装：
+下载 [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后构建安装：
 
 ```bash
 # 解压 AUR 包
@@ -134,12 +128,12 @@ cd SteamCloudFileManager-linux-x86_64-aur
 makepkg -si
 
 # 运行
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### .tar.gz（通用）
 
-从 [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 下载 `.tar.gz` 包，然后解压运行：
+下载 [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后解压运行：
 
 ```bash
 # 解压
@@ -147,7 +141,7 @@ tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
 cd SteamCloudFileManager-linux-x86_64
 
 # 运行
-./steamcloudfilemanager
+./SteamCloudFileManager
 ```
 
 ### 从源码构建
@@ -161,7 +155,7 @@ cargo build --release
 **构建依赖：**
 
 - **Cargo**
-- **Rust 1.90.0+** (因为 egui 0.33 需要 Rust 1.88+，推荐 1.90+)
+- **Rust 1.90.0+**
   - 使用 Rust 2021 edition
   - 安装：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
@@ -221,82 +215,42 @@ cargo build --release
 
 **注意：** 本软件提供了“以调试模式重启 Steam”按钮，可以自动根据引导完成上述操作。
 
-### 基本操作
+### 基本操作流程
 
-1. 确保 Steam 已以调试模式运行
-2. 启动本工具
-3. 选择游戏：
-   - 点击“游戏库”按钮，从扫描到的游戏列表中选择
-   - 或者直接在 App ID 输入框中输入游戏的 App ID
-4. 点击“连接”按钮
-5. 连接成功后即可下载/上传/删除文件
+1. 确保 Steam 已运行在调试模式。
+2. 选择目标游戏：
+   - **游戏库选择**：点击游戏库按钮选择本地游戏（会自动连接）。
+   - **手动输入**：输入 App ID 后点击 **"连接"**。
+3. 加载完成后，可在左侧树状视图中操作文件。
 
 App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
 
-### 注意事项
-
-> ⚠️ **重要提示**
-
-> **删除操作风险**：
-
-> - 删除云存档文件是 **不可逆** 的操作
-> - 删除后文件会从所有设备上同步删除
-> - 请确保在删除前已经备份重要文件
-
-> **备份建议**：
-
-> - 在进行任何删除或修改操作前，先下载备份
-> - 定期备份重要游戏的云存档
-> - 使用“批量下载”功能快速备份整个游戏的存档
-
-> **云同步说明**：
-
-> - 上传/删除后，请等待 Steam 完成同步（通常在断开连接后）
-> - 同步过程中不要关闭 Steam 或关机
+> ⚠️ **警告**
+>
+> - **删除不可逆**：删除操作会立即提交至本地缓存，无法撤销。
+> - **数据安全**：建议在批量操作前先备份原始文件。
+> - **同步机制**：文件变更写入本地缓存后，Steam 会在后台异步上传。请勿在同步完成前强制杀掉 Steam 进程。
 
 ## 技术架构
 
 ### 云同步机制
 
-Steam 云同步采用三层架构：
-
 ```
 Steam 云端服务器
-        ↕ (后台异步同步)
-Steam 客户端本地缓存
+        ↕ (异步后台同步)
+Steam Client 本地缓存
         ↕ (Steam API)
-本软件
+Steam 云文件管理器
 ```
 
-**重要说明**：
+### VDF 解析与 Root 映射
 
-- 上传/删除操作会立即写入**本地缓存**
-- 实际同步到云端是 **后台异步**进行的
-- **断开连接后** Steam 会自动触发同步，这是 Steam 的安全机制
-
-### VDF 解析
-
-- 直接读取 `remotecache.vdf` 获取完整文件列表
-- 显示文件在本地磁盘的实际存储位置
-- 支持所有 Root 路径类型（0-12）
-
-**什么是 Root 路径？**
-
-Root 路径是 Steam 云存档系统中的文件存储位置类型。不同的游戏可能将存档保存在不同的目录：
-
-- **Root 0** - Steam Cloud 默认目录（`userdata/{user_id}/{app_id}/remote/`）
-- **Root 1** - 游戏安装目录（`steamapps/common/{GameDir}/`）
-- **Root 2** - 文档文件夹（Windows: `Documents/`, macOS: `~/Documents/`）
-- **Root 3** - AppData Roaming（Windows: `%APPDATA%`, macOS: `~/Library/Application Support/`）
-- **Root 7** - macOS Application Support / Windows Videos
-- **Root 12** - Windows LocalLow / macOS Caches
-- **其他** - 图片、音乐、视频、桌面等系统文件夹
-
-我们的软件会自动识别并显示每个文件的实际存储位置。
-
-> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。（我还没测试完🥺👉👈
+工具并不依赖硬编码路径，而是实时解析 `remotecache.vdf` 获取文件列表。同时通过解析 **`appinfo.vdf`** (全局应用配置) 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统，将 `Root 0` (Cloud), `Root 1` (InstallDir), `Root 2` (Documents) 等虚拟路径转换为本地磁盘的绝对路径。
+具体映射规则可参考源码和
 
 - **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的路径映射规则
+
+> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。（我还没测试完🥺👉👈
 
 ### CDP 协议
 

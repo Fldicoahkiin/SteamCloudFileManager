@@ -40,29 +40,18 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 - **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
 - **Multi-Platform Support**: Windows / macOS / Linux.
 
-## Platform Support
+## Platform Compatibility
 
-### x64 (Intel/AMD)
+Supports **Windows (x64)**, **macOS (Intel & Apple Silicon)**, and **Linux (x64)**.
+Build artifacts include standard installers and portable versions (Generic Binary / AppImage).
 
-| Platform | Status | Package Format |
-|:--------:|:------:|----------------|
-| Windows | ✅ | `.zip` |
-| macOS | ✅ | `.dmg` |
-| Linux | ✅ | `.deb` `.rpm` `.AppImage` `.tar.gz` |
-
-### ARM64
-
-| Platform | Status | Note |
-|:--------:|:------:|------|
-| macOS (Apple Silicon) | ✅ | Native support |
-| Windows | ❌ | Steam SDK not available |
-| Linux | ❌ | Steam SDK not available |
+> *Note: Due to upstream Steamworks SDK limitations, we cannot currently build ARM64 versions for Windows and Linux.*
 
 ## Installation
 
 ### Windows
 
-1. Download `SteamCloudFileManager-windows-x86_64.zip` from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+1. Download [![Portable-x64](https://img.shields.io/badge/Portable-x64-0078D6.svg?logo=windows)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 2. Extract to any location
 3. Double-click `SteamCloudFileManager.exe` to run
 
@@ -74,44 +63,49 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 
 ### macOS
 
-1. Download from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases):
-   - Intel: `SteamCloudFileManager-macos-x86_64.dmg`
-   - Apple Silicon: `SteamCloudFileManager-macos-aarch64.dmg`
+1. Download the version for your architecture:
+   - Intel: [![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+   - Apple Silicon: [![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 2. Open the DMG file
-3. Drag the app to Applications folder
+3. Drag the app to the Applications folder
+4. If you encounter a "Damaged" or "Cannot be opened" error, run the following command in Terminal to fix the signature:
+   
+   ```bash
+   xattr -c "/Applications/Steam Cloud File Manager.app"
+   ```
 
 ### Linux
 
 #### Debian/Ubuntu
 
-Download the `.deb` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then install:
+Download [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then install:
 
 ```bash
 # Install
-sudo dpkg -i steamcloudfilemanager_*.deb
+sudo dpkg -i steam-cloud-file-manager_*.deb
 sudo apt-get install -f
 
 # Run
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### Fedora/RHEL/openSUSE
 
-Download the `.rpm` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then install:
+Download [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then install:
 
 ```bash
 # Install
-sudo dnf install ./steamcloudfilemanager-*.rpm
+sudo dnf install ./steam-cloud-file-manager-*.rpm
 # or
-sudo rpm -i steamcloudfilemanager-*.rpm
+sudo rpm -i steam-cloud-file-manager-*.rpm
 
 # Run
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### AppImage (Universal)
 
-Download the `.AppImage` file from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then run:
+Download [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then run:
 
 ```bash
 # Add execute permission
@@ -123,7 +117,7 @@ chmod +x SteamCloudFileManager-linux-x86_64.AppImage
 
 #### Arch Linux (AUR)
 
-Download the AUR package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then build and install:
+Download [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then build and install:
 
 ```bash
 # Extract AUR package
@@ -134,12 +128,12 @@ cd SteamCloudFileManager-linux-x86_64-aur
 makepkg -si
 
 # Run
-steamcloudfilemanager
+steam-cloud-file-manager
 ```
 
 #### .tar.gz (Universal)
 
-Download the `.tar.gz` package from [Releases](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases), then extract and run:
+Download [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then extract and run:
 
 ```bash
 # Extract
@@ -147,7 +141,7 @@ tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
 cd SteamCloudFileManager-linux-x86_64
 
 # Run
-./steamcloudfilemanager
+./SteamCloudFileManager
 ```
 
 ### Build from Source
@@ -161,7 +155,7 @@ cargo build --release
 **Build Dependencies:**
 
 - **Cargo**
-- **Rust 1.90.0+** (egui 0.33 requires Rust 1.88+, 1.90+ recommended)
+- **Rust 1.90.0+**
   - Uses Rust 2021 edition
   - Install: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
@@ -185,119 +179,43 @@ cargo build --release
 
 ### Steam Debug Mode
 
-This tool uses CDP protocol to communicate with Steam, which **requires** Steam to run in debug mode.
+This tool relies on the Steam Client's CDP (Chrome DevTools Protocol) interface to fetch cloud file lists. **This interface is disabled by default and must be enabled by adding the `-cef-enable-debugging` argument when launching Steam.**
 
-**Why debug mode is required?**
+The software features a built-in **"Restart Steam in Debug Mode"** button to automate this. If it fails, please launch Steam manually with the argument.
 
-- CDP (Chrome DevTools Protocol) is the debugging interface for Steam's built-in browser
-- We use this interface to retrieve cloud file lists and download links
-- CDP port is only enabled when debug mode is activated
+- **Why is this necessary?**: We need the CDP port to inspect Steam's internal browser data, which is currently the only way to list cloud files without launching the game.
 
-**Windows:**
+### Basic Workflow
 
-1. Right-click Steam shortcut, select "Properties"
-2. Add to the end of "Target" field: `-cef-enable-debugging`
-3. Click "OK" and launch Steam
-
-**macOS:**
-
-1. Quit Steam
-2. Run in terminal:
-
-   ```bash
-   open -a Steam --args -cef-enable-debugging
-   ```
-
-**Linux:**
-
-1. Close Steam
-2. Run in terminal:
-
-   ```bash
-   steam -cef-enable-debugging &
-   ```
-
-   Or modify Steam shortcut, add `-cef-enable-debugging` to the end of Exec line
-
-**Note:** This tool provides a "Restart Steam in Debug Mode" button that can automatically complete the above operations with guidance.
-
-### Basic Operations
-
-1. Ensure Steam is running in debug mode
-2. Launch this tool
-3. Select a game:
-   - Click "Game Library" button to select from scanned game list
-   - Or directly enter the game's App ID in the input box
-4. Click "Connect" button
-5. After connection, you can download/upload/delete files
+1. Ensure Steam is running in debug mode.
+2. Select the target game in the software (Logic scan or App ID).
+3. Click **"Connect"** to initialize the API.
+4. Once loaded, manipulate files via the tree view on the left.
 
 App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
-### Important Notes
-
-> ⚠️ **Important**
-
-> **Deletion Risks**:
-
-> - Deleting cloud save files is **irreversible**
-> - Deleted files will be synced and removed from all devices
-> - Make sure to backup important files before deletion
-
-> **Backup Recommendations**:
-
-> - Download backups before any deletion or modification
-> - Regularly backup important game saves
-> - Use "Batch Download" feature to quickly backup entire game saves
-
-> **Cloud Sync Notes**:
-
-> - After upload/delete, wait for Steam to complete sync (usually after disconnect)
-> - Do not close Steam or shutdown during sync
+> ⚠️ **Warning**
+>
+> - **Irreversible Action**: Deletions are committed to the local cache immediately.
+> - **Data Safety**: We recommend backing up original files before batch operations.
+> - **Sync Mechanism**: Changes are written to the local cache and uploaded asynchronously by Steam. Do not kill the Steam process before sync completes.
 
 ## Technical Architecture
 
 ### Cloud Sync Mechanism
-
-Steam cloud sync uses a three-tier architecture:
 
 ```
 Steam Cloud Server
         ↕ (Async background sync)
 Steam Client Local Cache
         ↕ (Steam API)
-Our Software
+Steam Cloud File Manager
 ```
 
-**Important Notes**:
+### VDF Parsing & Root Mapping
 
-- Upload/delete operations write to **local cache** immediately
-- Actual sync to cloud is performed **asynchronously** in the background
-- **After disconnect**, Steam automatically triggers sync - this is Steam's safety mechanism
-- For details, see [CLOUD_SYNC_EXPLAINED.md](docs/CLOUD_SYNC_EXPLAINED.md)
-
-### VDF Parsing
-
-- Directly reads `remotecache.vdf` to get complete file list
-- Shows actual storage location of files on local disk
-- Supports all Root path types (0-12)
-
-**What is Root Path?**
-
-Root path is the file storage location type in Steam's cloud save system. Different games may save their files in different directories:
-
-- **Root 0** - Steam Cloud default directory (`userdata/{user_id}/{app_id}/remote/`)
-- **Root 1** - Game installation directory (`steamapps/common/{GameDir}/`)
-- **Root 2** - Documents folder (Windows: `Documents/`, macOS: `~/Documents/`)
-- **Root 3** - AppData Roaming (Windows: `%APPDATA%`, macOS: `~/Library/Application Support/`)
-- **Root 7** - macOS Application Support / Windows Videos
-- **Root 12** - Windows LocalLow / macOS Caches
-- **Others** - Pictures, Music, Videos, Desktop, and other system folders
-
-Our software automatically identifies and displays the actual storage location of each file.
-
-> **Note**: The Root path mapping table is still being updated. Different games may use different Root values, and cross-platform behavior may vary. (Not fully tested yet🥺👉👈
-
-- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete path mapping rules and game examples
+The tool parses `remotecache.vdf` in real-time to list files. It also parses **`appinfo.vdf`** (Global App Config) to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping system to translate virtual paths like `Root 0` (Cloud), `Root 1` (InstallDir), and `Root 2` (Documents) into absolute local disk paths.
+See source code or [ROOT_PATH_MAPPING.md](ROOT_PATH_MAPPING.md) for details.
 
 ### CDP Protocol
 
