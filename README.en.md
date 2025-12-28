@@ -29,18 +29,16 @@
 
 ## Features
 
-A GUI tool for managing Steam Cloud saves, allowing direct cloud file operations without launching games.
+A cloud save management utility built with Rust and the Steamworks SDK. By directly interfacing with low-level Steam APIs, it provides complete visibility and control over your cloud files. It supports uploading, downloading, and deleting individual files, and introduces a symlink sync solution to resolve cross-platform configuration sync issues.
 
-Steam's built-in cloud save management is quite basic. This tool provides more complete file listings and batch operation support:
-
-- View complete cloud save file list (tree view)
-- Batch download/upload files (drag & drop support)
-- Delete or unsync specific files
-- File search and filtering (local/cloud)
-- Quickly switch between games (auto-scan game library)
-- View actual file locations on local disk
-- Display cloud sync status and quota
-- Multi-user support
+- **VDF File Tree Visualization**: Fully parses `remotecache.vdf` to reconstruct the cloud directory structure.
+- **Batch Transfer**: Supports multi-file selection and drag-and-drop for uploads/downloads.
+- **Deep Control**: Directly delete cloud files and force sync status updates.
+- **Root Path Mapping**: Automatically resolves Root IDs (0-12) to absolute local disk paths.
+- **Search & Filter**: Supports regex search for filenames, paths, and sync status.
+- **Game Library Scanning**: Automatically discovers local games by parsing `libraryfolders.vdf`.
+- **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
+- **Multi-Platform Support**: Windows / macOS / Linux.
 
 ## Platform Support
 
@@ -239,22 +237,22 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 > ⚠️ **Important**
 
-**Deletion Risks**:
+> **Deletion Risks**:
 
-- Deleting cloud save files is **irreversible**
-- Deleted files will be synced and removed from all devices
-- Make sure to backup important files before deletion
+> - Deleting cloud save files is **irreversible**
+> - Deleted files will be synced and removed from all devices
+> - Make sure to backup important files before deletion
 
-**Backup Recommendations**:
+> **Backup Recommendations**:
 
-- Download backups before any deletion or modification
-- Regularly backup important game saves
-- Use "Batch Download" feature to quickly backup entire game saves
+> - Download backups before any deletion or modification
+> - Regularly backup important game saves
+> - Use "Batch Download" feature to quickly backup entire game saves
 
-**Cloud Sync Notes**:
+> **Cloud Sync Notes**:
 
-- After upload/delete, wait for Steam to complete sync (usually after disconnect)
-- Do not close Steam or shutdown during sync
+> - After upload/delete, wait for Steam to complete sync (usually after disconnect)
+> - Do not close Steam or shutdown during sync
 
 ## Technical Architecture
 
