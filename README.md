@@ -373,6 +373,11 @@ src/
 - [tracing](https://github.com/tokio-rs/tracing)
 - [serde](https://github.com/serde-rs/serde)
 - [image](https://github.com/image-rs/image)
+- [self_update](https://github.com/jaemk/self_update)
+- [regex](https://github.com/rust-lang/regex)
+- [chrono](https://github.com/chronotope/chrono)
+- [walkdir](https://github.com/BurntSushi/walkdir)
+- [open](https://github.com/Byron/open-rs)
 
 ### 打包工具
 
@@ -386,6 +391,7 @@ src/
 
 - [SteamCloudFileManagerLite](<https://github.com/GMMan/SteamCloudFileManagerLite>)
 - [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
+- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools)
 
 ### 文档资料
 
@@ -394,6 +400,7 @@ src/
 - [VDF Parser (Python)](https://github.com/ValvePython/vdf)
 - [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
 - [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
+- [Elena Temple Dev Blog: Steam Cloud Saves](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html)
 
 ## Star History
 

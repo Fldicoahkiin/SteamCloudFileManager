@@ -179,11 +179,43 @@ cargo build --release
 
 ### Steam Debug Mode
 
-This tool relies on the Steam Client's CDP (Chrome DevTools Protocol) interface to fetch cloud file lists. **This interface is disabled by default and must be enabled by adding the `-cef-enable-debugging` argument when launching Steam.**
+### Steam Debug Mode
 
-The software features a built-in **"Restart Steam in Debug Mode"** button to automate this. If it fails, please launch Steam manually with the argument.
+This tool uses the CDP protocol to communicate with Steam, so you **must** launch Steam with debugging enabled.
 
-- **Why is this necessary?**: We need the CDP port to inspect Steam's internal browser data, which is currently the only way to list cloud files without launching the game.
+**Why is this required?**
+
+- CDP (Chrome DevTools Protocol) is the debugging interface for Steam's built-in browser.
+- We use this interface to fetch the cloud file list and download links.
+- The CDP port is only active when debug mode is enabled.
+
+**Windows:**
+
+1. Right-click your Steam shortcut and select "Properties".
+2. Add `-cef-enable-debugging` to the end of the "Target" field.
+3. Click "OK" and launch Steam.
+
+**macOS:**
+
+1. Quit Steam.
+2. Run in Terminal:
+
+   ```bash
+   open -a Steam --args -cef-enable-debugging
+   ```
+
+**Linux:**
+
+1. Close Steam.
+2. Run in Terminal:
+
+   ```bash
+   steam -cef-enable-debugging &
+   ```
+
+   Or edit your Steam shortcut and append `-cef-enable-debugging` to the Exec line.
+
+**Note:** The software features a built-in "Restart Steam in Debug Mode" button that attempts to automate this.
 
 ### Basic Workflow
 
@@ -336,6 +368,13 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 - [ureq](https://github.com/algesten/ureq)
 - [anyhow](https://github.com/dtolnay/anyhow)
 - [tracing](https://github.com/tokio-rs/tracing)
+- [serde](https://github.com/serde-rs/serde)
+- [image](https://github.com/image-rs/image)
+- [self_update](https://github.com/jaemk/self_update)
+- [regex](https://github.com/rust-lang/regex)
+- [chrono](https://github.com/chronotope/chrono)
+- [walkdir](https://github.com/BurntSushi/walkdir)
+- [open](https://github.com/Byron/open-rs)
 
 ### Packaging Tools
 
@@ -349,6 +388,7 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 - [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
 - [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
+- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools)
 
 ### Documentation
 
@@ -357,6 +397,7 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 - [VDF Parser (Python)](https://github.com/ValvePython/vdf)
 - [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
 - [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
+- [Elena Temple Dev Blog: Steam Cloud Saves](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html)
 
 ## Star History
 
