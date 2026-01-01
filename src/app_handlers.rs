@@ -508,8 +508,10 @@ impl AppHandlers {
                                         .unwrap_or_default(),
                                     is_persisted: false,
                                     exists: true, // 本地存在
-                                    root: 0,
-                                    root_description: crate::path_resolver::get_root_description(0),
+                                    root: local_file.root_id,
+                                    root_description: crate::path_resolver::get_root_description(
+                                        local_file.root_id,
+                                    ),
                                 };
                                 file_list.files.push(cloud_file);
                             }
@@ -676,6 +678,9 @@ impl AppHandlers {
     // 轮询 Hash 检测结果
     pub fn poll_hash_results(&self, file_list: &mut FileListState, dialogs: &mut DialogState) {
         for result in file_list.hash_checker.poll() {
+            if let Some(ref err) = result.error {
+                tracing::error!("Hash 检测失败: 文件={} 错误={}", result.filename, err);
+            }
             let (hash_status, _) = result.process();
 
             // 更新 comparison_map

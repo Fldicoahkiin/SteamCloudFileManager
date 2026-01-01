@@ -111,7 +111,7 @@ impl FileComparison {
 
         match (local, cloud) {
             (Some(l), Some(c)) => {
-                // 1. 检查存在状态
+                // 检查存在状态
                 if !l.exists {
                     flags.exists_diff = true;
                     return (SyncStatus::CloudOnly, 0, 0, flags);
@@ -121,19 +121,19 @@ impl FileComparison {
                     return (SyncStatus::LocalOnly, 0, 0, flags);
                 }
 
-                // 2. 计算大小差异（按精度最低的来，即 CDP 精度：1% 或最小 1KB）
+                // 计算大小差异（按精度最低的来，即 CDP 精度：1% 或最小 1KB）
                 let size_diff = l.size as i64 - c.size as i64;
                 let size_tolerance = (c.size as f64 * 0.01).max(1024.0) as i64;
                 flags.size_diff = size_diff.abs() > size_tolerance;
 
-                // 3. 计算时间差异（精确到秒）
+                // 计算时间差异（精确到秒）
                 let time_diff = l.modified.timestamp() - c.timestamp.timestamp();
                 flags.time_diff = time_diff != 0;
 
                 // 判断状态
-                let status = if time_diff > 0 {
+                let status = if time_diff > 2 {
                     SyncStatus::LocalNewer
-                } else if time_diff < 0 {
+                } else if time_diff < -2 {
                     SyncStatus::CloudNewer
                 } else if flags.size_diff {
                     // 时间相同但大小不同 → 需要 hash 确认
@@ -256,14 +256,28 @@ pub fn find_local_path_for_file(
     cloud_file: &crate::steam_api::CloudFile,
     local_save_paths: &[(String, PathBuf)],
 ) -> Option<PathBuf> {
+    // 优先尝试通过 root ID 匹配 (最可靠)
+    // local_save_paths 的 desc 格式是 "TypeName (ID)"，所以我们查找以 "(ID)" 结尾的项
+    let target_id_suffix = format!("({})", cloud_file.root);
+    for (desc, base_path) in local_save_paths {
+        if desc.ends_with(&target_id_suffix) {
+            return Some(base_path.clone());
+        }
+    }
+
+    // 尝试通过 root_description 字符串匹配 (兼容旧逻辑或处理特殊情况)
+    // 获取去除 CDP 前缀后的描述符
     let (_, file_root_desc) =
         crate::path_resolver::parse_cdp_root_description(&cloud_file.root_description);
 
     for (desc, base_path) in local_save_paths {
+        // 如果描述符完全相等，或者文件描述符包含了本地路径描述符（反之亦然）
         if desc == file_root_desc || file_root_desc.contains(desc) {
             return Some(base_path.clone());
         }
     }
+
+    // 默认回退
     local_save_paths.first().map(|(_, p)| p.clone())
 }
 
@@ -485,6 +499,7 @@ fn calculate_file_hash(path: &PathBuf) -> Result<String, String> {
 // 下载文件并计算 hash
 fn download_and_hash(url: &str) -> Result<String, String> {
     let resp = ureq::get(url)
+        .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .call()
         .map_err(|e| format!("下载失败: {}", e))?;
 

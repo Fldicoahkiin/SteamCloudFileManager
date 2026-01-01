@@ -516,20 +516,20 @@ pub fn get_root_type_name(root: u32) -> &'static str {
 
 // 从 appinfo.vdf 的 root 字符串名称转换为 RootType
 pub fn root_name_to_type(name: &str) -> Option<RootType> {
-    match name {
-        "SteamCloudDocuments" | "0" => Some(RootType::SteamRemote),
-        "GameInstall" | "1" => Some(RootType::GameInstallDir),
-        "WinMyDocuments" | "2" => Some(RootType::Documents),
-        "WinAppDataRoaming" | "3" => Some(RootType::AppDataRoaming),
-        "WinAppDataLocal" | "4" => Some(RootType::AppDataLocal),
-        "WinPictures" | "5" => Some(RootType::Pictures),
-        "WinMusic" | "6" => Some(RootType::Music),
-        "WinVideos" | "MacAppSupport" | "7" => Some(RootType::Videos),
-        "LinuxXdgDataHome" | "8" => Some(RootType::Desktop),
-        "WinSavedGames" | "9" => Some(RootType::SavedGames),
-        "WinDownloads" | "10" => Some(RootType::Downloads),
-        "WinPublic" | "11" => Some(RootType::PublicShared),
-        "WinAppDataLocalLow" | "12" => Some(RootType::AppDataLocalLow),
+    match name.to_lowercase().as_str() {
+        "steamclouddocuments" | "0" => Some(RootType::SteamRemote),
+        "gameinstall" | "1" => Some(RootType::GameInstallDir),
+        "winmydocuments" | "2" => Some(RootType::Documents),
+        "winappdataroaming" | "3" => Some(RootType::AppDataRoaming),
+        "winappdatalocal" | "4" => Some(RootType::AppDataLocal),
+        "winpictures" | "5" => Some(RootType::Pictures),
+        "winmusic" | "6" => Some(RootType::Music),
+        "winvideos" | "macappsupport" | "7" => Some(RootType::Videos),
+        "linuxxdgdatahome" | "8" => Some(RootType::Desktop),
+        "winsavedgames" | "9" => Some(RootType::SavedGames),
+        "windownloads" | "10" => Some(RootType::Downloads),
+        "winpublic" | "11" => Some(RootType::PublicShared),
+        "winappdatalocallow" | "12" => Some(RootType::AppDataLocalLow),
         _ => None,
     }
 }
@@ -585,6 +585,7 @@ pub struct SaveFileConfig {
 #[derive(Debug, Clone)]
 pub struct ScannedLocalFile {
     pub relative_path: String, // 相对于 root 的路径 (用于与云端文件名匹配)
+    pub root_id: u32,          // 所属 Root ID
     pub size: u64,
     pub modified: std::time::SystemTime,
 }
@@ -617,6 +618,7 @@ pub fn scan_local_files_from_ufs(
                 continue;
             }
         };
+        let root_id = root_type.to_u32();
 
         // 解析基础路径
         let base_path = match resolve_root_base_path(root_type, steam_path, user_id, app_id) {
@@ -662,6 +664,7 @@ pub fn scan_local_files_from_ufs(
             if let Ok(metadata) = std::fs::metadata(&full_path) {
                 results.push(ScannedLocalFile {
                     relative_path,
+                    root_id,
                     size: metadata.len(),
                     modified: metadata
                         .modified()

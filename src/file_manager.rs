@@ -142,10 +142,15 @@ impl FileService {
                             let url = parts.first().unwrap_or(&"");
                             let cdp_folder = parts.get(1).unwrap_or(&"");
 
-                            // 只有当 CDP folder 不为空时才覆盖 root_description
-                            // 否则保留 VDF 的 root_description
-                            if !cdp_folder.is_empty() {
-                                f.root_description = cdp_file.root_description.clone();
+                            // 保留 URL 以便 Hash 检测下载云端文件
+                            // 如果 CDP folder 为空或不匹配，使用 VDF 的 folder 信息拼接
+                            if !url.is_empty() {
+                                if !cdp_folder.is_empty() {
+                                    f.root_description = cdp_file.root_description.clone();
+                                } else {
+                                    // CDP folder 为空，使用 VDF 的 root_description 拼接 URL
+                                    f.root_description = format!("CDP:{}|{}", url, vdf_root_desc);
+                                }
                             }
 
                             tracing::trace!(
