@@ -49,6 +49,7 @@ pub struct FileListState {
     pub sync_status_map: HashMap<String, SyncStatus>, // 文件名 -> 同步状态
     pub comparison_map: HashMap<String, FileComparisonInfo>, // 文件名 -> 对比详情
     pub hash_checker: AsyncHashChecker,               // 异步 hash 检测器
+    pub hash_checked_app_id: Option<u32>, // 已完成 Hash 检测的 app_id (缓存，避免重复检测)
 }
 
 impl FileListState {
@@ -60,6 +61,7 @@ impl FileListState {
         self.sync_status_map.clear();
         self.comparison_map.clear();
         self.hash_checker.cancel();
+        self.hash_checked_app_id = None;
     }
 
     // 更新同步状态

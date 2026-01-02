@@ -71,6 +71,8 @@ impl AppHandlers {
 
         file_list.is_refreshing = true;
         file_list.files.clear();
+        file_list.hash_checked_app_id = None;
+        file_list.hash_checker.cancel();
 
         let steam_manager = self.steam_manager.clone();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -525,6 +527,17 @@ impl AppHandlers {
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
                 file_list.update_sync_status(); // 更新同步状态
+
+                // 自动启动 Hash 检测
+                if app_id > 0 && !file_list.files.is_empty() {
+                    let comparisons =
+                        crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
+                    dialogs.conflict_dialog.set_comparisons(comparisons.clone());
+                    file_list.hash_checker.start(app_id, &comparisons);
+                    file_list.hash_checked_app_id = None; // 正在检测中，尚未完成
+                    tracing::info!("已启动异步 Hash 检测");
+                }
+
                 misc.status_message = misc.i18n.status_files_loaded(count);
                 file_list.is_refreshing = false;
                 connection.remote_ready = true;
@@ -634,13 +647,27 @@ impl AppHandlers {
         dialogs: &mut DialogState,
         app_id: u32,
     ) {
+        // 如果已经完成过 Hash 检测且是同一个 app_id，直接打开对话框显示缓存结果
+        if file_list.hash_checked_app_id == Some(app_id) {
+            tracing::info!("使用缓存的 Hash 检测结果 (app_id={})", app_id);
+            dialogs.conflict_dialog.show = true;
+            return;
+        }
+
+        // 如果正在检测中，只显示对话框，不启动新检测（避免取消正在进行的自动检测）
+        if file_list.hash_checker.is_running() && file_list.hash_checker.get_app_id() == app_id {
+            tracing::info!("Hash 检测正在进行中，显示对话框 (app_id={})", app_id);
+            dialogs.conflict_dialog.show = true;
+            return;
+        }
+
+        // 没有检测过或检测被取消，启动新检测
         let comparisons =
             crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
         dialogs.conflict_dialog.set_comparisons(comparisons.clone());
 
-        // 启动异步 hash 检测
         file_list.hash_checker.start(app_id, &comparisons);
-        tracing::info!("已启动异步 Hash 检测");
+        tracing::info!("已启动异步 Hash 检测 (app_id={})", app_id);
     }
 
     // 重新检测单个文件的 hash
@@ -716,6 +743,15 @@ impl AppHandlers {
                 result.cloud_hash,
                 result.error.is_some(),
             );
+        }
+
+        // 检测完成后标记 app_id，用于缓存结果避免重复检测
+        if file_list.hash_checked_app_id.is_none() && file_list.hash_checker.is_completed() {
+            let app_id = file_list.hash_checker.get_app_id();
+            if app_id > 0 {
+                file_list.hash_checked_app_id = Some(app_id);
+                tracing::info!("Hash 检测完成，已缓存结果 (app_id={})", app_id);
+            }
         }
     }
 

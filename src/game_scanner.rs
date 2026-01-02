@@ -349,7 +349,9 @@ pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Sca
     let mut cdp_count = 0;
     let mut cdp_order = std::collections::HashMap::new();
     if crate::cdp_client::CdpClient::is_cdp_running() {
-        if let Ok(mut client) = crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::GameList) {
+        if let Ok(mut client) =
+            crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::GameList)
+        {
             if let Ok(cdp_games) = client.fetch_game_list() {
                 cdp_count = cdp_games.len();
                 let map: std::collections::HashMap<u32, usize> = games

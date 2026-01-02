@@ -446,6 +446,23 @@ impl AsyncHashChecker {
 
         results
     }
+
+    // 检查是否完成所有检测
+    pub fn is_completed(&self) -> bool {
+        let (completed, total) = *self.progress.lock().unwrap();
+        total > 0 && completed >= total
+    }
+
+    // 检查是否正在检测中
+    pub fn is_running(&self) -> bool {
+        let (completed, total) = *self.progress.lock().unwrap();
+        total > 0 && completed < total && !self.cancelled.load(Ordering::SeqCst)
+    }
+
+    // 获取当前检测的 app_id
+    pub fn get_app_id(&self) -> u32 {
+        self.app_id.load(Ordering::SeqCst)
+    }
 }
 
 impl Default for AsyncHashChecker {

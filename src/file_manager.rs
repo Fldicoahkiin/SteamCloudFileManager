@@ -111,7 +111,9 @@ impl FileService {
 
         tracing::info!("尝试通过 CDP 补充文件信息");
 
-        if let Ok(mut client) = crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList) {
+        if let Ok(mut client) =
+            crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList)
+        {
             if let Ok(cdp_files) = client.fetch_game_files(app_id) {
                 tracing::info!(count = cdp_files.len(), "CDP 返回文件");
 
