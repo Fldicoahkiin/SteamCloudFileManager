@@ -1,5 +1,8 @@
 use std::process::Command;
 
+#[cfg(windows)]
+use winres::WindowsResource;
+
 fn main() {
     // 获取 git commit hash
     let output = Command::new("git")
@@ -54,4 +57,25 @@ fn main() {
     // 当 git 状态改变时重新运行
     println!("cargo:rerun-if-changed=.git/HEAD");
     println!("cargo:rerun-if-changed=.git/index");
+
+    // Windows: 嵌入图标和应用程序元数据
+    #[cfg(windows)]
+    {
+        let mut res = WindowsResource::new();
+        res.set_icon("assets/app_icon.ico");
+        res.set("FileDescription", "Steam Cloud File Manager");
+        res.set("ProductName", "Steam Cloud File Manager");
+        res.set(
+            "LegalCopyright",
+            "Copyright © 2025 Flacier. All rights reserved.",
+        );
+        res.set("CompanyName", "Flacier");
+
+        if let Err(e) = res.compile() {
+            eprintln!("Warning: Failed to compile Windows resources: {}", e);
+        }
+
+        // 当图标文件改变时重新运行
+        println!("cargo:rerun-if-changed=assets/app_icon.ico");
+    }
 }
