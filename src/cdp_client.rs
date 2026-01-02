@@ -35,15 +35,23 @@ struct CdpResponse {
     error: Option<Value>,
 }
 
+// CDP 连接目标类型
+#[derive(Debug, Clone, Copy)]
+pub enum CdpTarget {
+    // 游戏列表页 (remotestorage)
+    GameList,
+    // 文件详情页 (remotestorageapp?appid=xxx)
+    FileList,
+}
+
 impl CdpClient {
     // 检查 CDP 服务是否可用
     pub fn is_cdp_running() -> bool {
         ureq::get("http://127.0.0.1:8080/json").call().is_ok()
     }
 
-    // 连接到 Steam CDP 端口
-    pub fn connect() -> Result<Self> {
-        // 获取目标列表
+    // 连接到指定类型的页面
+    pub fn connect_for(target_type: CdpTarget) -> Result<Self> {
         let resp = ureq::get("http://127.0.0.1:8080/json")
             .call()
             .map_err(|e| anyhow!("无法连接到 Steam 调试端口: {}", e))?;
@@ -51,17 +59,30 @@ impl CdpClient {
         let text = resp.into_body().read_to_string()?;
         let targets: Vec<Target> = serde_json::from_str(&text)?;
 
+        // 根据目标类型选择正确的页面
+        let target_desc = match target_type {
+            CdpTarget::GameList => "游戏列表页",
+            CdpTarget::FileList => "文件详情页",
+        };
+
+        // 精确匹配目标页面
         let target = targets
             .iter()
             .find(|t| {
                 t.websocket_debugger_url.is_some()
                     && t.target_type == "page"
-                    && t.url
-                        .as_ref()
-                        .is_some_and(|url| url.contains("remotestorage"))
+                    && t.url.as_ref().is_some_and(|url| {
+                        match target_type {
+                            CdpTarget::FileList => url.contains("remotestorageapp"),
+                            CdpTarget::GameList => {
+                                // 匹配 remotestorage 但排除 remotestorageapp
+                                url.contains("remotestorage") && !url.contains("remotestorageapp")
+                            }
+                        }
+                    })
             })
             .or_else(|| {
-                // 如果没有 remotestorage 页面，尝试查找 store.steampowered.com 页面
+                // 回退：选择任意 store.steampowered.com 页面
                 targets.iter().find(|t| {
                     t.websocket_debugger_url.is_some()
                         && t.target_type == "page"
@@ -71,16 +92,16 @@ impl CdpClient {
                 })
             })
             .or_else(|| {
-                // 最后才选择任意 page 类型
+                // 最后回退：任意 page
                 targets
                     .iter()
                     .find(|t| t.websocket_debugger_url.is_some() && t.target_type == "page")
             })
-            .or_else(|| targets.iter().find(|t| t.websocket_debugger_url.is_some()))
-            .ok_or_else(|| anyhow!("未找到可用的调试目标"))?;
+            .ok_or_else(|| anyhow!("未找到{}的调试目标", target_desc))?;
 
         tracing::debug!(
-            "CDP 连接到目标: type={}, url={:?}",
+            "CDP 连接到目标 (期望: {}): type={}, url={:?}",
+            target_desc,
             target.target_type,
             target.url
         );
