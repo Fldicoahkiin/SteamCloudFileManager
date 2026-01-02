@@ -202,12 +202,42 @@ fn node_or_children_match(node: &FileTreeNode, search_query: &str) -> bool {
 // 检查文件是否匹配筛选条件
 fn matches_filter(file: &CloudFile, show_only_local: bool, show_only_cloud: bool) -> bool {
     if show_only_local {
-        return file.exists;
+        // 仅本地：显示本地存在但云端不存在的文件
+        return file.exists && !file.is_persisted;
     }
     if show_only_cloud {
+        // 仅云端：显示云端存在但本地不存在的文件
         return file.is_persisted && !file.exists;
     }
     true
+}
+
+// 检查节点或其子节点是否匹配筛选条件（用于过滤空文件夹）
+fn node_or_children_match_filter(
+    node: &FileTreeNode,
+    show_only_local: bool,
+    show_only_cloud: bool,
+) -> bool {
+    // 如果没有筛选条件，所有节点都匹配
+    if !show_only_local && !show_only_cloud {
+        return true;
+    }
+
+    match node {
+        FileTreeNode::Folder { children, .. } => {
+            // 文件夹：递归检查是否有任何子节点匹配
+            for child in children {
+                if node_or_children_match_filter(child, show_only_local, show_only_cloud) {
+                    return true;
+                }
+            }
+            false
+        }
+        FileTreeNode::File { file, .. } => {
+            // 文件：直接检查是否匹配筛选条件
+            matches_filter(file, show_only_local, show_only_cloud)
+        }
+    }
 }
 
 // 文件树渲染参数
@@ -395,6 +425,11 @@ fn render_tree_body_recursive(
 
         // 检查节点是否匹配搜索条件
         if !node_or_children_match(node, ctx.search_query) {
+            continue;
+        }
+
+        // 检查节点是否匹配筛选条件（仅本地/仅云端）
+        if !node_or_children_match_filter(node, ctx.show_only_local, ctx.show_only_cloud) {
             continue;
         }
 

@@ -1172,15 +1172,15 @@ impl I18n {
 
     pub fn only_local_tooltip(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "只显示本地存在的文件",
-            Language::English => "Show only files that exist locally",
+            Language::Chinese => "只显示仅在本地存在的文件（未同步到云端）",
+            Language::English => "Show only files that exist locally but not in cloud",
         }
     }
 
     pub fn only_cloud_tooltip(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "只显示云端存在的文件",
-            Language::English => "Show only files that exist in cloud",
+            Language::Chinese => "只显示仅在云端存在的文件（本地不存在）",
+            Language::English => "Show only files that exist in cloud but not locally",
         }
     }
 
