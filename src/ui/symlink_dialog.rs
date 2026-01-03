@@ -212,6 +212,23 @@ impl SymlinkDialog {
 
                 ui.add_space(4.0);
 
+                // 实验性功能警告
+                egui::Frame::new()
+                    .fill(egui::Color32::from_rgb(255, 243, 205))
+                    .inner_margin(8.0)
+                    .corner_radius(4.0)
+                    .show(ui, |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label(
+                                RichText::new(i18n.symlink_experimental_warning())
+                                    .size(11.0)
+                                    .color(egui::Color32::from_rgb(133, 100, 4)),
+                            );
+                        });
+                    });
+
+                ui.add_space(8.0);
+
                 // Remote 目录路径
                 ui.horizontal(|ui| {
                     ui.label(RichText::new("Remote 目录:").strong());

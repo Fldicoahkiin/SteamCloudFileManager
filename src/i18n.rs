@@ -1559,8 +1559,8 @@ impl I18n {
 
     pub fn symlink_title(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "软链接管理",
-            Language::English => "Symlink Management",
+            Language::Chinese => "软链接管理 (实验性)",
+            Language::English => "Symlink Management (Experimental)",
         }
     }
 
@@ -1715,6 +1715,13 @@ impl I18n {
         match self.lang {
             Language::Chinese => "添加配置失败",
             Language::English => "Add config failed",
+        }
+    }
+
+    pub fn symlink_experimental_warning(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "⚠ 实验性功能：软链接创建后，需要手动点击「同步云端」按钮触发同步。请谨慎操作，删除软链接不会影响源文件。",
+            Language::English => "⚠ Experimental: After creating symlinks, you need to manually click 'Sync to Cloud' to trigger sync. Deleting symlinks won't affect source files.",
         }
     }
 }
