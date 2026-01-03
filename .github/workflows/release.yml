@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整 git 历史以便 build.rs 能获取 commit hash
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -170,12 +170,48 @@ jobs:
       - name: Prepare Windows/Linux artifact
         if: "!matrix.use_bundle"
         shell: bash
-        run: "cd target/${{ matrix.target }}/release\nmkdir -p dist\n\nORIGINAL_BIN=\"SteamCloudFileManager\"\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  ORIGINAL_BIN=\"SteamCloudFileManager.exe\"\nfi\n\nif [ \"${{ matrix.os }}\" == \"windows-latest\" ]; then\n  # Windows: 保持 PascalCase 命名\n  cp \"$ORIGINAL_BIN\" dist/\n  \n  # 复制 DLL\n  if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi\n  if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi\n  \n  cd dist\n  # 新格式: SteamCloudFileManager-{version}-windows-x86_64.zip\n  7z a -tzip ../../../../SteamCloudFileManager-${{ env.VERSION }}-windows-x86_64.zip *\nelse\n  # Linux: 重命名为小写+连字符（Linux 惯例）\n  cp \"$ORIGINAL_BIN\" dist/steam-cloud-file-manager\n  \n  # 复制 SO\n  if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi\n  \n  cd dist\n  # 新格式: SteamCloudFileManager-{version}-linux-x86_64.tar.gz\n  tar czf ../../../../SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.tar.gz *\nfi\n"
+        run: |
+          cd target/${{ matrix.target }}/release
+          mkdir -p dist
+
+          ORIGINAL_BIN="SteamCloudFileManager"
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            ORIGINAL_BIN="SteamCloudFileManager.exe"
+          fi
+
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            # Windows: 保持 PascalCase 命名
+            cp "$ORIGINAL_BIN" dist/
+
+            # 复制 DLL
+            if [ -f steam_api64.dll ]; then cp steam_api64.dll dist/; fi
+            if [ -f steam_api.dll ]; then cp steam_api.dll dist/; fi
+
+            cd dist
+            7z a -tzip ../../../../SteamCloudFileManager-${{ env.VERSION }}-windows-x86_64.zip *
+          else
+            # Linux: 重命名为小写+连字符（Linux 惯例）
+            cp "$ORIGINAL_BIN" dist/steam-cloud-file-manager
+
+            # 复制 SO
+            if [ -f libsteam_api.so ]; then cp libsteam_api.so dist/; fi
+
+            cd dist
+            tar czf ../../../../SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.tar.gz *
+          fi
       - name: Build .deb package
         if: matrix.build_deb
         run: |
           cargo install cargo-deb
           cargo deb --target ${{ matrix.target }} --no-build --no-strip
+
+          # 重命名为统一格式
+          DEB_FILE=$(find target/${{ matrix.target }}/debian -name "*.deb" | head -n 1)
+          if [ -n "$DEB_FILE" ]; then
+            NEW_NAME="steam-cloud-file-manager-${{ env.VERSION }}-linux-amd64.deb"
+            mv "$DEB_FILE" "target/${{ matrix.target }}/debian/$NEW_NAME"
+            echo "重命名 deb 包: $NEW_NAME"
+          fi
       - name: Build .rpm package
         if: matrix.build_rpm
         run: |
@@ -183,6 +219,14 @@ jobs:
           cargo build --release --target ${{ matrix.target }}
           strip -s target/${{ matrix.target }}/release/SteamCloudFileManager
           cargo generate-rpm --target ${{ matrix.target }}
+
+          # 重命名为统一格式
+          RPM_FILE=$(find target/${{ matrix.target }}/generate-rpm -name "*.rpm" | head -n 1)
+          if [ -n "$RPM_FILE" ]; then
+            NEW_NAME="steam-cloud-file-manager-${{ env.VERSION }}-linux-x86_64.rpm"
+            mv "$RPM_FILE" "target/${{ matrix.target }}/generate-rpm/$NEW_NAME"
+            echo "重命名 rpm 包: $NEW_NAME"
+          fi
       - name: Build AppImage
         if: matrix.build_appimage
         run: |
@@ -308,7 +352,32 @@ jobs:
             echo "previous_tag=$PREVIOUS_TAG" >> $GITHUB_OUTPUT
           fi
       - name: Prepare Release Notes
-        run: "VERSION=${GITHUB_REF#refs/tags/v}\nTAG=${GITHUB_REF#refs/tags/}\nPREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}\nREPO=\"${{ github.repository }}\"\n\ngit log --pretty=format:\"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )\" $PREVIOUS_TAG..HEAD > changelog.txt\necho \"\" >> changelog.txt\nif [ -f \".github/release-template.md\" ]; then\n  sed \"s|{{REPO}}|${REPO}|g; s|{{VERSION}}|${VERSION}|g; s|{{TAG}}|${TAG}|g; s|{{PREVIOUS_TAG}}|${PREVIOUS_TAG}|g\" .github/release-template.md > release-notes-temp.md\n  \n  # 替换 {{CHANGELOG_LIST}} 为 changelog.txt 内容\n  # 使用 awk 将 changelog.txt 插入到 release-notes-temp.md 中\n  awk 'FNR==NR{a=a$0\"\\n\";next} /{{CHANGELOG_LIST}}/{printf \"%s\", a; next} 1' changelog.txt release-notes-temp.md > release-notes.md\nelse\n  echo \"Warning: .github/release-template.md not found, using default notes.\" > release-notes.md\n  echo \"## What's Changed\" >> release-notes.md\n  cat changelog.txt >> release-notes.md\n  echo \"\" >> release-notes.md\n  echo \"## Full Changelog\" >> release-notes.md\n  echo \"https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG}\" >> release-notes.md\nfi\n"
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          TAG=${GITHUB_REF#refs/tags/}
+          PREVIOUS_TAG=${{ steps.previoustag.outputs.previous_tag }}
+          REPO="${{ github.repository }}"
+
+          git log --pretty=format:"- %s ( [%h](https://github.com/${{ github.repository }}/commit/%H) )" $PREVIOUS_TAG..HEAD > changelog.txt
+          echo "" >> changelog.txt
+
+          if [ -f ".github/release-template.md" ]; then
+            sed -e "s|{{REPO}}|${REPO}|g" \
+                -e "s|{{VERSION}}|${VERSION}|g" \
+                -e "s|{{TAG}}|${TAG}|g" \
+                -e "s|{{PREVIOUS_TAG}}|${PREVIOUS_TAG}|g" \
+                .github/release-template.md > release-notes-temp.md
+
+            # 替换 {{CHANGELOG_LIST}} 为 changelog.txt 内容
+            awk 'FNR==NR{a=a$0"\n";next} /{{CHANGELOG_LIST}}/{printf "%s", a; next} 1' changelog.txt release-notes-temp.md > release-notes.md
+          else
+            echo "Warning: .github/release-template.md not found, using default notes." > release-notes.md
+            echo "## What's Changed" >> release-notes.md
+            cat changelog.txt >> release-notes.md
+            echo "" >> release-notes.md
+            echo "## Full Changelog" >> release-notes.md
+            echo "https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${TAG}" >> release-notes.md
+          fi
       - name: Prepare ordered release files list
         id: prepare_files
         run: |

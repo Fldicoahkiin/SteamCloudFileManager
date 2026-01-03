@@ -28,7 +28,10 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: 下载 Linux 构建产物
         run: |
-          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.tar.gz" -o linux-x86_64.tar.gz
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download"
+          VERSION="${{ env.VERSION }}"
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-linux-x86_64.tar.gz" \
+            -o linux-x86_64.tar.gz
       - name: 计算 SHA256
         run: |
           SHA256=$(sha256sum linux-x86_64.tar.gz | cut -d' ' -f1)

@@ -28,9 +28,12 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_ENV
       - name: 下载 macOS 构建产物
         run: |
-          # 下载 macOS tar.gz 文件用于计算 SHA256
-          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-macos-x86_64.tar.gz" -o macos-x86_64.tar.gz
-          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-macos-aarch64.tar.gz" -o macos-aarch64.tar.gz
+          BASE_URL="https://github.com/${{ github.repository }}/releases/download"
+          VERSION="${{ env.VERSION }}"
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-x86_64.tar.gz" \
+            -o macos-x86_64.tar.gz
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-aarch64.tar.gz" \
+            -o macos-aarch64.tar.gz
       - name: 计算 SHA256
         run: |
           SHA256_X64=$(sha256sum macos-x86_64.tar.gz | cut -d' ' -f1)
