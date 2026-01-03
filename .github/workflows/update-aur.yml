@@ -4,6 +4,9 @@ name: Update AUR Package
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: ["Release"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       version:
@@ -20,12 +23,19 @@ jobs:
       - name: 获取版本号
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
+            # 手动触发
             VERSION="${{ github.event.inputs.version }}"
-          else
+          elif [ -n "${{ github.event.release.tag_name }}" ]; then
+            # release 事件触发
             VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          else
+            # workflow_run 触发，获取最新 tag
+            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
             VERSION="${VERSION#v}"
           fi
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "检测到版本: $VERSION"
       - name: 下载 Linux 构建产物
         run: |
           BASE_URL="https://github.com/${{ github.repository }}/releases/download"
