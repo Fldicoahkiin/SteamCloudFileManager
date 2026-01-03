@@ -799,7 +799,10 @@ impl UploadQueue {
                     .strip_prefix(folder_path)
                     .map_err(|e| anyhow!("无法计算相对路径: {}", e))?;
 
-                let relative_path_str = relative_path.to_str().unwrap().replace("\\", "/");
+                let relative_path_str = relative_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("路径包含非 UTF-8 字符: {:?}", relative_path))?
+                    .replace("\\", "/");
 
                 // 构建云端路径：[virtual_root]/[folder_name]/[relative_path]
                 // 注意：如果 relative_path 为空（即直接是文件夹本身，虽然 WalkDir 这里是文件所以不会空，但以防万一），
