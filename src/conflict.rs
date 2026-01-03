@@ -111,14 +111,27 @@ impl FileComparison {
 
         match (local, cloud) {
             (Some(l), Some(c)) => {
-                // 检查存在状态
-                if !l.exists {
-                    flags.exists_diff = true;
-                    return (SyncStatus::CloudOnly, 0, 0, flags);
-                }
-                if !c.is_persisted {
-                    flags.persisted_diff = true;
-                    return (SyncStatus::LocalOnly, 0, 0, flags);
+                // 同时检查本地和云端状态
+                match (l.exists, c.is_persisted) {
+                    (false, false) => {
+                        // 本地和云端都不存在 → Steam 缓存残留，标记为未知
+                        flags.exists_diff = true;
+                        flags.persisted_diff = true;
+                        return (SyncStatus::Unknown, 0, 0, flags);
+                    }
+                    (false, true) => {
+                        // 本地不存在，但云端存在 → 仅云端
+                        flags.exists_diff = true;
+                        return (SyncStatus::CloudOnly, 0, 0, flags);
+                    }
+                    (true, false) => {
+                        // 本地存在，但云端未同步 → 仅本地
+                        flags.persisted_diff = true;
+                        return (SyncStatus::LocalOnly, 0, 0, flags);
+                    }
+                    (true, true) => {
+                        // 两边都存在，继续比较
+                    }
                 }
 
                 // 计算大小差异（按精度最低的来，即 CDP 精度：1% 或最小 1KB）
