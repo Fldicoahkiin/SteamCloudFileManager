@@ -20,6 +20,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - name: 获取版本号
         run: |
           if [ -n "${{ github.event.inputs.version }}" ]; then
@@ -31,9 +34,16 @@ jobs:
             VERSION="${VERSION#v}"
           else
             # workflow_run 触发，获取最新 tag
+            git fetch --tags
             VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
             VERSION="${VERSION#v}"
           fi
+
+          if [ -z "$VERSION" ]; then
+            echo "错误: 无法获取版本号"
+            exit 1
+          fi
+
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "检测到版本: $VERSION"
       - name: 下载 Linux 构建产物
