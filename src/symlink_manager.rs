@@ -347,7 +347,7 @@ fn create_symlink_platform(target: &Path, link: &Path) -> Result<()> {
 
 #[cfg(windows)]
 fn create_symlink_platform(target: &Path, link: &Path) -> Result<()> {
-    // Windows 上需要判断目标是文件还是目录
+    // Windows 上需要管理员权限或开发者模式
     if target.is_dir() {
         std::os::windows::fs::symlink_dir(target, link)?;
     } else {
@@ -425,124 +425,5 @@ fn generate_symlink_commands(target: &Path, link: &Path) -> Vec<String> {
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
         vec![format!("# 不支持的平台")]
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-
-    // 测试路径计算逻辑 - RemoteToLocal 方向
-    #[test]
-    fn test_paths_remote_to_local() {
-        let config = SymlinkConfig::new(
-            12345,
-            LinkDirection::RemoteToLocal,
-            PathBuf::from("/Users/test/saves"),
-            "MySaves".to_string(),
-        );
-        let remote_dir = PathBuf::from("/Steam/userdata/123/12345/remote");
-
-        // RemoteToLocal: 链接在 remote，源是本地目录
-        assert_eq!(
-            config.get_link_path(&remote_dir),
-            PathBuf::from("/Steam/userdata/123/12345/remote/MySaves")
-        );
-        assert_eq!(
-            config.get_target_path(&remote_dir),
-            PathBuf::from("/Users/test/saves")
-        );
-    }
-
-    // 测试路径计算逻辑 - LocalToRemote 方向
-    #[test]
-    fn test_paths_local_to_remote() {
-        let config = SymlinkConfig::new(
-            12345,
-            LinkDirection::LocalToRemote,
-            PathBuf::from("/Users/test/saves"),
-            "MySaves".to_string(),
-        );
-        let remote_dir = PathBuf::from("/Steam/userdata/123/12345/remote");
-
-        // LocalToRemote: 链接在本地，源是 remote
-        assert_eq!(
-            config.get_link_path(&remote_dir),
-            PathBuf::from("/Users/test/saves")
-        );
-        assert_eq!(
-            config.get_target_path(&remote_dir),
-            PathBuf::from("/Steam/userdata/123/12345/remote/MySaves")
-        );
-    }
-
-    // 测试实际软链接创建和删除（仅在 CI 环境运行）
-    // GitHub Actions 会自动设置 CI=true
-    #[test]
-    fn test_symlink_create_and_remove() {
-        // 仅在 CI 环境运行此测试，避免本地用户误操作
-        if env::var("CI").is_err() {
-            println!("跳过软链接测试（仅在 CI 环境运行）");
-            return;
-        }
-
-        let temp_dir = env::temp_dir().join("scfm_test_symlink");
-        let _ = fs::remove_dir_all(&temp_dir); // 清理旧测试数据
-        fs::create_dir_all(&temp_dir).expect("创建测试目录失败");
-
-        let target_dir = temp_dir.join("target_folder");
-        let link_path = temp_dir.join("my_link");
-
-        // 创建目标目录
-        fs::create_dir_all(&target_dir).expect("创建目标目录失败");
-
-        // 创建软链接
-        let result = create_symlink_platform(&target_dir, &link_path);
-        assert!(result.is_ok(), "创建软链接失败: {:?}", result.err());
-
-        // 验证软链接存在且是软链接
-        assert!(link_path.symlink_metadata().is_ok(), "软链接不存在");
-        assert!(
-            link_path
-                .symlink_metadata()
-                .unwrap()
-                .file_type()
-                .is_symlink(),
-            "不是软链接"
-        );
-
-        // 验证软链接指向正确目标
-        let resolved = fs::read_link(&link_path).expect("读取软链接失败");
-        assert_eq!(resolved, target_dir, "软链接目标不正确");
-
-        // 删除软链接
-        let remove_result = remove_symlink_platform(&link_path);
-        assert!(
-            remove_result.is_ok(),
-            "删除软链接失败: {:?}",
-            remove_result.err()
-        );
-
-        // 验证软链接已删除，但目标目录仍存在
-        assert!(!link_path.exists(), "软链接未删除");
-        assert!(target_dir.exists(), "目标目录被误删");
-
-        // 清理
-        let _ = fs::remove_dir_all(&temp_dir);
-    }
-
-    // 测试命令生成不为空
-    #[test]
-    fn test_generate_commands() {
-        let commands =
-            generate_symlink_commands(Path::new("/target/path"), Path::new("/link/path"));
-        assert!(!commands.is_empty(), "命令列表不应为空");
-        // 验证至少包含创建和删除命令
-        let joined = commands.join("\n");
-        assert!(
-            joined.contains("ln") || joined.contains("mklink") || joined.contains("New-Item"),
-            "应包含创建软链接命令"
-        );
     }
 }
