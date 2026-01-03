@@ -63,6 +63,15 @@
 
 ### macOS
 
+#### Homebrew
+
+```bash
+brew tap Fldicoahkiin/tap
+brew install steam-cloud-file-manager
+```
+
+#### 手动安装
+
 1. 下载对应版本：
    - Intel 芯片：[![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
    - Apple Silicon：[![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
@@ -74,74 +83,68 @@
    xattr -c "/Applications/Steam Cloud File Manager.app"
    ```
 
-### Linux
-
-#### Debian/Ubuntu
-
-下载 [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后安装：
+### Arch Linux (AUR)
 
 ```bash
-# 安装
+yay -S steam-cloud-file-manager-bin
+# 或
+paru -S steam-cloud-file-manager-bin
+```
+
+手动构建：
+
+```bash
+git clone https://aur.archlinux.org/steam-cloud-file-manager-bin.git
+cd steam-cloud-file-manager-bin
+makepkg -si
+steam-cloud-file-manager
+```
+
+或下载 [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 预构建包：
+
+```bash
+tar -xzf SteamCloudFileManager-*-linux-x86_64-aur.tar.gz
+cd SteamCloudFileManager-*-linux-x86_64-aur
+makepkg -si
+steam-cloud-file-manager
+```
+
+
+### Debian/Ubuntu
+
+下载 [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+
+```bash
 sudo dpkg -i steam-cloud-file-manager_*.deb
 sudo apt-get install -f
-
-# 运行
 steam-cloud-file-manager
 ```
 
-#### Fedora/RHEL/openSUSE
+### Fedora/RHEL/openSUSE
 
-下载 [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后安装：
+下载 [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# 安装
 sudo dnf install ./steam-cloud-file-manager-*.rpm
-# 或
-sudo rpm -i steam-cloud-file-manager-*.rpm
-
-# 运行
 steam-cloud-file-manager
 ```
 
-#### AppImage（通用）
+### AppImage（通用）
 
-下载 [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后运行：
+下载 [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# 添加执行权限
-chmod +x SteamCloudFileManager-linux-x86_64.AppImage
-
-# 运行
-./SteamCloudFileManager-linux-x86_64.AppImage
+chmod +x SteamCloudFileManager-*.AppImage
+./SteamCloudFileManager-*.AppImage
 ```
 
-#### Arch Linux (AUR)
+### .tar.gz（通用）
 
-下载 [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后构建安装：
-
-```bash
-# 解压 AUR 包
-tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
-cd SteamCloudFileManager-linux-x86_64-aur
-
-# 使用 makepkg 构建并安装
-makepkg -si
-
-# 运行
-steam-cloud-file-manager
-```
-
-#### .tar.gz（通用）
-
-下载 [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) ，然后解压运行：
+下载 [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# 解压
-tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
-cd SteamCloudFileManager-linux-x86_64
-
-# 运行
-./SteamCloudFileManager
+tar -xzf SteamCloudFileManager-*-linux-x86_64.tar.gz
+./steam-cloud-file-manager
 ```
 
 ### 从源码构建
@@ -235,33 +238,38 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ### 云同步机制
 
+```mermaid
+graph TD
+    A[Steam 云端服务器] <-->|异步后台同步| B[Steam Client 本地缓存]
+    B <-->|Steam API| C[Steam 云文件管理器]
+    C -->|读取| D[remotecache.vdf]
+    C -->|解析| E[appinfo.vdf]
+    C <-->|CDP 协议| F[Steam CEF 调试接口]
 ```
-Steam 云端服务器
-        ↕ (异步后台同步)
-Steam Client 本地缓存
-        ↕ (Steam API)
-Steam 云文件管理器
+
+### 数据流
+
+```mermaid
+graph LR
+    subgraph 本地操作
+        A[文件上传] --> B[ISteamRemoteStorage]
+        C[文件删除] --> B
+    end
+    subgraph 远程查询
+        D[CDP 协议] --> E[云端文件列表]
+        D --> F[下载链接获取]
+    end
+    B --> G[Steam 云端]
+    E --> H[文件状态合并]
 ```
 
 ### VDF 解析与 Root 映射
 
 工具并不依赖硬编码路径，而是实时解析 `remotecache.vdf` 获取文件列表。同时通过解析 **`appinfo.vdf`** (全局应用配置) 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统，将 `Root 0` (Cloud), `Root 1` (InstallDir), `Root 2` (Documents) 等虚拟路径转换为本地磁盘的绝对路径。
-具体映射规则可参考源码和
 
 - **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的路径映射规则
 
-> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。（我还没测试完🥺👉👈
-
-### CDP 协议
-
-- 通过 Steam CEF 调试接口与客户端通信
-- 实时获取云端文件列表和下载链接
-- 自动合并云端状态到本地视图
-
-### Steamworks API
-
-- 使用 `ISteamRemoteStorage` API
-- 处理文件上传和删除操作
+> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。
 
 ## TODO
 
@@ -272,18 +280,18 @@ Steam 云文件管理器
 - [x] 树状视图
 - [x] 批量上传/下载
 - [x] 文件冲突检测与处理
-- [ ] 云存档备份与恢复
-- [ ] 软链接同步支持（实验性）
+- [x] 云存档备份
+- [x] 软链接同步支持（实验性）
 - [ ] 自动备份计划
 
 ### 包管理器支持
 
-- [ ] AUR (Arch User Repository) - `pacman -S steamcloudfilemanager`
-- [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
-- [ ] APT 仓库 (Debian/Ubuntu) - `apt install steamcloudfilemanager`
-- [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steamcloudfilemanager`
-- [ ] Flatpak - `flatpak install steamcloudfilemanager`
-- [ ] Snap - `snap install steamcloudfilemanager`
+- [x] AUR (Arch User Repository) - `yay -S steam-cloud-file-manager-bin`
+- [x] Homebrew (macOS) - `brew tap Fldicoahkiin/tap && brew install steam-cloud-file-manager`
+- [ ] APT 仓库 (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
+- [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
+- [ ] Flatpak - `flatpak install steam-cloud-file-manager`
+- [ ] Snap - `snap install steam-cloud-file-manager`
 
 ## 贡献
 
@@ -322,6 +330,7 @@ src/
 ├── downloader.rs           # 批量下载器
 ├── backup.rs               # 备份功能
 ├── conflict.rs             # 冲突检测
+├── symlink_manager.rs      # 软链接管理
 │
 ├── vdf_parser.rs           # VDF 文件解析（appinfo.vdf, loginusers.vdf）
 ├── path_resolver.rs        # 路径解析（savefiles 配置 → 实际路径）
@@ -332,6 +341,7 @@ src/
 ├── update.rs               # 自动更新
 ├── logger.rs               # 日志系统
 ├── i18n.rs                 # 国际化
+├── icons.rs                # 图标系统（Phosphor Icons）
 ├── version.rs              # 版本信息
 │
 └── ui/
@@ -347,6 +357,7 @@ src/
     ├── conflict_dialog.rs  # 冲突对话框
     ├── guide_dialog.rs     # 引导对话框
     ├── appinfo_dialog.rs   # AppInfo 对话框
+    ├── symlink_dialog.rs   # 软链接对话框
     └── font_loader.rs      # 字体加载
 ```
 
@@ -366,18 +377,27 @@ src/
 
 ### 工具库
 
-- [rfd](https://github.com/PolyMeilex/rfd)
-- [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
-- [ureq](https://github.com/algesten/ureq)
-- [anyhow](https://github.com/dtolnay/anyhow)
-- [tracing](https://github.com/tokio-rs/tracing)
-- [serde](https://github.com/serde-rs/serde)
-- [image](https://github.com/image-rs/image)
-- [self_update](https://github.com/jaemk/self_update)
-- [regex](https://github.com/rust-lang/regex)
-- [chrono](https://github.com/chronotope/chrono)
-- [walkdir](https://github.com/BurntSushi/walkdir)
-- [open](https://github.com/Byron/open-rs)
+- [rfd](https://github.com/PolyMeilex/rfd) - 原生文件对话框
+- [ureq](https://github.com/algesten/ureq) - HTTP 客户端
+- [anyhow](https://github.com/dtolnay/anyhow) - 错误处理
+- [tracing](https://github.com/tokio-rs/tracing) - 日志追踪
+- [serde](https://github.com/serde-rs/serde) - 序列化框架
+- [image](https://github.com/image-rs/image) - 图像处理
+- [self_update](https://github.com/jaemk/self_update) - 自动更新
+- [regex](https://github.com/rust-lang/regex) - 正则表达式
+- [chrono](https://github.com/chronotope/chrono) - 时间日期
+- [walkdir](https://github.com/BurntSushi/walkdir) - 目录遍历
+- [open](https://github.com/Byron/open-rs) - 打开文件/URL
+- [dirs](https://github.com/dirs-dev/dirs-rs) - 系统目录
+- [uuid](https://github.com/uuid-rs/uuid) - UUID 生成
+- [sha1](https://github.com/RustCrypto/hashes) - 哈希计算
+- [byteorder](https://github.com/BurntSushi/byteorder) - 字节序处理
+- [url](https://github.com/servo/rust-url) - URL 解析
+
+### UI 扩展
+
+- [egui-phosphor](https://github.com/amPerl/egui-phosphor) - Phosphor 图标库
+- [egui_extras](https://github.com/emilk/egui/tree/master/crates/egui_extras) - egui 扩展组件
 
 ### 打包工具
 

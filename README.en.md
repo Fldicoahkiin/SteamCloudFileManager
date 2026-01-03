@@ -63,6 +63,15 @@ Build artifacts include standard installers and portable versions (Generic Binar
 
 ### macOS
 
+#### Homebrew
+
+```bash
+brew tap Fldicoahkiin/tap
+brew install steam-cloud-file-manager
+```
+
+#### Manual Installation
+
 1. Download the version for your architecture:
    - Intel: [![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
    - Apple Silicon: [![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
@@ -74,74 +83,68 @@ Build artifacts include standard installers and portable versions (Generic Binar
    xattr -c "/Applications/Steam Cloud File Manager.app"
    ```
 
-### Linux
-
-#### Debian/Ubuntu
-
-Download [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then install:
+### Arch Linux (AUR)
 
 ```bash
-# Install
+yay -S steam-cloud-file-manager-bin
+# or
+paru -S steam-cloud-file-manager-bin
+```
+
+Manual build:
+
+```bash
+git clone https://aur.archlinux.org/steam-cloud-file-manager-bin.git
+cd steam-cloud-file-manager-bin
+makepkg -si
+steam-cloud-file-manager
+```
+
+Or download [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) pre-built package:
+
+```bash
+tar -xzf SteamCloudFileManager-*-linux-x86_64-aur.tar.gz
+cd SteamCloudFileManager-*-linux-x86_64-aur
+makepkg -si
+steam-cloud-file-manager
+```
+
+
+### Debian/Ubuntu
+
+Download [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+
+```bash
 sudo dpkg -i steam-cloud-file-manager_*.deb
 sudo apt-get install -f
-
-# Run
 steam-cloud-file-manager
 ```
 
-#### Fedora/RHEL/openSUSE
+### Fedora/RHEL/openSUSE
 
-Download [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then install:
+Download [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# Install
 sudo dnf install ./steam-cloud-file-manager-*.rpm
-# or
-sudo rpm -i steam-cloud-file-manager-*.rpm
-
-# Run
 steam-cloud-file-manager
 ```
 
-#### AppImage (Universal)
+### AppImage (Universal)
 
-Download [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then run:
+Download [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# Add execute permission
-chmod +x SteamCloudFileManager-linux-x86_64.AppImage
-
-# Run
-./SteamCloudFileManager-linux-x86_64.AppImage
+chmod +x SteamCloudFileManager-*.AppImage
+./SteamCloudFileManager-*.AppImage
 ```
 
-#### Arch Linux (AUR)
+### .tar.gz (Universal)
 
-Download [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then build and install:
-
-```bash
-# Extract AUR package
-tar -xzf SteamCloudFileManager-linux-x86_64-aur.tar.gz
-cd SteamCloudFileManager-linux-x86_64-aur
-
-# Build and install with makepkg
-makepkg -si
-
-# Run
-steam-cloud-file-manager
-```
-
-#### .tar.gz (Universal)
-
-Download [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) , then extract and run:
+Download [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
-# Extract
-tar -xzf SteamCloudFileManager-linux-x86_64.tar.gz
-cd SteamCloudFileManager-linux-x86_64
-
-# Run
-./SteamCloudFileManager
+tar -xzf SteamCloudFileManager-*-linux-x86_64.tar.gz
+./steam-cloud-file-manager
 ```
 
 ### Build from Source
@@ -179,8 +182,6 @@ cargo build --release
 
 ### Steam Debug Mode
 
-### Steam Debug Mode
-
 This tool uses the CDP protocol to communicate with Steam, so you **must** launch Steam with debugging enabled.
 
 **Why is this required?**
@@ -215,14 +216,15 @@ This tool uses the CDP protocol to communicate with Steam, so you **must** launc
 
    Or edit your Steam shortcut and append `-cef-enable-debugging` to the Exec line.
 
-**Note:** The software features a built-in "Restart Steam in Debug Mode" button that attempts to automate this.
+**Note:** The software features a built-in "Restart Steam in Debug Mode" button that automates this process.
 
 ### Basic Workflow
 
 1. Ensure Steam is running in debug mode.
-2. Select the target game in the software (Logic scan or App ID).
-3. Click **"Connect"** to initialize the API.
-4. Once loaded, manipulate files via the tree view on the left.
+2. Select the target game:
+   - **Game Library**: Click the game library button to select a local game (auto-connects).
+   - **Manual Input**: Enter App ID and click **"Connect"**.
+3. Once loaded, manipulate files via the tree view on the left.
 
 App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
@@ -236,29 +238,38 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ### Cloud Sync Mechanism
 
+```mermaid
+graph TD
+    A[Steam Cloud Server] <-->|Async Background Sync| B[Steam Client Local Cache]
+    B <-->|Steam API| C[Steam Cloud File Manager]
+    C -->|Read| D[remotecache.vdf]
+    C -->|Parse| E[appinfo.vdf]
+    C <-->|CDP Protocol| F[Steam CEF Debug Interface]
 ```
-Steam Cloud Server
-        ↕ (Async background sync)
-Steam Client Local Cache
-        ↕ (Steam API)
-Steam Cloud File Manager
+
+### Data Flow
+
+```mermaid
+graph LR
+    subgraph Local Operations
+        A[File Upload] --> B[ISteamRemoteStorage]
+        C[File Delete] --> B
+    end
+    subgraph Remote Queries
+        D[CDP Protocol] --> E[Cloud File List]
+        D --> F[Download Links]
+    end
+    B --> G[Steam Cloud]
+    E --> H[File Status Merge]
 ```
 
 ### VDF Parsing & Root Mapping
 
 The tool parses `remotecache.vdf` in real-time to list files. It also parses **`appinfo.vdf`** (Global App Config) to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping system to translate virtual paths like `Root 0` (Cloud), `Root 1` (InstallDir), and `Root 2` (Documents) into absolute local disk paths.
-See source code or [ROOT_PATH_MAPPING.md](ROOT_PATH_MAPPING.md) for details.
 
-### CDP Protocol
+- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete path mapping rules
 
-- Communicates with client via Steam CEF debug interface
-- Retrieves cloud file list and download links in real-time
-- Automatically merges cloud status into local view
-
-### Steamworks API
-
-- Uses `ISteamRemoteStorage` API
-- Handles file upload and delete operations
+> **Note**: The Root path mapping table is continuously updated. Different games may use different Root values, and cross-platform behavior may vary.
 
 ## TODO
 
@@ -269,18 +280,18 @@ See source code or [ROOT_PATH_MAPPING.md](ROOT_PATH_MAPPING.md) for details.
 - [x] Tree view
 - [x] Batch upload/download
 - [x] File conflict detection and handling
-- [ ] Cloud save backup and restore
-- [ ] Symlink sync support (experimental)
+- [x] Cloud save backup
+- [x] Symlink sync support (experimental)
 - [ ] Automatic backup schedule
 
 ### Package Manager Support
 
-- [ ] AUR (Arch User Repository) - `pacman -S steamcloudfilemanager`
-- [ ] Homebrew (macOS) - `brew install steamcloudfilemanager`
-- [ ] APT Repository (Debian/Ubuntu) - `apt install steamcloudfilemanager`
-- [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steamcloudfilemanager`
-- [ ] Flatpak - `flatpak install steamcloudfilemanager`
-- [ ] Snap - `snap install steamcloudfilemanager`
+- [x] AUR (Arch User Repository) - `yay -S steam-cloud-file-manager-bin`
+- [x] Homebrew (macOS) - `brew tap Fldicoahkiin/tap && brew install steam-cloud-file-manager`
+- [ ] APT Repository (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
+- [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
+- [ ] Flatpak - `flatpak install steam-cloud-file-manager`
+- [ ] Snap - `snap install steam-cloud-file-manager`
 
 ## Contributing
 
@@ -319,6 +330,7 @@ src/
 ├── downloader.rs           # Batch downloader
 ├── backup.rs               # Backup functionality
 ├── conflict.rs             # Conflict detection
+├── symlink_manager.rs      # Symlink management
 │
 ├── vdf_parser.rs           # VDF file parsing (appinfo.vdf, loginusers.vdf)
 ├── path_resolver.rs        # Path resolution (savefiles config → actual paths)
@@ -329,6 +341,7 @@ src/
 ├── update.rs               # Auto update
 ├── logger.rs               # Logging system
 ├── i18n.rs                 # Internationalization
+├── icons.rs                # Icon system (Phosphor Icons)
 ├── version.rs              # Version info
 │
 └── ui/
@@ -344,6 +357,7 @@ src/
     ├── conflict_dialog.rs  # Conflict dialog
     ├── guide_dialog.rs     # Guide dialog
     ├── appinfo_dialog.rs   # AppInfo dialog
+    ├── symlink_dialog.rs   # Symlink dialog
     └── font_loader.rs      # Font loader
 ```
 
@@ -363,18 +377,27 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ### Utility Libraries
 
-- [rfd](https://github.com/PolyMeilex/rfd)
-- [sysinfo](https://github.com/GuillaumeGomez/sysinfo)
-- [ureq](https://github.com/algesten/ureq)
-- [anyhow](https://github.com/dtolnay/anyhow)
-- [tracing](https://github.com/tokio-rs/tracing)
-- [serde](https://github.com/serde-rs/serde)
-- [image](https://github.com/image-rs/image)
-- [self_update](https://github.com/jaemk/self_update)
-- [regex](https://github.com/rust-lang/regex)
-- [chrono](https://github.com/chronotope/chrono)
-- [walkdir](https://github.com/BurntSushi/walkdir)
-- [open](https://github.com/Byron/open-rs)
+- [rfd](https://github.com/PolyMeilex/rfd) - Native file dialogs
+- [ureq](https://github.com/algesten/ureq) - HTTP client
+- [anyhow](https://github.com/dtolnay/anyhow) - Error handling
+- [tracing](https://github.com/tokio-rs/tracing) - Logging/tracing
+- [serde](https://github.com/serde-rs/serde) - Serialization framework
+- [image](https://github.com/image-rs/image) - Image processing
+- [self_update](https://github.com/jaemk/self_update) - Auto update
+- [regex](https://github.com/rust-lang/regex) - Regular expressions
+- [chrono](https://github.com/chronotope/chrono) - Date/time
+- [walkdir](https://github.com/BurntSushi/walkdir) - Directory traversal
+- [open](https://github.com/Byron/open-rs) - Open files/URLs
+- [dirs](https://github.com/dirs-dev/dirs-rs) - System directories
+- [uuid](https://github.com/uuid-rs/uuid) - UUID generation
+- [sha1](https://github.com/RustCrypto/hashes) - Hash computation
+- [byteorder](https://github.com/BurntSushi/byteorder) - Byte order handling
+- [url](https://github.com/servo/rust-url) - URL parsing
+
+### UI Extensions
+
+- [egui-phosphor](https://github.com/amPerl/egui-phosphor) - Phosphor icon library
+- [egui_extras](https://github.com/emilk/egui/tree/master/crates/egui_extras) - egui extension components
 
 ### Packaging Tools
 
