@@ -26,6 +26,7 @@ pub enum StatusPanelAction {
     None,
     ToggleCloudEnabled,
     ShowAppInfo(u32),
+    ShowSymlinkManager(u32),
 }
 
 // 状态面板的状态数据
@@ -66,6 +67,7 @@ pub enum BottomPanelEvent {
     ToggleCloud,
     CompareFiles,
     ShowAppInfo(u32),
+    ShowSymlinkManager(u32),
 }
 
 // 顶部面板渲染
@@ -277,6 +279,9 @@ pub fn render_bottom_panel(
         StatusPanelAction::ShowAppInfo(id) if event == BottomPanelEvent::None => {
             event = BottomPanelEvent::ShowAppInfo(id);
         }
+        StatusPanelAction::ShowSymlinkManager(id) if event == BottomPanelEvent::None => {
+            event = BottomPanelEvent::ShowSymlinkManager(id);
+        }
         _ => {}
     }
 
@@ -437,11 +442,14 @@ fn draw_complete_status_panel(
         draw_quota_info(ui, total, available, i18n);
     }
 
-    // 显示 appinfo.vdf 按钮
+    // 显示 appinfo.vdf 按钮 和 软链接管理按钮
     if state.is_connected && state.app_id > 0 {
         ui.horizontal(|ui| {
             if ui.button(i18n.show_appinfo_vdf()).clicked() {
                 action = StatusPanelAction::ShowAppInfo(state.app_id);
+            }
+            if ui.button(i18n.symlink_title()).clicked() {
+                action = StatusPanelAction::ShowSymlinkManager(state.app_id);
             }
         });
     }

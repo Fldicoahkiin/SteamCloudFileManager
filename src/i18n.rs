@@ -38,7 +38,8 @@ impl I18n {
         self.lang
     }
 
-    // UI 通用文本
+    // ========== UI 通用文本 ==========
+
     pub fn app_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "Steam 云存档管理器",
@@ -123,7 +124,8 @@ impl I18n {
         }
     }
 
-    // 账户和游戏选择
+    // ========== 账户和游戏选择 ==========
+
     pub fn account_cloud_status(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "账户云存储",
@@ -145,7 +147,8 @@ impl I18n {
         }
     }
 
-    // 文件操作
+    // ========== 文件操作 ==========
+
     pub fn select_all(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "全选",
@@ -223,7 +226,7 @@ impl I18n {
         }
     }
 
-    // 窗口标题
+    // ========== 窗口标题 ==========
     pub fn select_game_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "选择游戏",
@@ -273,7 +276,7 @@ impl I18n {
         }
     }
 
-    // About 窗口内容
+    // ========== About 窗口内容 ==========
     pub fn author(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "作者:",
@@ -296,7 +299,7 @@ impl I18n {
         }
     }
 
-    // 游戏选择器相关
+    // ========== 游戏选择器相关 ==========
     pub fn games_with_cloud(&self, count: usize) -> String {
         match self.lang {
             Language::Chinese => format!("{} 个有云存档的游戏", count),
@@ -336,7 +339,7 @@ impl I18n {
         }
     }
 
-    // 用户选择器
+    // ========== 用户选择器 ==========
     pub fn select_user(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "选择用户",
@@ -374,7 +377,7 @@ impl I18n {
         }
     }
 
-    // About 窗口更多翻译
+    // ========== About 窗口更多翻译 ==========
     pub fn checking_update(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "检查中...",
@@ -494,7 +497,7 @@ impl I18n {
         }
     }
 
-    // Guide 对话框
+    // ========== Guide 对话框 ==========
     pub fn restarting_steam(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "正在重启 Steam",
@@ -540,7 +543,7 @@ impl I18n {
         }
     }
 
-    // Upload 对话框
+    // ========== Upload 对话框 ==========
     pub fn prepare_upload(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "准备上传",
@@ -729,7 +732,7 @@ impl I18n {
         }
     }
 
-    // Steam 重启状态消息
+    // ========== Steam 重启状态消息 ==========
     pub fn closing_steam(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "正在关闭 Steam...",
@@ -758,7 +761,7 @@ impl I18n {
         }
     }
 
-    // 错误消息
+    // ========== 错误消息 ==========
     pub fn error_enter_app_id(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "请输入App ID",
@@ -819,7 +822,7 @@ impl I18n {
         }
     }
 
-    // 提示文本
+    // ========== 提示文本 ==========
     pub fn hint_you_can(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "您可以：",
@@ -928,7 +931,7 @@ impl I18n {
         }
     }
 
-    // 调试模式警告
+    // ========== 调试模式警告 ==========
     pub fn debug_mode_not_enabled(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "⚠ Steam 调试模式未启用",
@@ -1013,7 +1016,7 @@ impl I18n {
         }
     }
 
-    // 状态栏
+    // ========== 状态栏 ==========
     pub fn status_label(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "状态:",
@@ -1042,7 +1045,7 @@ impl I18n {
         }
     }
 
-    // 按钮悬停提示
+    // ========== 按钮悬停提示 ==========
     pub fn select_all_hint(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "选择列表中的所有文件",
@@ -1127,7 +1130,7 @@ impl I18n {
         }
     }
 
-    // 文件列表面板
+    // ========== 文件列表面板 ==========
     pub fn local_save_path(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "本地存档路径:",
@@ -1219,7 +1222,7 @@ impl I18n {
         }
     }
 
-    // 文件对比对话框
+    // ========== 文件对比对话框 ==========
     pub fn file_comparison_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "文件对比",
@@ -1502,7 +1505,7 @@ impl I18n {
         }
     }
 
-    // 下载相关
+    // ========== 下载相关 ==========
     pub fn download_progress_title(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "下载进度",
@@ -1549,6 +1552,169 @@ impl I18n {
         match self.lang {
             Language::Chinese => "打开下载目录",
             Language::English => "Open Download Dir",
+        }
+    }
+
+    // ========== 软链接功能 ==========
+
+    pub fn symlink_title(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "软链接管理",
+            Language::English => "Symlink Management",
+        }
+    }
+
+    pub fn symlink_configured_links(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "已配置的软链接",
+            Language::English => "Configured Symlinks",
+        }
+    }
+
+    pub fn symlink_no_configs(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "暂无软链接配置",
+            Language::English => "No symlink configurations",
+        }
+    }
+
+    pub fn symlink_add_new(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "添加新软链接",
+            Language::English => "Add New Symlink",
+        }
+    }
+
+    pub fn symlink_direction(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "方向:",
+            Language::English => "Direction:",
+        }
+    }
+
+    pub fn symlink_local_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地路径:",
+            Language::English => "Local Path:",
+        }
+    }
+
+    pub fn symlink_remote_subfolder(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Remote 子目录:",
+            Language::English => "Remote Subfolder:",
+        }
+    }
+
+    pub fn symlink_browse(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "选择文件夹",
+            Language::English => "Browse",
+        }
+    }
+
+    pub fn symlink_add_config(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "添加配置",
+            Language::English => "Add Config",
+        }
+    }
+
+    pub fn symlink_add_and_create(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "添加并创建链接",
+            Language::English => "Add & Create Link",
+        }
+    }
+
+    pub fn symlink_create(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "创建链接",
+            Language::English => "Create Link",
+        }
+    }
+
+    pub fn symlink_remove_link(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "删除链接",
+            Language::English => "Remove Link",
+        }
+    }
+
+    pub fn symlink_delete_config(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "删除配置",
+            Language::English => "Delete Config",
+        }
+    }
+
+    pub fn symlink_copy_command(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "复制命令",
+            Language::English => "Copy Command",
+        }
+    }
+
+    pub fn symlink_refresh(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "刷新",
+            Language::English => "Refresh",
+        }
+    }
+
+    pub fn symlink_command_copied(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "命令已复制到剪贴板",
+            Language::English => "Command copied to clipboard",
+        }
+    }
+
+    pub fn symlink_config_deleted(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "配置已删除",
+            Language::English => "Config deleted",
+        }
+    }
+
+    pub fn symlink_config_added(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "配置已添加",
+            Language::English => "Config added",
+        }
+    }
+
+    pub fn symlink_created(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "软链接已创建",
+            Language::English => "Symlink created",
+        }
+    }
+
+    pub fn symlink_removed(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "软链接已删除",
+            Language::English => "Symlink removed",
+        }
+    }
+
+    pub fn symlink_create_failed(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "创建失败",
+            Language::English => "Create failed",
+        }
+    }
+
+    pub fn symlink_remove_failed(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "删除失败",
+            Language::English => "Remove failed",
+        }
+    }
+
+    pub fn symlink_add_failed(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "添加配置失败",
+            Language::English => "Add config failed",
         }
     }
 }

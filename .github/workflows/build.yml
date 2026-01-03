@@ -66,3 +66,5 @@ jobs:
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
       - name: Build
         run: cargo build --release --target ${{ matrix.target }} --locked
+      - name: Run tests
+        run: cargo test --target ${{ matrix.target }}

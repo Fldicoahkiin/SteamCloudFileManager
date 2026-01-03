@@ -17,6 +17,7 @@ mod path_resolver;
 mod steam_api;
 mod steam_process;
 mod steam_worker;
+mod symlink_manager;
 mod ui;
 mod update;
 mod user_manager;

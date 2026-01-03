@@ -114,6 +114,7 @@ pub struct DialogState {
     pub backup_progress: Option<crate::ui::BackupProgressDialog>,
     pub download_progress: Option<crate::ui::DownloadProgressDialog>,
     pub appinfo_dialog: Option<crate::ui::AppInfoDialog>,
+    pub symlink_dialog: Option<crate::ui::SymlinkDialog>,
 }
 
 impl Default for DialogState {
@@ -134,6 +135,7 @@ impl Default for DialogState {
             backup_progress: None,
             download_progress: None,
             appinfo_dialog: None,
+            symlink_dialog: None,
         }
     }
 }

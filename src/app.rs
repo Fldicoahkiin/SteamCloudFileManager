@@ -174,6 +174,31 @@ impl SteamCloudApp {
         }
     }
 
+    fn show_symlink_manager(&mut self, app_id: u32) {
+        match crate::vdf_parser::VdfParser::new() {
+            Ok(parser) => {
+                let game_name = self
+                    .game_library
+                    .cloud_games
+                    .iter()
+                    .find(|g| g.app_id == app_id)
+                    .and_then(|g| g.game_name.clone())
+                    .unwrap_or_else(|| format!("Game {}", app_id));
+
+                self.dialogs.symlink_dialog = Some(crate::ui::SymlinkDialog::new(
+                    app_id,
+                    game_name,
+                    parser.get_steam_path().clone(),
+                    parser.get_user_id().to_string(),
+                ));
+            }
+            Err(e) => {
+                self.dialogs
+                    .show_error(&format!("VDF 解析器初始化失败: {}", e));
+            }
+        }
+    }
+
     fn scan_cloud_games(&mut self) {
         self.handlers.scan_cloud_games(
             &mut self.game_library,
@@ -457,6 +482,9 @@ impl eframe::App for SteamCloudApp {
             crate::ui::BottomPanelEvent::ShowAppInfo(app_id) => {
                 self.show_appinfo(app_id);
             }
+            crate::ui::BottomPanelEvent::ShowSymlinkManager(app_id) => {
+                self.show_symlink_manager(app_id);
+            }
             crate::ui::BottomPanelEvent::None => {}
         }
 
@@ -485,6 +513,18 @@ impl eframe::App for SteamCloudApp {
             if !crate::ui::draw_appinfo_dialog(ctx, dialog, &self.misc.i18n) {
                 self.dialogs.appinfo_dialog = None;
             }
+        }
+
+        // Symlink 管理对话框
+        let mut close_symlink_dialog = false;
+        if let Some(ref mut dialog) = self.dialogs.symlink_dialog {
+            let action = dialog.draw(ctx, &self.misc.i18n);
+            if matches!(action, crate::ui::SymlinkAction::Close) || !dialog.show {
+                close_symlink_dialog = true;
+            }
+        }
+        if close_symlink_dialog {
+            self.dialogs.symlink_dialog = None;
         }
 
         if self.game_library.show_game_selector {
