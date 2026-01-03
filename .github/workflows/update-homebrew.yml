@@ -1,0 +1,62 @@
+name: Update Homebrew Tap
+# 当 Release 发布时自动更新 Homebrew Formula
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要更新的版本号 (不带 v 前缀)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  update-homebrew:
+    name: Update Homebrew Tap
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 获取版本号
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: 下载 macOS 构建产物
+        run: |
+          # 下载 macOS tar.gz 文件用于计算 SHA256
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-macos-x86_64.tar.gz" -o macos-x86_64.tar.gz
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-macos-aarch64.tar.gz" -o macos-aarch64.tar.gz
+      - name: 计算 SHA256
+        run: |
+          SHA256_X64=$(sha256sum macos-x86_64.tar.gz | cut -d' ' -f1)
+          SHA256_ARM64=$(sha256sum macos-aarch64.tar.gz | cut -d' ' -f1)
+          echo "SHA256_X64=$SHA256_X64" >> $GITHUB_ENV
+          echo "SHA256_ARM64=$SHA256_ARM64" >> $GITHUB_ENV
+          echo "SHA256 x64: $SHA256_X64"
+          echo "SHA256 arm64: $SHA256_ARM64"
+      - name: 生成 Homebrew Formula
+        run: |
+          chmod +x scripts/packaging/homebrew/generate-formula.sh
+          ./scripts/packaging/homebrew/generate-formula.sh \
+            "${{ env.VERSION }}" \
+            "${{ env.SHA256_X64 }}" \
+            "${{ env.SHA256_ARM64 }}" \
+            "steam-cloud-file-manager.rb"
+          cat steam-cloud-file-manager.rb
+      - name: 推送到 Homebrew Tap
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${{ github.repository_owner }}/homebrew-tap.git tap-repo
+          cp steam-cloud-file-manager.rb tap-repo/
+          cd tap-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add steam-cloud-file-manager.rb
+          git commit -m "Update steam-cloud-file-manager to ${{ env.VERSION }}" || echo "无更改需要提交"
+          git push

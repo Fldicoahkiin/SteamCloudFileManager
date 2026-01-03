@@ -1,0 +1,82 @@
+name: Update AUR Package
+# 当 Release 发布时自动更新 AUR 包
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '要更新的版本号 (不带 v 前缀)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  update-aur:
+    name: Update AUR Package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 获取版本号
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      - name: 下载 Linux 构建产物
+        run: |
+          curl -sL "https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.tar.gz" -o linux-x86_64.tar.gz
+      - name: 计算 SHA256
+        run: |
+          SHA256=$(sha256sum linux-x86_64.tar.gz | cut -d' ' -f1)
+          echo "SHA256=$SHA256" >> $GITHUB_ENV
+          echo "SHA256: $SHA256"
+      - name: 生成 PKGBUILD
+        run: |
+          chmod +x scripts/packaging/aur/generate-pkgbuild.sh
+          ./scripts/packaging/aur/generate-pkgbuild.sh \
+            "${{ env.VERSION }}" \
+            "${{ env.SHA256 }}" \
+            "aur-package"
+          cat aur-package/PKGBUILD
+      - name: 配置 AUR SSH
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << EOF
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            User aur
+          EOF
+      - name: 推送到 AUR
+        env:
+          AUR_USERNAME: ${{ secrets.AUR_USERNAME }}
+        run: |
+          # 克隆 AUR 仓库
+          git clone ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git aur-repo || {
+            # 如果仓库不存在则初始化
+            mkdir -p aur-repo
+            cd aur-repo
+            git init
+            git remote add origin ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git
+            cd ..
+          }
+
+          # 复制生成的文件
+          cp aur-package/PKGBUILD aur-repo/
+          cp aur-package/.SRCINFO aur-repo/
+
+          # 提交并推送
+          cd aur-repo
+          git config user.name "${{ env.AUR_USERNAME }}"
+          git config user.email "${{ env.AUR_USERNAME }}@users.noreply.github.com"
+          git add PKGBUILD .SRCINFO
+          git commit -m "Update to ${{ env.VERSION }}" || echo "无更改需要提交"
+          git push origin master || git push origin main
