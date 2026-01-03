@@ -67,7 +67,7 @@ fn main() {
         res.set("ProductName", "Steam Cloud File Manager");
         res.set(
             "LegalCopyright",
-            "Copyright © 2025 Flacier. All rights reserved.",
+            "Copyright © 2026 Flacier. All rights reserved.",
         );
         res.set("CompanyName", "Flacier");
 

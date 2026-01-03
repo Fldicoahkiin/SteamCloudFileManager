@@ -531,7 +531,7 @@ fn draw_about_content(
 
     ui.vertical_centered(|ui| {
         ui.label(
-            egui::RichText::new("Copyright © 2025 Flacier")
+            egui::RichText::new("Copyright © 2026 Flacier")
                 .size(9.0)
                 .color(text_subtle),
         );
