@@ -35,7 +35,6 @@ impl ConflictDialog {
     pub fn set_comparisons(&mut self, comparisons: Vec<FileComparison>) {
         self.comparisons = comparisons;
         self.selected_index = None;
-        self.show = true;
     }
 
     // 更新 hash 检测结果

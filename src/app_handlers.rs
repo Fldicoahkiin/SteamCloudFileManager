@@ -665,6 +665,7 @@ impl AppHandlers {
         let comparisons =
             crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
         dialogs.conflict_dialog.set_comparisons(comparisons.clone());
+        dialogs.conflict_dialog.show = true;
 
         file_list.hash_checker.start(app_id, &comparisons);
         tracing::info!("已启动异步 Hash 检测 (app_id={})", app_id);
