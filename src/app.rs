@@ -190,6 +190,7 @@ impl SteamCloudApp {
                     game_name,
                     parser.get_steam_path().clone(),
                     parser.get_user_id().to_string(),
+                    Some(self.steam_manager.clone()),
                 ));
             }
             Err(e) => {

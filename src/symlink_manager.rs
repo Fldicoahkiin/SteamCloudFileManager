@@ -307,6 +307,80 @@ impl SymlinkManager {
             .filter(|c| c.app_id == app_id)
             .collect())
     }
+
+    // 扫描软链接目录中的所有文件
+    // 返回 (云端路径, 本地文件绝对路径, 文件大小) 列表
+    pub fn scan_symlink_files(
+        &self,
+        config: &SymlinkConfig,
+    ) -> Result<Vec<(String, PathBuf, u64)>> {
+        let remote_dir = self.get_remote_dir(config.app_id);
+
+        // 对于 RemoteToLocal：源是 local_path，链接在 remote
+        // 需要扫描的是源目录（local_path），注册时使用 remote_subfolder 前缀
+        let (scan_dir, cloud_prefix) = match config.direction {
+            LinkDirection::RemoteToLocal => {
+                // 扫描本地目录，上传到 remote_subfolder/*
+                (&config.local_path, config.remote_subfolder.clone())
+            }
+            LinkDirection::LocalToRemote => {
+                // 扫描 remote 子目录，上传到 remote_subfolder/*
+                let remote_subdir = remote_dir.join(&config.remote_subfolder);
+                return self.scan_directory(&remote_subdir, &config.remote_subfolder);
+            }
+        };
+
+        self.scan_directory(scan_dir, &cloud_prefix)
+    }
+
+    // 扫描指定目录下的所有文件
+    fn scan_directory(&self, dir: &Path, prefix: &str) -> Result<Vec<(String, PathBuf, u64)>> {
+        use walkdir::WalkDir;
+
+        if !dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut files = Vec::new();
+
+        for entry in WalkDir::new(dir).follow_links(true) {
+            let entry = entry?;
+            if entry.file_type().is_file() {
+                let file_path = entry.path().to_path_buf();
+                let size = entry.metadata()?.len();
+
+                // 计算相对路径
+                let relative_path = file_path
+                    .strip_prefix(dir)
+                    .map_err(|e| anyhow!("无法计算相对路径: {}", e))?;
+
+                let relative_str = relative_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("路径包含非 UTF-8 字符"))?
+                    .replace("\\", "/");
+
+                // 构建云端路径: prefix/relative_path
+                let cloud_path = if prefix.is_empty() {
+                    relative_str
+                } else if relative_str.is_empty() {
+                    prefix.to_string()
+                } else {
+                    format!("{}/{}", prefix, relative_str)
+                };
+
+                files.push((cloud_path, file_path, size));
+            }
+        }
+
+        tracing::debug!(
+            "扫描目录 {:?} 发现 {} 个文件 (前缀: {})",
+            dir,
+            files.len(),
+            prefix
+        );
+
+        Ok(files)
+    }
 }
 
 // 获取配置文件路径

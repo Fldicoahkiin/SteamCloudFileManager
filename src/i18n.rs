@@ -1720,8 +1720,64 @@ impl I18n {
 
     pub fn symlink_experimental_warning(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "⚠ 实验性功能：软链接创建后，需要手动点击「同步云端」按钮触发同步。请谨慎操作，删除软链接不会影响源文件。",
-            Language::English => "⚠ Experimental: After creating symlinks, you need to manually click 'Sync to Cloud' to trigger sync. Deleting symlinks won't affect source files.",
+            Language::Chinese => "⚠ 实验性功能：创建软链接后会自动同步目录下的文件到云端。点击 ☁ 按钮可手动同步新增文件。",
+            Language::English => "⚠ Experimental: Files in the directory are auto-synced after symlink creation. Click ☁ to manually sync new files.",
+        }
+    }
+
+    pub fn symlink_sync_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "同步文件到云端",
+            Language::English => "Sync files to cloud",
+        }
+    }
+
+    pub fn symlink_sync_success(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "同步成功",
+            Language::English => "Sync successful",
+        }
+    }
+
+    pub fn symlink_sync_partial(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "部分同步成功",
+            Language::English => "Partially synced",
+        }
+    }
+
+    pub fn symlink_sync_no_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "目录为空，无文件需要同步",
+            Language::English => "Directory is empty, no files to sync",
+        }
+    }
+
+    pub fn symlink_sync_no_manager(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "软链接管理器未初始化",
+            Language::English => "Symlink manager not initialized",
+        }
+    }
+
+    pub fn symlink_sync_no_steam(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Steam 未连接，无法同步",
+            Language::English => "Steam not connected, cannot sync",
+        }
+    }
+
+    pub fn symlink_sync_scan_failed(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "扫描目录失败",
+            Language::English => "Failed to scan directory",
+        }
+    }
+
+    pub fn files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "个文件",
+            Language::English => "files",
         }
     }
 }

@@ -1,7 +1,9 @@
 use crate::i18n::I18n;
+use crate::steam_worker::SteamWorkerManager;
 use crate::symlink_manager::{LinkDirection, LinkStatus, SymlinkConfig, SymlinkManager};
 use egui::RichText;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SymlinkAction {
@@ -19,6 +21,7 @@ struct PendingOperations {
     add_and_create: Option<SymlinkConfig>,
     refresh: bool,
     copy_command: Option<usize>,
+    sync_files: Option<usize>, // 同步指定配置的文件到云端
 }
 
 // 软链接管理对话框状态
@@ -42,12 +45,21 @@ pub struct SymlinkDialog {
     // 管理器
     manager: Option<SymlinkManager>,
 
+    // Steam 管理器（用于上传文件）
+    steam_manager: Option<Arc<Mutex<SteamWorkerManager>>>,
+
     // 缓存的 remote 目录路径
     remote_dir: PathBuf,
 }
 
 impl SymlinkDialog {
-    pub fn new(app_id: u32, game_name: String, steam_path: PathBuf, user_id: String) -> Self {
+    pub fn new(
+        app_id: u32,
+        game_name: String,
+        steam_path: PathBuf,
+        user_id: String,
+        steam_manager: Option<Arc<Mutex<SteamWorkerManager>>>,
+    ) -> Self {
         let manager = SymlinkManager::new(steam_path, user_id).ok();
         let remote_dir = manager
             .as_ref()
@@ -65,6 +77,7 @@ impl SymlinkDialog {
             new_remote_subfolder: String::new(),
             status_message: None,
             manager,
+            steam_manager,
             remote_dir,
         };
 
@@ -151,7 +164,9 @@ impl SymlinkDialog {
                 } else {
                     match manager.create_symlink(&config) {
                         Ok(_) => {
-                            message = Some((i18n.symlink_created().to_string(), false));
+                            // 创建成功后自动同步文件
+                            let sync_result = self.sync_files_for_config(&config, i18n);
+                            message = Some(sync_result);
                         }
                         Err(e) => {
                             message =
@@ -162,6 +177,14 @@ impl SymlinkDialog {
                     self.new_remote_subfolder.clear();
                     need_refresh = true;
                 }
+            }
+        }
+
+        // 同步文件到云端
+        if let Some(i) = ops.sync_files {
+            if let Some(config) = self.configs.get(i).cloned() {
+                let sync_result = self.sync_files_for_config(&config, i18n);
+                message = Some(sync_result);
             }
         }
 
@@ -178,6 +201,102 @@ impl SymlinkDialog {
         // 刷新配置 - 在所有 manager 借用结束后
         if need_refresh {
             self.refresh_configs();
+        }
+    }
+
+    // 同步指定配置下的所有文件到云端
+    fn sync_files_for_config(&self, config: &SymlinkConfig, i18n: &I18n) -> (String, bool) {
+        // 检查必要条件
+        let Some(manager) = &self.manager else {
+            return (i18n.symlink_sync_no_manager().to_string(), true);
+        };
+        let Some(steam_mgr) = &self.steam_manager else {
+            return (i18n.symlink_sync_no_steam().to_string(), true);
+        };
+
+        // 扫描文件
+        let files = match manager.scan_symlink_files(config) {
+            Ok(f) => f,
+            Err(e) => {
+                return (format!("{}: {}", i18n.symlink_sync_scan_failed(), e), true);
+            }
+        };
+
+        if files.is_empty() {
+            return (i18n.symlink_sync_no_files().to_string(), false);
+        }
+
+        // 上传文件
+        let mut success_count = 0;
+        let mut failed_count = 0;
+        let total = files.len();
+
+        for (cloud_path, local_path, _size) in &files {
+            // 读取本地文件
+            match std::fs::read(local_path) {
+                Ok(data) => {
+                    // 上传到云端
+                    if let Ok(mut mgr) = steam_mgr.lock() {
+                        match mgr.write_file(cloud_path, &data) {
+                            Ok(_) => {
+                                tracing::debug!(
+                                    "同步文件: {} -> {}",
+                                    local_path.display(),
+                                    cloud_path
+                                );
+                                success_count += 1;
+                            }
+                            Err(e) => {
+                                tracing::warn!("上传失败 {}: {}", cloud_path, e);
+                                failed_count += 1;
+                            }
+                        }
+                    } else {
+                        failed_count += 1;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("读取文件失败 {}: {}", local_path.display(), e);
+                    failed_count += 1;
+                }
+            }
+        }
+
+        // 触发云同步
+        if success_count > 0 {
+            if let Ok(mut mgr) = steam_mgr.lock() {
+                let _ = mgr.sync_cloud_files();
+            }
+        }
+
+        tracing::info!(
+            "软链接文件同步完成: {}/{} 成功, {} 失败",
+            success_count,
+            total,
+            failed_count
+        );
+
+        if failed_count == 0 {
+            (
+                format!(
+                    "{} ({} {})",
+                    i18n.symlink_sync_success(),
+                    success_count,
+                    i18n.files()
+                ),
+                false,
+            )
+        } else {
+            (
+                format!(
+                    "{}: {}/{} {}",
+                    i18n.symlink_sync_partial(),
+                    success_count,
+                    total,
+                    i18n.files()
+                ),
+                true,
+            )
         }
     }
 
@@ -309,6 +428,19 @@ impl SymlinkDialog {
                                                     }
                                                 }
                                                 LinkStatus::Valid | LinkStatus::Broken => {
+                                                    // 同步文件按钮（仅对有效链接且 Steam 已连接时显示）
+                                                    if *status == LinkStatus::Valid
+                                                        && self.steam_manager.is_some()
+                                                        && ui
+                                                            .small_button("☁")
+                                                            .on_hover_text(
+                                                                i18n.symlink_sync_files(),
+                                                            )
+                                                            .clicked()
+                                                    {
+                                                        pending.sync_files = Some(i);
+                                                    }
+
                                                     if ui
                                                         .small_button("✂")
                                                         .on_hover_text(i18n.symlink_remove_link())
