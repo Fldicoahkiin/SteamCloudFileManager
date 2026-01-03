@@ -82,19 +82,38 @@ impl FileService {
         use chrono::{Local, TimeZone};
         let mut mgr = manager.lock().map_err(|e| anyhow!("锁错误: {}", e))?;
         let worker_files = mgr.get_files()?;
+
+        // 获取 Steam 路径信息以验证文件真实存在
+        let parser = VdfParser::new().ok();
+        let path_info = parser
+            .as_ref()
+            .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
+        let app_id = mgr.get_app_id();
+
         Ok(worker_files
             .into_iter()
-            .map(|f| CloudFile {
-                name: f.name,
-                size: f.size,
-                timestamp: Local
-                    .timestamp_opt(f.timestamp, 0)
-                    .single()
-                    .unwrap_or_else(Local::now),
-                is_persisted: f.is_persisted,
-                exists: f.exists,
-                root: f.root,
-                root_description: f.root_description,
+            .map(|f| {
+                // 验证文件是否真实存在于本地（而不是信任 API 缓存）
+                let actual_exists = if let Some((ref steam_path, ref user_id)) = path_info {
+                    resolve_cloud_file_path(f.root, &f.name, steam_path, user_id, app_id)
+                        .map(|p| p.exists())
+                        .unwrap_or(false)
+                } else {
+                    f.exists
+                };
+
+                CloudFile {
+                    name: f.name,
+                    size: f.size,
+                    timestamp: Local
+                        .timestamp_opt(f.timestamp, 0)
+                        .single()
+                        .unwrap_or_else(Local::now),
+                    is_persisted: f.is_persisted,
+                    exists: actual_exists,
+                    root: f.root,
+                    root_description: f.root_description,
+                }
             })
             .collect())
     }

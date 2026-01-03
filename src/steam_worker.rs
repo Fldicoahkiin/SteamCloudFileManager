@@ -271,6 +271,10 @@ impl SteamWorkerManager {
         self.child.is_some() && self.app_id > 0
     }
 
+    pub fn get_app_id(&self) -> u32 {
+        self.app_id
+    }
+
     // 通用请求-响应处理
     fn request<T, F>(&mut self, req: &WorkerRequest, extract: F) -> Result<T>
     where
