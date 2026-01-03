@@ -193,6 +193,29 @@ impl FileService {
                             );
                         }
                     } else {
+                        // CDP 返回了本地列表中没有的文件（云端独有）
+                        // 验证文件是否真实存在于本地
+                        let mut cdp_file = cdp_file;
+
+                        // 获取 Steam 路径信息以验证文件真实存在
+                        let parser = VdfParser::new().ok();
+                        if let Some(p) = parser.as_ref() {
+                            let steam_path = p.get_steam_path();
+                            let user_id = p.get_user_id().to_string();
+                            cdp_file.exists = resolve_cloud_file_path(
+                                cdp_file.root,
+                                &cdp_file.name,
+                                steam_path,
+                                &user_id,
+                                app_id,
+                            )
+                            .map(|p| p.exists())
+                            .unwrap_or(false);
+                        } else {
+                            // 无法获取路径信息，保守地设为 false（CDP 只能确认云端存在）
+                            cdp_file.exists = false;
+                        }
+
                         tracing::trace!(
                             "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
                             cdp_file.name,
