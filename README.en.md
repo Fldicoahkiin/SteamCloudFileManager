@@ -236,40 +236,130 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ## Technical Architecture
 
-### Cloud Sync Mechanism
+### Core Flow
 
 ```mermaid
 graph TD
-    A[Steam Cloud Server] <-->|Async Background Sync| B[Steam Client Local Cache]
-    B <-->|Steam API| C[Steam Cloud File Manager]
-    C -->|Read| D[remotecache.vdf]
-    C -->|Parse| E[appinfo.vdf]
-    C <-->|CDP Protocol| F[Steam CEF Debug Interface]
+    User([User Action]) -->|Select Game/File| App[Steam Cloud File Manager]
+    App --> VDF["VDF Parser: remotecache.vdf"]
+    VDF --> PathResolver["Path Resolver: Root ID Mapping"]
+    PathResolver --> FileList[File List View]
+    FileList --> CDP["CDP Client: Get Download Links"]
+    CDP --> SteamBrowser["Steam Built-in Browser 127.0.0.1:8080"]
+    SteamBrowser --> CloudPage["Cloud Storage Page store.steampowered.com"]
+    CloudPage -->|File List + Download Links| FileList
+    FileList -->|Upload/Download/Delete| SteamAPI["Steam API: ISteamRemoteStorage"]
+    SteamAPI --> LocalCache["Local Cache userdata/uid/appid/remote/"]
+    LocalCache -.->|Background Async Sync| CloudServer[Steam Cloud Server]
+    CloudServer -.->|Sync to Other Devices| LocalCache
+    LocalCache -->|Refresh| VDF
 ```
 
 ### Data Flow
 
 ```mermaid
-graph LR
-    subgraph Local Operations
-        A[File Upload] --> B[ISteamRemoteStorage]
-        C[File Delete] --> B
+graph TD
+    subgraph Toolbar
+        Upload[Upload]
+        Download[Download]
+        SyncToCloud[Sync to Cloud]
+        Delete[Delete]
+        Forget[Forget]
+        Compare[Compare Files]
+        Refresh[Refresh]
+        Backup[Backup]
     end
-    subgraph Remote Queries
-        D[CDP Protocol] --> E[Cloud File List]
-        D --> F[Download Links]
+    
+    subgraph SteamAPI[Steam API]
+        WriteFile[write_file]
+        ReadFile[read_file]
+        DeleteFile[delete_file]
+        ForgetFile[forget_file]
+        SyncCloud[sync_cloud_files]
     end
-    B --> G[Steam Cloud]
-    E --> H[File Status Merge]
+    
+    subgraph DataFetch[Data Fetching]
+        CDPClient[CDP Client]
+        VDFParser[VDF Parser]
+    end
+    
+    Upload -->|Select Local File| WriteFile
+    WriteFile --> SyncCloud
+    
+    Download --> CDPClient
+    CDPClient -->|Get Download URL| HTTP[HTTP Download]
+    HTTP --> LocalDisk[Local Disk]
+    
+    SyncToCloud -->|Upload Local-Only Files| WriteFile
+    
+    Delete --> DeleteFile
+    DeleteFile --> SyncCloud
+    
+    Forget -->|Remove from Cloud, Keep Local| ForgetFile
+    ForgetFile --> SyncCloud
+    
+    Compare --> CDPClient
+    Compare --> VDFParser
+    CDPClient -->|Calculate Cloud Hash| HashCompare[Hash Compare]
+    VDFParser -->|Calculate Local Hash| HashCompare
+    
+    Backup --> ReadFile
+    ReadFile --> LocalDisk
+    
+    Refresh --> VDFParser
+    Refresh --> CDPClient
+    VDFParser --> FileList[File List]
+    CDPClient --> FileList
+    
+    SyncCloud -.->|Background Async| CloudServer[Steam Cloud]
 ```
+
+### Data Source Priority
+
+| Source | Data Content | Priority | Description |
+|--------|--------------|----------|-------------|
+| **VDF** | Local cached file list, sync status | Primary | Parses `remotecache.vdf` |
+| **CDP** | Real-time cloud file list, download URLs | Supplement | Via Steam's built-in browser |
+| **Steam API** | File read/write/delete, quota query | Operations | `ISteamRemoteStorage` interface |
+
+### Sync Status (`is_persisted`)
+
+```
+Newly uploaded file
+  is_persisted = false  ← Only in local cache
+  ↓
+  Steam background upload (takes seconds to minutes)
+  ↓
+  is_persisted = true   ← Synced to cloud
+```
+
+> ⚠️ **Important**: `sync_cloud_files()` returns immediately; actual upload happens asynchronously in background. Steam forces sync completion on disconnect.
+
+### CDP Protocol
+
+Fetches real-time cloud data via Steam's CEF (Chromium Embedded Framework) debug interface:
+
+1. **Detect**: Access `http://127.0.0.1:8080/json` to get debug target list
+2. **Connect**: Establish WebSocket connection to target page
+3. **Navigate**: Go to `store.steampowered.com/account/remotestorage`
+4. **Inject**: Execute JavaScript to extract file list and download URLs
+5. **Merge**: Combine CDP data with VDF data, supplementing download URLs and real-time status
 
 ### VDF Parsing & Root Mapping
 
-The tool parses `remotecache.vdf` in real-time to list files. It also parses **`appinfo.vdf`** (Global App Config) to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping system to translate virtual paths like `Root 0` (Cloud), `Root 1` (InstallDir), and `Root 2` (Documents) into absolute local disk paths.
+The tool parses `remotecache.vdf` in real-time for file lists, and parses **`appinfo.vdf`** to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping:
+
+| Root ID | Meaning | Example Path (Windows) |
+|---------|---------|----------------------|
+| 0 | Cloud (Steam cloud directory) | `userdata/{uid}/{appid}/remote/` |
+| 1 | InstallDir (Game install directory) | `steamapps/common/GameName/` |
+| 2 | Documents (My Documents) | `C:/Users/xxx/Documents/` |
+| 3 | SavedGames | `C:/Users/xxx/Saved Games/` |
 
 - **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete path mapping rules
 
 > **Note**: The Root path mapping table is continuously updated. Different games may use different Root values, and cross-platform behavior may vary.
+
 
 ## TODO
 

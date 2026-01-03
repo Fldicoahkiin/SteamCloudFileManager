@@ -240,36 +240,126 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ```mermaid
 graph TD
-    A[Steam 云端服务器] <-->|异步后台同步| B[Steam Client 本地缓存]
-    B <-->|Steam API| C[Steam 云文件管理器]
-    C -->|读取| D[remotecache.vdf]
-    C -->|解析| E[appinfo.vdf]
-    C <-->|CDP 协议| F[Steam CEF 调试接口]
+    User([用户操作]) -->|选择游戏/文件| App[Steam 云文件管理器]
+    App --> VDF["VDF 解析器: remotecache.vdf"]
+    VDF --> PathResolver["路径解析器: Root ID 映射"]
+    PathResolver --> FileList[文件列表视图]
+    FileList --> CDP["CDP 客户端: 获取下载链接"]
+    CDP --> SteamBrowser["Steam 内置浏览器 127.0.0.1:8080"]
+    SteamBrowser --> CloudPage["云存储页面 store.steampowered.com"]
+    CloudPage -->|文件列表+下载链接| FileList
+    FileList -->|上传/下载/删除| SteamAPI["Steam API: ISteamRemoteStorage"]
+    SteamAPI --> LocalCache["本地缓存 userdata/uid/appid/remote/"]
+    LocalCache -.->|后台异步同步| CloudServer[Steam 云端服务器]
+    CloudServer -.->|同步到其他设备| LocalCache
+    LocalCache -->|刷新| VDF
 ```
 
 ### 数据流
 
 ```mermaid
-graph LR
-    subgraph 本地操作
-        A[文件上传] --> B[ISteamRemoteStorage]
-        C[文件删除] --> B
+graph TD
+    subgraph 操作栏
+        Upload[上传]
+        Download[下载]
+        SyncToCloud[同步到云端]
+        Delete[删除]
+        Forget[移出同步]
+        Compare[文件对比]
+        Refresh[刷新]
+        Backup[备份]
     end
-    subgraph 远程查询
-        D[CDP 协议] --> E[云端文件列表]
-        D --> F[下载链接获取]
+    
+    subgraph SteamAPI[Steam API]
+        WriteFile[write_file]
+        ReadFile[read_file]
+        DeleteFile[delete_file]
+        ForgetFile[forget_file]
+        SyncCloud[sync_cloud_files]
     end
-    B --> G[Steam 云端]
-    E --> H[文件状态合并]
+    
+    subgraph 数据获取
+        CDPClient[CDP 客户端]
+        VDFParser[VDF 解析器]
+    end
+    
+    Upload -->|选择本地文件| WriteFile
+    WriteFile --> SyncCloud
+    
+    Download --> CDPClient
+    CDPClient -->|获取下载链接| HTTP[HTTP 下载]
+    HTTP --> LocalDisk[本地磁盘]
+    
+    SyncToCloud -->|仅本地文件上传| WriteFile
+    
+    Delete --> DeleteFile
+    DeleteFile --> SyncCloud
+    
+    Forget -->|从云端移除但保留本地| ForgetFile
+    ForgetFile --> SyncCloud
+    
+    Compare --> CDPClient
+    Compare --> VDFParser
+    CDPClient -->|计算云端 Hash| HashCompare[Hash 对比]
+    VDFParser -->|计算本地 Hash| HashCompare
+    
+    Backup --> ReadFile
+    ReadFile --> LocalDisk
+    
+    Refresh --> VDFParser
+    Refresh --> CDPClient
+    VDFParser --> FileList[文件列表]
+    CDPClient --> FileList
+    
+    SyncCloud -.->|后台异步| CloudServer[Steam 云端]
 ```
+
+### 数据源优先级
+
+| 来源 | 数据内容 | 优先级 | 说明 |
+|------|----------|--------|------|
+| **VDF** | 本地缓存的文件列表、同步状态 | 主要 | 解析 `remotecache.vdf` |
+| **CDP** | 云端实时文件列表、下载链接 | 补充 | 通过 Steam 内置浏览器获取 |
+| **Steam API** | 文件读写、删除、配额查询 | 操作 | `ISteamRemoteStorage` 接口 |
+
+### 同步状态 (`is_persisted`)
+
+```
+新上传的文件
+  is_persisted = false  ← 仅在本地缓存
+  ↓
+  Steam 后台上传（需要数秒到数分钟）
+  ↓
+  is_persisted = true   ← 已同步到云端
+```
+
+> ⚠️ **重要**：`sync_cloud_files()` 调用后会立即返回，实际上传在后台异步进行。断开连接时 Steam 会强制完成同步。
+
+### CDP 协议
+
+通过 Steam 客户端的 CEF (Chromium Embedded Framework) 调试接口获取云端实时数据：
+
+1. **检测**: 访问 `http://127.0.0.1:8080/json` 获取调试目标列表
+2. **连接**: 建立 WebSocket 连接到目标页面
+3. **导航**: 跳转到 `store.steampowered.com/account/remotestorage`
+4. **注入**: 执行 JavaScript 提取文件列表和下载链接
+5. **合并**: 将 CDP 数据与 VDF 数据合并，补充下载链接和实时状态
 
 ### VDF 解析与 Root 映射
 
-工具并不依赖硬编码路径，而是实时解析 `remotecache.vdf` 获取文件列表。同时通过解析 **`appinfo.vdf`** (全局应用配置) 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统，将 `Root 0` (Cloud), `Root 1` (InstallDir), `Root 2` (Documents) 等虚拟路径转换为本地磁盘的绝对路径。
+工具实时解析 `remotecache.vdf` 获取文件列表，同时解析 **`appinfo.vdf`** 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统：
+
+| Root ID | 含义 | 示例路径 (Windows) |
+|---------|------|-------------------|
+| 0 | Cloud (Steam 云目录) | `userdata/{uid}/{appid}/remote/` |
+| 1 | InstallDir (游戏安装目录) | `steamapps/common/GameName/` |
+| 2 | Documents (我的文档) | `C:/Users/xxx/Documents/` |
+| 3 | SavedGames | `C:/Users/xxx/Saved Games/` |
 
 - **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的路径映射规则
 
 > **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。
+
 
 ## TODO
 
