@@ -1,4 +1,5 @@
 use crate::i18n::I18n;
+use crate::icons;
 use egui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -414,7 +415,7 @@ fn draw_about_content(
             }
             crate::update::UpdateStatus::Error(err) => {
                 ui.label(
-                    egui::RichText::new(format!("❌ {}", err))
+                    egui::RichText::new(format!("{} {}", icons::ERROR, err))
                         .size(10.0)
                         .color(crate::ui::theme::error_color(ui.ctx())),
                 );

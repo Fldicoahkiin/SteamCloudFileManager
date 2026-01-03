@@ -1,6 +1,7 @@
 use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryState, MiscState};
 use crate::async_handlers::AsyncHandlers;
 use crate::i18n::I18n;
+use crate::icons;
 use crate::steam_worker::SteamWorkerManager;
 use eframe::egui;
 use std::sync::{Arc, Mutex};
@@ -495,9 +496,9 @@ fn draw_cloud_status(
     ui.horizontal(|ui| {
         ui.label(format!("{}:", i18n.account_cloud_status()));
         match account_enabled {
-            Some(true) => ui.label(format!("✅ {}", i18n.logged_in())),
-            Some(false) => ui.label(format!("❌ {}", i18n.not_logged_in())),
-            None => ui.label("❓ Unknown"),
+            Some(true) => ui.label(format!("{} {}", icons::CHECK, i18n.logged_in())),
+            Some(false) => ui.label(format!("{} {}", icons::CLOSE, i18n.not_logged_in())),
+            None => ui.label(format!("{} Unknown", icons::QUESTION)),
         };
     });
 }

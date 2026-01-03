@@ -12,6 +12,7 @@ mod file_manager;
 mod file_tree;
 mod game_scanner;
 mod i18n;
+mod icons;
 mod logger;
 mod path_resolver;
 mod steam_api;

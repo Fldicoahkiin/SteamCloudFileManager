@@ -1,5 +1,6 @@
 use crate::game_scanner::CloudGameInfo;
 use crate::i18n::I18n;
+use crate::icons;
 use crate::vdf_parser::UserInfo;
 use egui;
 
@@ -251,7 +252,7 @@ fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo, i18n: &I18n) -> Option<Str
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if user.is_current {
-                    ui.label(format!("✅ {}", i18n.current_user()));
+                    ui.label(format!("{} {}", icons::CHECK, i18n.current_user()));
                 } else if ui.button(i18n.switch()).clicked() {
                     clicked = true;
                 }

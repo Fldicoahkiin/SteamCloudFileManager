@@ -1,5 +1,6 @@
 use crate::conflict::{FileComparison, SyncStatus};
 use crate::i18n::I18n;
+use crate::icons;
 use egui;
 
 // 文件对比对话框
@@ -251,7 +252,12 @@ fn render_filter_bar(
         }
 
         if stats.conflicts > 0 {
-            let label = format!("⚠ {} ({})", i18n.filter_conflicts(), stats.conflicts);
+            let label = format!(
+                "{} {} ({})",
+                icons::WARNING,
+                i18n.filter_conflicts(),
+                stats.conflicts
+            );
             if ui
                 .selectable_label(current_filter == SyncStatusFilter::Conflicts, label)
                 .clicked()
@@ -261,7 +267,12 @@ fn render_filter_bar(
         }
 
         if stats.local_newer > 0 {
-            let label = format!("↑ {} ({})", i18n.filter_local_newer(), stats.local_newer);
+            let label = format!(
+                "{} {} ({})",
+                icons::ARROW_UP,
+                i18n.filter_local_newer(),
+                stats.local_newer
+            );
             if ui
                 .selectable_label(current_filter == SyncStatusFilter::LocalNewer, label)
                 .clicked()
@@ -271,7 +282,12 @@ fn render_filter_bar(
         }
 
         if stats.cloud_newer > 0 {
-            let label = format!("↓ {} ({})", i18n.filter_cloud_newer(), stats.cloud_newer);
+            let label = format!(
+                "{} {} ({})",
+                icons::ARROW_DOWN,
+                i18n.filter_cloud_newer(),
+                stats.cloud_newer
+            );
             if ui
                 .selectable_label(current_filter == SyncStatusFilter::CloudNewer, label)
                 .clicked()
@@ -281,7 +297,12 @@ fn render_filter_bar(
         }
 
         if stats.synced > 0 {
-            let label = format!("✓ {} ({})", i18n.filter_synced(), stats.synced);
+            let label = format!(
+                "{} {} ({})",
+                icons::CHECK,
+                i18n.filter_synced(),
+                stats.synced
+            );
             if ui
                 .selectable_label(current_filter == SyncStatusFilter::Synced, label)
                 .clicked()
@@ -463,7 +484,7 @@ fn render_detail_panel(
             ui.label(comparison.hash_status_display());
             // 重新检测按钮
             if ui
-                .small_button("🔄")
+                .small_button(icons::REFRESH)
                 .on_hover_text("重新检测 Hash")
                 .clicked()
             {
@@ -522,13 +543,13 @@ fn render_footer(ui: &mut egui::Ui, conflicts: usize, i18n: &I18n) -> bool {
 // 获取同步状态的显示文本和颜色
 fn get_status_display(status: SyncStatus, ctx: &egui::Context) -> (&'static str, egui::Color32) {
     match status {
-        SyncStatus::Synced => ("✓", crate::ui::theme::success_color(ctx)),
-        SyncStatus::LocalNewer => ("↑", crate::ui::theme::info_color(ctx)),
-        SyncStatus::CloudNewer => ("↓", crate::ui::theme::warning_color(ctx)),
-        SyncStatus::Conflict => ("⚠", crate::ui::theme::error_color(ctx)),
-        SyncStatus::LocalOnly => ("📁", crate::ui::theme::muted_color(ctx)),
-        SyncStatus::CloudOnly => ("☁", crate::ui::theme::muted_color(ctx)),
-        SyncStatus::Unknown => ("?", crate::ui::theme::muted_color(ctx)),
+        SyncStatus::Synced => (icons::CHECK, crate::ui::theme::success_color(ctx)),
+        SyncStatus::LocalNewer => (icons::ARROW_UP, crate::ui::theme::info_color(ctx)),
+        SyncStatus::CloudNewer => (icons::ARROW_DOWN, crate::ui::theme::warning_color(ctx)),
+        SyncStatus::Conflict => (icons::WARNING, crate::ui::theme::error_color(ctx)),
+        SyncStatus::LocalOnly => (icons::FILE, crate::ui::theme::muted_color(ctx)),
+        SyncStatus::CloudOnly => (icons::CLOUD, crate::ui::theme::muted_color(ctx)),
+        SyncStatus::Unknown => (icons::QUESTION, crate::ui::theme::muted_color(ctx)),
     }
 }
 
@@ -538,10 +559,14 @@ fn get_hash_display(
     ctx: &egui::Context,
 ) -> (&'static str, egui::Color32) {
     match status {
-        crate::conflict::HashStatus::Pending => ("⏳", crate::ui::theme::muted_color(ctx)),
-        crate::conflict::HashStatus::Checking => ("🔄", crate::ui::theme::warning_color(ctx)),
-        crate::conflict::HashStatus::Match => ("✓", crate::ui::theme::success_color(ctx)),
-        crate::conflict::HashStatus::Mismatch => ("✗", crate::ui::theme::error_color(ctx)),
-        crate::conflict::HashStatus::Error => ("⚠", crate::ui::theme::error_color(ctx)),
+        crate::conflict::HashStatus::Pending => {
+            (icons::HOURGLASS, crate::ui::theme::muted_color(ctx))
+        }
+        crate::conflict::HashStatus::Checking => {
+            (icons::SPINNER, crate::ui::theme::warning_color(ctx))
+        }
+        crate::conflict::HashStatus::Match => (icons::CHECK, crate::ui::theme::success_color(ctx)),
+        crate::conflict::HashStatus::Mismatch => (icons::ERROR, crate::ui::theme::error_color(ctx)),
+        crate::conflict::HashStatus::Error => (icons::WARNING, crate::ui::theme::error_color(ctx)),
     }
 }

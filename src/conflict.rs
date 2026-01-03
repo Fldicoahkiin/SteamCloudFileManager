@@ -169,25 +169,25 @@ impl FileComparison {
         }
     }
 
-    pub fn status_display(&self) -> &'static str {
+    pub fn status_display(&self) -> String {
         match self.status {
-            SyncStatus::Synced => "✓ 已同步",
-            SyncStatus::LocalNewer => "↑ 本地较新",
-            SyncStatus::CloudNewer => "↓ 云端较新",
-            SyncStatus::Conflict => "⚠ 冲突",
-            SyncStatus::LocalOnly => "📁 仅本地",
-            SyncStatus::CloudOnly => "☁ 仅云端",
-            SyncStatus::Unknown => "? 检测中",
+            SyncStatus::Synced => format!("{} 已同步", crate::icons::CHECK),
+            SyncStatus::LocalNewer => format!("{} 本地较新", crate::icons::ARROW_UP),
+            SyncStatus::CloudNewer => format!("{} 云端较新", crate::icons::ARROW_DOWN),
+            SyncStatus::Conflict => format!("{} 冲突", crate::icons::WARNING),
+            SyncStatus::LocalOnly => format!("{} 仅本地", crate::icons::FILE),
+            SyncStatus::CloudOnly => format!("{} 仅云端", crate::icons::CLOUD),
+            SyncStatus::Unknown => format!("{} 检测中", crate::icons::QUESTION),
         }
     }
 
-    pub fn hash_status_display(&self) -> &'static str {
+    pub fn hash_status_display(&self) -> String {
         match self.hash_status {
-            HashStatus::Pending => "⏳ 等待",
-            HashStatus::Checking => "🔄 检测中",
-            HashStatus::Match => "✓ 一致",
-            HashStatus::Mismatch => "✗ 不一致",
-            HashStatus::Error => "⚠ 错误",
+            HashStatus::Pending => format!("{} 等待", crate::icons::HOURGLASS),
+            HashStatus::Checking => format!("{} 检测中", crate::icons::SPINNER),
+            HashStatus::Match => format!("{} 一致", crate::icons::CHECK),
+            HashStatus::Mismatch => format!("{} 不一致", crate::icons::ERROR),
+            HashStatus::Error => format!("{} 错误", crate::icons::WARNING),
         }
     }
 }

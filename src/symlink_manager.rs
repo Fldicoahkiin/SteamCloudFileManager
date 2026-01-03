@@ -40,10 +40,10 @@ pub enum LinkStatus {
 impl LinkStatus {
     pub fn icon(&self) -> &'static str {
         match self {
-            LinkStatus::Valid => "✅",
-            LinkStatus::Broken => "⚠️",
-            LinkStatus::NotExists => "❌",
-            LinkStatus::Conflict => "🔴",
+            LinkStatus::Valid => crate::icons::CHECK,
+            LinkStatus::Broken => crate::icons::WARNING,
+            LinkStatus::NotExists => crate::icons::CLOSE,
+            LinkStatus::Conflict => crate::icons::ERROR,
         }
     }
 

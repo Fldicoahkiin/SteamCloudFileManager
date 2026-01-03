@@ -1,6 +1,7 @@
 use crate::conflict::SyncStatus;
 use crate::file_tree::{FileTree, FileTreeNode};
 use crate::i18n::I18n;
+use crate::icons;
 use crate::steam_api::CloudFile;
 use egui;
 use egui_extras::{Column, TableBuilder};
@@ -267,7 +268,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
         ui.label(i18n.local_save_path());
         ui.horizontal_wrapped(|ui| {
             for (desc, path) in local_save_paths {
-                let button_text = format!("📁 {}", desc);
+                let button_text = format!("{} {}", icons::FOLDER, desc);
                 if ui
                     .button(button_text)
                     .on_hover_text(path.display().to_string())
@@ -288,7 +289,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
 
     // 搜索和筛选
     ui.horizontal(|ui| {
-        ui.label("🔍");
+        ui.label(icons::MAGNIFYING_GLASS);
         ui.add(
             egui::TextEdit::singleline(state.search_query)
                 .desired_width(200.0)
@@ -472,13 +473,21 @@ fn render_tree_body_recursive(
                             ui.add_space(indent);
 
                             // 展开/折叠箭头按钮
-                            let arrow = if expanded { "▾" } else { "▸" };
+                            let arrow = if expanded {
+                                icons::ARROW_DOWN
+                            } else {
+                                icons::ARROW_RIGHT
+                            };
                             if ui.small_button(arrow).clicked() {
                                 *is_expanded = !*is_expanded;
                             }
 
                             // 文件夹图标和名称
-                            let folder_icon = if expanded { "📂" } else { "📁" };
+                            let folder_icon = if expanded {
+                                icons::FOLDER_OPEN
+                            } else {
+                                icons::FOLDER
+                            };
                             let folder_label =
                                 format!("{} {} ({})", folder_icon, folder_name, count);
                             let response = ui.selectable_label(false, folder_label);
@@ -620,9 +629,12 @@ fn render_tree_body_recursive(
                     row.col(|ui| {
                         let ctx = ui.ctx();
                         if file.exists {
-                            ui.colored_label(crate::ui::theme::local_exists_color(ctx), "✓");
+                            ui.colored_label(
+                                crate::ui::theme::local_exists_color(ctx),
+                                icons::CHECK,
+                            );
                         } else {
-                            ui.colored_label(crate::ui::theme::muted_color(ctx), "✗");
+                            ui.colored_label(crate::ui::theme::muted_color(ctx), icons::CLOSE);
                         }
                     });
 
@@ -630,9 +642,12 @@ fn render_tree_body_recursive(
                     row.col(|ui| {
                         let ctx = ui.ctx();
                         if file.is_persisted {
-                            ui.colored_label(crate::ui::theme::cloud_exists_color(ctx), "✓");
+                            ui.colored_label(
+                                crate::ui::theme::cloud_exists_color(ctx),
+                                icons::CHECK,
+                            );
                         } else {
-                            ui.colored_label(crate::ui::theme::muted_color(ctx), "✗");
+                            ui.colored_label(crate::ui::theme::muted_color(ctx), icons::CLOSE);
                         }
                     });
 

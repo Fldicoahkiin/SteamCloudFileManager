@@ -1,4 +1,5 @@
 use crate::i18n::I18n;
+use crate::icons;
 use crate::steam_worker::SteamWorkerManager;
 use crate::symlink_manager::{LinkDirection, LinkStatus, SymlinkConfig, SymlinkManager};
 use egui::RichText;
@@ -356,7 +357,11 @@ impl SymlinkDialog {
                             .size(11.0)
                             .color(crate::ui::theme::muted_color(ctx)),
                     );
-                    if ui.small_button("📋").on_hover_text("复制路径").clicked() {
+                    if ui
+                        .small_button(icons::COPY)
+                        .on_hover_text("复制路径")
+                        .clicked()
+                    {
                         ctx.copy_text(remote_dir.to_string_lossy().to_string());
                     }
                 });
@@ -388,8 +393,8 @@ impl SymlinkDialog {
 
                                     // 方向图标，hover 显示方向描述
                                     let direction_icon = match config.direction {
-                                        LinkDirection::RemoteToLocal => "⬆",
-                                        LinkDirection::LocalToRemote => "⬇",
+                                        LinkDirection::RemoteToLocal => icons::CLOUD_DOWNLOAD,
+                                        LinkDirection::LocalToRemote => icons::CLOUD_UPLOAD,
                                     };
                                     ui.label(direction_icon)
                                         .on_hover_text(config.direction.description());
@@ -409,7 +414,7 @@ impl SymlinkDialog {
                                         |ui| {
                                             // 删除配置按钮
                                             if ui
-                                                .small_button("🗑")
+                                                .small_button(icons::TRASH)
                                                 .on_hover_text(i18n.symlink_delete_config())
                                                 .clicked()
                                             {
@@ -420,7 +425,7 @@ impl SymlinkDialog {
                                             match status {
                                                 LinkStatus::NotExists => {
                                                     if ui
-                                                        .small_button("🔗")
+                                                        .small_button(icons::LINK)
                                                         .on_hover_text(i18n.symlink_create())
                                                         .clicked()
                                                     {
@@ -432,7 +437,7 @@ impl SymlinkDialog {
                                                     if *status == LinkStatus::Valid
                                                         && self.steam_manager.is_some()
                                                         && ui
-                                                            .small_button("☁")
+                                                            .small_button(icons::CLOUD_UPLOAD)
                                                             .on_hover_text(
                                                                 i18n.symlink_sync_files(),
                                                             )
@@ -442,7 +447,7 @@ impl SymlinkDialog {
                                                     }
 
                                                     if ui
-                                                        .small_button("✂")
+                                                        .small_button(icons::UNLINK)
                                                         .on_hover_text(i18n.symlink_remove_link())
                                                         .clicked()
                                                     {
@@ -460,7 +465,7 @@ impl SymlinkDialog {
 
                                             // 复制命令按钮
                                             if ui
-                                                .small_button("📋")
+                                                .small_button(icons::COPY)
                                                 .on_hover_text(i18n.symlink_copy_command())
                                                 .clicked()
                                             {
@@ -489,12 +494,20 @@ impl SymlinkDialog {
                     ui.selectable_value(
                         &mut self.new_direction,
                         LinkDirection::RemoteToLocal,
-                        format!("⬆ {}", LinkDirection::RemoteToLocal.description()),
+                        format!(
+                            "{} {}",
+                            icons::CLOUD_DOWNLOAD,
+                            LinkDirection::RemoteToLocal.description()
+                        ),
                     );
                     ui.selectable_value(
                         &mut self.new_direction,
                         LinkDirection::LocalToRemote,
-                        format!("⬇ {}", LinkDirection::LocalToRemote.description()),
+                        format!(
+                            "{} {}",
+                            icons::CLOUD_UPLOAD,
+                            LinkDirection::LocalToRemote.description()
+                        ),
                     );
                 });
 
@@ -509,7 +522,7 @@ impl SymlinkDialog {
                             .hint_text("/path/to/saves"),
                     );
                     if ui
-                        .button("📁")
+                        .button(icons::FOLDER_OPEN)
                         .on_hover_text(i18n.symlink_browse())
                         .clicked()
                     {
@@ -581,7 +594,7 @@ impl SymlinkDialog {
                 // 底部按钮
                 ui.horizontal(|ui| {
                     if ui
-                        .button("🔄")
+                        .button(icons::REFRESH)
                         .on_hover_text(i18n.symlink_refresh())
                         .clicked()
                     {

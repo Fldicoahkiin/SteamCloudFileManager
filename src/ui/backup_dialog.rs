@@ -1,6 +1,7 @@
 use crate::backup::{BackupProgress, BackupResult};
 use crate::file_manager::format_size;
 use crate::i18n::I18n;
+use crate::icons;
 use crate::steam_api::CloudFile;
 use egui::RichText;
 
@@ -90,7 +91,11 @@ impl BackupPreviewDialog {
                             ui.horizontal(|ui| {
                                 // 状态图标
                                 let has_url = file.root_description.starts_with("CDP:");
-                                let icon = if has_url { "✓" } else { "⚠" };
+                                let icon = if has_url {
+                                    icons::CHECK
+                                } else {
+                                    icons::WARNING
+                                };
                                 let color = if has_url {
                                     crate::ui::theme::success_color(ctx)
                                 } else {

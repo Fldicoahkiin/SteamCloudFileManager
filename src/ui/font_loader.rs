@@ -13,6 +13,9 @@ pub fn setup_fonts(ctx: &egui::Context) {
     // 加载 CJK 字体
     load_cjk_fonts(&mut fonts);
 
+    // 加载 Phosphor 图标字体
+    egui_phosphor::add_to_fonts(&mut fonts, egui_phosphor::Variant::Regular);
+
     ctx.set_fonts(fonts);
 
     // 应用默认主题

@@ -1,5 +1,6 @@
 use crate::file_manager::{format_size, UploadQueue};
 use crate::i18n::I18n;
+use crate::icons;
 use egui::RichText;
 
 // 上传对话框的操作结果
@@ -195,7 +196,7 @@ impl UploadPreviewDialog {
                     }
 
                     // 确认按钮
-                    if ui.button("✓").clicked() {
+                    if ui.button(icons::CHECK).clicked() {
                         if !self.editing_path.is_empty() {
                             path_to_update = Some((index, self.editing_path.clone()));
                         }
@@ -203,7 +204,7 @@ impl UploadPreviewDialog {
                     }
 
                     // 取消按钮
-                    if ui.button("✗").clicked() {
+                    if ui.button(icons::CLOSE).clicked() {
                         self.editing_index = None;
                     }
                 } else {
@@ -212,9 +213,15 @@ impl UploadPreviewDialog {
                     let display_path = if path_parts.len() > 1 {
                         let folder = path_parts[..path_parts.len() - 1].join("/");
                         let filename = path_parts.last().unwrap();
-                        format!("📁 {} / 📄 {}", folder, filename)
+                        format!(
+                            "{} {} / {} {}",
+                            icons::FOLDER,
+                            folder,
+                            icons::FILE,
+                            filename
+                        )
                     } else {
-                        format!("📄 {}", task.cloud_path)
+                        format!("{} {}", icons::FILE, task.cloud_path)
                     };
 
                     // 路径标签
@@ -350,10 +357,10 @@ impl UploadProgressDialog {
                         .max_height(150.0)
                         .show(ui, |ui| {
                             for file in &self.completed_files {
-                                ui.label(format!("✓ {}", file));
+                                ui.label(format!("{} {}", icons::CHECK, file));
                             }
                             if !self.current_file.is_empty() {
-                                ui.label(format!("⏳ {}", self.current_file));
+                                ui.label(format!("{} {}", icons::HOURGLASS, self.current_file));
                             }
                         });
 

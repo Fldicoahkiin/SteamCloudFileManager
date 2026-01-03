@@ -1,6 +1,6 @@
 [package]
 name = "steam-cloud-file-manager"
-version = "0.9.5"
+version = "0.9.6"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
@@ -106,6 +106,7 @@ files = [
 eframe = "0.33.2"
 egui = "0.33.2"
 egui_extras = { version = "0.33.2", features = ["all_loaders"] }
+egui-phosphor = "0.11.0"
 
 # Steam API
 steamworks = "0.12.2"

@@ -1,3 +1,4 @@
+use crate::icons;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -378,24 +379,24 @@ impl I18n {
     }
 
     // ========== About 窗口更多翻译 ==========
-    pub fn checking_update(&self) -> &'static str {
+    pub fn checking_update(&self) -> String {
         match self.lang {
-            Language::Chinese => "检查中...",
-            Language::English => "Checking...",
+            Language::Chinese => format!("{} 检查中...", icons::SPINNER),
+            Language::English => format!("{} Checking...", icons::SPINNER),
         }
     }
 
-    pub fn check_update_btn(&self) -> &'static str {
+    pub fn check_update_btn(&self) -> String {
         match self.lang {
-            Language::Chinese => "🔄 检查更新",
-            Language::English => "🔄 Check Update",
+            Language::Chinese => format!("{} 检查更新", icons::REFRESH),
+            Language::English => format!("{} Check Update", icons::REFRESH),
         }
     }
 
-    pub fn already_latest(&self) -> &'static str {
+    pub fn already_latest(&self) -> String {
         match self.lang {
-            Language::Chinese => "✅ 当前已是最新版本",
-            Language::English => "✅ Already up to date",
+            Language::Chinese => format!("{} 当前已是最新版本", icons::CHECK),
+            Language::English => format!("{} Already up to date", icons::CHECK),
         }
     }
 
@@ -413,38 +414,38 @@ impl I18n {
         }
     }
 
-    pub fn download_and_install(&self) -> &'static str {
+    pub fn download_and_install(&self) -> String {
         match self.lang {
-            Language::Chinese => "📥 下载并安装",
-            Language::English => "📥 Download & Install",
+            Language::Chinese => format!("{} 下载并安装", icons::DOWNLOAD),
+            Language::English => format!("{} Download & Install", icons::DOWNLOAD),
         }
     }
 
-    pub fn view_details(&self) -> &'static str {
+    pub fn view_details(&self) -> String {
         match self.lang {
-            Language::Chinese => "🌐 查看详情",
-            Language::English => "🌐 View Details",
+            Language::Chinese => format!("{} 查看详情", icons::GLOBE),
+            Language::English => format!("{} View Details", icons::GLOBE),
         }
     }
 
-    pub fn downloading_update(&self) -> &'static str {
+    pub fn downloading_update(&self) -> String {
         match self.lang {
-            Language::Chinese => "📥 正在下载更新...",
-            Language::English => "📥 Downloading update...",
+            Language::Chinese => format!("{} 正在下载更新...", icons::DOWNLOAD),
+            Language::English => format!("{} Downloading update...", icons::DOWNLOAD),
         }
     }
 
-    pub fn installing_update(&self) -> &'static str {
+    pub fn installing_update(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚙️ 正在安装更新...",
-            Language::English => "⚙️ Installing update...",
+            Language::Chinese => format!("{} 正在安装更新...", icons::GEAR),
+            Language::English => format!("{} Installing update...", icons::GEAR),
         }
     }
 
-    pub fn update_success(&self) -> &'static str {
+    pub fn update_success(&self) -> String {
         match self.lang {
-            Language::Chinese => "✅ 更新安装成功！",
-            Language::English => "✅ Update installed successfully!",
+            Language::Chinese => format!("{} 更新安装成功！", icons::CHECK),
+            Language::English => format!("{} Update installed successfully!", icons::CHECK),
         }
     }
 
@@ -455,10 +456,10 @@ impl I18n {
         }
     }
 
-    pub fn restart_now(&self) -> &'static str {
+    pub fn restart_now(&self) -> String {
         match self.lang {
-            Language::Chinese => "🔄 立即重启",
-            Language::English => "🔄 Restart Now",
+            Language::Chinese => format!("{} 立即重启", icons::REFRESH),
+            Language::English => format!("{} Restart Now", icons::REFRESH),
         }
     }
 
@@ -569,10 +570,10 @@ impl I18n {
         }
     }
 
-    pub fn warning(&self) -> &'static str {
+    pub fn warning(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚠️ 警告：",
-            Language::English => "⚠️ Warning:",
+            Language::Chinese => format!("{} 警告：", icons::WARNING),
+            Language::English => format!("{} Warning:", icons::WARNING),
         }
     }
 
@@ -583,24 +584,24 @@ impl I18n {
         }
     }
 
-    pub fn add_files(&self) -> &'static str {
+    pub fn add_files(&self) -> String {
         match self.lang {
-            Language::Chinese => "📄 添加文件",
-            Language::English => "📄 Add Files",
+            Language::Chinese => format!("{} 添加文件", icons::ADD_FILE),
+            Language::English => format!("{} Add Files", icons::ADD_FILE),
         }
     }
 
-    pub fn add_folder(&self) -> &'static str {
+    pub fn add_folder(&self) -> String {
         match self.lang {
-            Language::Chinese => "📁 添加文件夹",
-            Language::English => "📁 Add Folder",
+            Language::Chinese => format!("{} 添加文件夹", icons::ADD_FOLDER),
+            Language::English => format!("{} Add Folder", icons::ADD_FOLDER),
         }
     }
 
-    pub fn confirm_upload(&self) -> &'static str {
+    pub fn confirm_upload(&self) -> String {
         match self.lang {
-            Language::Chinese => "✓ 确认上传",
-            Language::English => "✓ Confirm Upload",
+            Language::Chinese => format!("{} 确认上传", icons::CHECK),
+            Language::English => format!("{} Confirm Upload", icons::CHECK),
         }
     }
 
@@ -646,10 +647,10 @@ impl I18n {
         }
     }
 
-    pub fn uploading_files(&self) -> &'static str {
+    pub fn uploading_files(&self) -> String {
         match self.lang {
-            Language::Chinese => "📤 正在上传文件",
-            Language::English => "📤 Uploading Files",
+            Language::Chinese => format!("{} 正在上传文件", icons::UPLOAD),
+            Language::English => format!("{} Uploading Files", icons::UPLOAD),
         }
     }
 
@@ -674,18 +675,19 @@ impl I18n {
         }
     }
 
-    pub fn upload_complete(&self) -> &'static str {
+    pub fn upload_complete(&self) -> String {
         match self.lang {
-            Language::Chinese => "✓ 上传完成",
-            Language::English => "✓ Upload Complete",
+            Language::Chinese => format!("{} 上传完成", icons::CHECK),
+            Language::English => format!("{} Upload Complete", icons::CHECK),
         }
     }
 
     pub fn upload_success(&self, count: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("🎉 成功上传 {} 个文件", count),
+            Language::Chinese => format!("{} 成功上传 {} 个文件", icons::ROCKET, count),
             Language::English => format!(
-                "🎉 Successfully uploaded {} file{}",
+                "{} Successfully uploaded {} file{}",
+                icons::ROCKET,
                 count,
                 if count != 1 { "s" } else { "" }
             ),
@@ -694,10 +696,17 @@ impl I18n {
 
     pub fn upload_partial(&self, success: usize, failed: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("⚠️ 上传完成：成功 {}，失败 {}", success, failed),
+            Language::Chinese => format!(
+                "{} 上传完成：成功 {}，失败 {}",
+                icons::WARNING,
+                success,
+                failed
+            ),
             Language::English => format!(
-                "⚠️ Upload complete: {} succeeded, {} failed",
-                success, failed
+                "{} Upload complete: {} succeeded, {} failed",
+                icons::WARNING,
+                success,
+                failed
             ),
         }
     }
@@ -932,24 +941,24 @@ impl I18n {
     }
 
     // ========== 调试模式警告 ==========
-    pub fn debug_mode_not_enabled(&self) -> &'static str {
+    pub fn debug_mode_not_enabled(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚠ Steam 调试模式未启用",
-            Language::English => "⚠ Steam Debug Mode Not Enabled",
+            Language::Chinese => format!("{} Steam 调试模式未启用", icons::WARNING),
+            Language::English => format!("{} Steam Debug Mode Not Enabled", icons::WARNING),
         }
     }
 
-    pub fn steam_running(&self) -> &'static str {
+    pub fn steam_running(&self) -> String {
         match self.lang {
-            Language::Chinese => "✓ Steam 正在运行",
-            Language::English => "✓ Steam is running",
+            Language::Chinese => format!("{} Steam 正在运行", icons::CHECK),
+            Language::English => format!("{} Steam is running", icons::CHECK),
         }
     }
 
-    pub fn steam_not_running(&self) -> &'static str {
+    pub fn steam_not_running(&self) -> String {
         match self.lang {
-            Language::Chinese => "✗ Steam 未运行",
-            Language::English => "✗ Steam is not running",
+            Language::Chinese => format!("{} Steam 未运行", icons::CLOSE),
+            Language::English => format!("{} Steam is not running", icons::CLOSE),
         }
     }
 
@@ -1002,10 +1011,10 @@ impl I18n {
         }
     }
 
-    pub fn dismiss_temporarily(&self) -> &'static str {
+    pub fn dismiss_temporarily(&self) -> String {
         match self.lang {
-            Language::Chinese => "✕ 暂时忽略",
-            Language::English => "✕ Dismiss",
+            Language::Chinese => format!("{} 暂时忽略", icons::CLOSE),
+            Language::English => format!("{} Dismiss", icons::CLOSE),
         }
     }
 
@@ -1423,8 +1432,12 @@ impl I18n {
 
     pub fn backup_cdp_warning(&self, count: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("⚠ {} 个文件无下载链接，将跳过", count),
-            Language::English => format!("⚠ {} files without download URL will be skipped", count),
+            Language::Chinese => format!("{} {} 个文件无下载链接，将跳过", icons::WARNING, count),
+            Language::English => format!(
+                "{} {} files without download URL will be skipped",
+                icons::WARNING,
+                count
+            ),
         }
     }
 
@@ -1463,17 +1476,17 @@ impl I18n {
         }
     }
 
-    pub fn backup_complete(&self) -> &'static str {
+    pub fn backup_complete(&self) -> String {
         match self.lang {
-            Language::Chinese => "✓ 备份完成",
-            Language::English => "✓ Backup Complete",
+            Language::Chinese => format!("{} 备份完成", icons::CHECK),
+            Language::English => format!("{} Backup Complete", icons::CHECK),
         }
     }
 
-    pub fn backup_partial(&self) -> &'static str {
+    pub fn backup_partial(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚠ 部分完成",
-            Language::English => "⚠ Partially Complete",
+            Language::Chinese => format!("{} 部分完成", icons::WARNING),
+            Language::English => format!("{} Partially Complete", icons::WARNING),
         }
     }
 
@@ -1520,17 +1533,17 @@ impl I18n {
         }
     }
 
-    pub fn download_complete(&self) -> &'static str {
+    pub fn download_complete(&self) -> String {
         match self.lang {
-            Language::Chinese => "✓ 下载完成",
-            Language::English => "✓ Download Complete",
+            Language::Chinese => format!("{} 下载完成", icons::CHECK),
+            Language::English => format!("{} Download Complete", icons::CHECK),
         }
     }
 
-    pub fn download_partial_status(&self) -> &'static str {
+    pub fn download_partial_status(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚠ 部分完成",
-            Language::English => "⚠ Partially Complete",
+            Language::Chinese => format!("{} 部分完成", icons::WARNING),
+            Language::English => format!("{} Partially Complete", icons::WARNING),
         }
     }
 
@@ -1718,10 +1731,18 @@ impl I18n {
         }
     }
 
-    pub fn symlink_experimental_warning(&self) -> &'static str {
+    pub fn symlink_experimental_warning(&self) -> String {
         match self.lang {
-            Language::Chinese => "⚠ 实验性功能：创建软链接后会自动同步目录下的文件到云端。点击 ☁ 按钮可手动同步新增文件。",
-            Language::English => "⚠ Experimental: Files in the directory are auto-synced after symlink creation. Click ☁ to manually sync new files.",
+            Language::Chinese => format!(
+                "{} 实验性功能：创建软链接后会自动同步目录下的文件到云端。点击 {} 按钮可手动同步新增文件。",
+                icons::WARNING,
+                icons::CLOUD_UPLOAD
+            ),
+            Language::English => format!(
+                "{} Experimental: Files in the directory are auto-synced after symlink creation. Click {} to manually sync new files.",
+                icons::WARNING,
+                icons::CLOUD_UPLOAD
+            ),
         }
     }
 
