@@ -103,9 +103,9 @@ files = [
 
 [dependencies]
 # UI Framework
-eframe = "0.33.2"
-egui = "0.33.2"
-egui_extras = { version = "0.33.2", features = ["all_loaders"] }
+eframe = "0.33.3"
+egui = "0.33.3"
+egui_extras = { version = "0.33.3", features = ["all_loaders"] }
 egui-phosphor = "0.11.0"
 
 # Steam API
@@ -116,26 +116,26 @@ steamworks-sys = "0.12.2"
 anyhow = "1.0.100"
 byteorder = "1.5.0"
 image = "0.25.9"
-open = "5.3.1"
+open = "5.3.3"
 regex = "1.12.2"
 rfd = "0.16.0"
 url = "2.5.7"
-walkdir = "2.5"
+walkdir = "2.5.0"
 
 # Serialization
 serde = "1.0.228"
-serde_json = "1.0.145"
+serde_json = "1.0.148"
 
 # Date and Time
 chrono = "0.4.42"
 
 # UUID and Directories
-uuid = { version = "1.11", features = ["v4"] }
-dirs = "5.0"
+uuid = { version = "1.19.0", features = ["v4"] }
+dirs = "6.0.0"
 
 # Logging
 log = "0.4.29"
-tracing = "0.1.43"
+tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 
 # Network
@@ -152,7 +152,7 @@ self_update = { version = "0.42", default-features = false, features = [
 ] }
 
 [target.'cfg(windows)'.dependencies]
-winapi = { version = "0.3", features = [
+winapi = { version = "0.3.9", features = [
     "winuser",
     "shellapi",
     "combaseapi",
@@ -165,4 +165,4 @@ winapi = { version = "0.3", features = [
 
 # Windows specific
 [target.'cfg(windows)'.build-dependencies]
-winres = "0.1"
+winres = "0.1.12"
