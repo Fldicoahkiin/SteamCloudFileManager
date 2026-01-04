@@ -403,11 +403,16 @@ graph TD
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request！
+欢迎提交 Issue 和 Pull Request！详细指南请查看 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-### 贡献翻译
+### 如何贡献
 
-如果您想添加新的语言支持，请查看 [i18n 贡献指南](I18N_GUIDE.md)。
+- 🐛 **报告 Bug**：使用 Issue 模板提交问题
+- ✨ **请求功能**：分享你的想法和建议
+- 📖 **完善文档**：帮助改进 README 和技术文档
+- 🌐 **贡献翻译**：添加新的语言支持，请查看 [i18n 贡献指南](I18N_GUIDE.md)
+- 🗺️ **补充 Root 映射**：帮助完善 [Root 路径映射表](ROOT_PATH_MAPPING.md)
+- 🔧 **提交代码**：修复 Bug 或实现新功能
 
 当前支持的语言：
 - 简体中文

@@ -403,11 +403,16 @@ The tool parses `remotecache.vdf` in real-time for file lists, and parses **`app
 
 ## Contributing
 
-Welcome to submit Issues and Pull Requests!
+Welcome to submit Issues and Pull Requests! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-### Contributing Translations
+### How to Contribute
 
-If you want to add a new language, please check the [i18n Contribution Guide](I18N_GUIDE.md).
+- 🐛 **Report Bugs**: Use Issue templates to submit problems
+- ✨ **Request Features**: Share your ideas and suggestions
+- 📖 **Improve Documentation**: Help improve README and technical docs
+- 🌐 **Contribute Translations**: Add new languages, see [i18n Contribution Guide](I18N_GUIDE.md)
+- 🗺️ **Add Root Mappings**: Help improve the [Root Path Mapping Table](ROOT_PATH_MAPPING.md)
+- 🔧 **Submit Code**: Fix bugs or implement new features
 
 Currently supported languages:
 - 简体中文

@@ -1,0 +1,59 @@
+name: 📖 Root 映射补充 / Root Mapping Addition
+description: 补充 Root 路径映射信息 / Add Root path mapping information
+title: "[Root Mapping]: "
+labels: ["documentation", "root-mapping"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你帮助完善 Root 路径映射表！这对其他玩家很有帮助。
+        Thanks for helping improve the Root path mapping table! This helps other players.
+
+  - type: input
+    id: game
+    attributes:
+      label: 游戏名称 / Game Name
+      placeholder: "例如: Mount & Blade: Warband"
+    validations:
+      required: true
+
+  - type: input
+    id: appid
+    attributes:
+      label: AppID
+      placeholder: "例如: 48700"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: 测试平台 / Tested Platform
+      options:
+        - Windows
+        - macOS
+        - Linux
+        - 多平台 / Multiple
+    validations:
+      required: true
+
+  - type: textarea
+    id: mapping
+    attributes:
+      label: Root 映射信息 / Root Mapping Information
+      description: 请提供 Root ID 和对应的实际路径 / Please provide Root ID and actual paths
+      placeholder: |
+        Root 0: userdata/<uid>/48700/remote/
+        Root 2: Documents/Mount and Blade Warband/
+        ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 备注 / Notes
+      description: 任何补充说明 / Any additional notes
+      placeholder: |
+        例如：配置文件不会自动同步
+        For example: Config files are not auto-synced

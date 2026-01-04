@@ -1,0 +1,55 @@
+name: ✨ 功能请求 / Feature Request
+description: 提出新功能建议 / Suggest a new feature
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你的建议！在提交前请确认这个功能还不存在。
+        Thanks for your suggestion! Please confirm this feature doesn't already exist.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述 / Problem Description
+      description: 你希望解决什么问题？/ What problem would you like to solve?
+      placeholder: |
+        例如：我经常需要...但是现在...
+        For example: I often need to... but currently...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: 建议的解决方案 / Proposed Solution
+      description: 你期望的功能是什么样的？/ What would you like to see?
+      placeholder: |
+        如果能够...就好了
+        It would be great if...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方案 / Alternatives Considered
+      description: 你考虑过其他解决方案吗？/ Have you considered any alternatives?
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 优先级 / Priority (你认为)
+      description: 你认为这个功能的重要程度 / How important do you think this is?
+      options:
+        - 低 / Low - 锦上添花 / Nice to have
+        - 中 / Medium - 有用但不紧急 / Useful but not urgent
+        - 高 / High - 很需要 / Really needed
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: 贡献意愿 / Willing to Contribute
+      options:
+        - label: 我愿意帮助实现这个功能 / I'm willing to help implement this feature
