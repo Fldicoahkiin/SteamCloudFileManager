@@ -73,8 +73,6 @@ Build artifacts include standard installers and portable versions (Generic Binar
 
 #### Homebrew
 
-#### Homebrew
-
 **Install (Recommended, auto-installs to Applications):**
 
 ```bash
