@@ -1,29 +1,37 @@
 # SteamCloudFileManager
 
+[English](README.en.md) | **简体中文**
+
 <p align="center">
   <img src="assets/steam_cloud-iOS-Default-1024x1024@1x.png" width="160" alt="steam_cloud" />
 </p>
 
-[English](README.en.md) | **简体中文**
+<p align="center">
+  <a href="https://www.rust-lang.org"><img src="https://img.shields.io/badge/rust-1.90+-orange?logo=rust" alt="Rust"></a>
+  <a href="https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager"><img src="https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg" alt="dependency status"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/stargazers"><img src="https://img.shields.io/github/stars/Fldicoahkiin/SteamCloudFileManager?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/network/members"><img src="https://img.shields.io/github/forks/Fldicoahkiin/SteamCloudFileManager?style=social" alt="GitHub forks"></a>
+</p>
 
-[![Rust](https://img.shields.io/badge/rust-1.90+-orange?logo=rust)](https://www.rust-lang.org)
-[![dependency status](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager/status.svg)](https://deps.rs/repo/github/Fldicoahkiin/SteamCloudFileManager)
-[![GitHub stars](https://img.shields.io/github/stars/Fldicoahkiin/SteamCloudFileManager?style=social)](https://github.com/Fldicoahkiin/SteamCloudFileManager/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/Fldicoahkiin/SteamCloudFileManager?style=social)](https://github.com/Fldicoahkiin/SteamCloudFileManager/network/members)
+<p align="center">
+  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL%203.0-blue.svg" alt="License: GPL-3.0"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/releases"><img src="https://img.shields.io/github/v/release/Fldicoahkiin/SteamCloudFileManager?include_prereleases&color=brightgreen" alt="GitHub release"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/releases"><img src="https://img.shields.io/github/downloads/Fldicoahkiin/SteamCloudFileManager/total?color=success" alt="GitHub downloads"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml"><img src="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg" alt="Build"></a>
+  <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml"><img src="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml/badge.svg" alt="Release"></a>
+</p>
 
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
-[![GitHub release](https://img.shields.io/github/v/release/Fldicoahkiin/SteamCloudFileManager?include_prereleases&color=brightgreen)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
-[![GitHub downloads](https://img.shields.io/github/downloads/Fldicoahkiin/SteamCloudFileManager/total?color=success)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
-[![Build](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml)
-[![Release](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml/badge.svg)](https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml)
-
-![Windows](https://img.shields.io/badge/Windows-0078D6?logo=microsoft&logoColor=white)
-![macOS](https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white)
-![Debian](https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white)
-![Fedora](https://img.shields.io/badge/Fedora-51A2DA?logo=fedora&logoColor=white)
-![Arch Linux](https://img.shields.io/badge/Arch_Linux-1793D1?logo=archlinux&logoColor=white)
-![AppImage](https://img.shields.io/badge/AppImage-2c9784?logo=linux&logoColor=white)
+<p align="center">
+  <a href="https://github.com/Fldicoahkiin/homebrew-tap"><img src="https://img.shields.io/badge/Homebrew-tap-FBB040?logo=homebrew&logoColor=white" alt="Homebrew"></a>
+  <a href="https://aur.archlinux.org/packages/steam-cloud-file-manager-bin"><img src="https://img.shields.io/aur/version/steam-cloud-file-manager-bin?logo=archlinux&logoColor=white&label=AUR" alt="AUR"></a>
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=microsoft&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" alt="macOS">
+  <img src="https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white" alt="Ubuntu">
+  <img src="https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white" alt="Debian">
+  <img src="https://img.shields.io/badge/Fedora-51A2DA?logo=fedora&logoColor=white" alt="Fedora">
+  <img src="https://img.shields.io/badge/Arch_Linux-1793D1?logo=archlinux&logoColor=white" alt="Arch Linux">
+  <img src="https://img.shields.io/badge/AppImage-2c9784?logo=linux&logoColor=white" alt="AppImage">
+</p>
 
 > 基于 Rust 和 egui 构建的跨平台 Steam 云存档管理工具
 
