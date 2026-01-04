@@ -18,13 +18,26 @@ class SteamCloudFileManager < Formula
   end
 
   def install
+    # 调试：列出当前目录所有文件
+    puts "Current directory contents:"
+    puts Dir["*"]
+    puts "Recursive search for .app:"
+    puts Dir["**/*.app"]
+
+    # 动态查找 app 名称
+    app_paths = Dir["**/*.app"]
+    raise "No .app found in #{Dir.pwd}" if app_paths.empty?
+    
+    app_path = app_paths.first
+    app_name = File.basename(app_path)
+
     # 安装 .app 应用包到 prefix 目录
-    prefix.install "Steam Cloud File Manager.app"
+    prefix.install app_path
     
     # 在 bin/ 目录创建启动脚本
     (bin/"steam-cloud-file-manager").write <<~EOS
       #!/bin/bash
-      open "#{prefix}/Steam Cloud File Manager.app" --args "$@"
+      open "#{prefix}/#{app_name}" --args "$@"
     EOS
   end
 
@@ -41,6 +54,6 @@ class SteamCloudFileManager < Formula
   end
 
   test do
-    assert_predicate prefix/"Steam Cloud File Manager.app", :exist?
+    system "#{bin}/steam-cloud-file-manager", "--version"
   end
 end
