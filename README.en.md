@@ -82,6 +82,8 @@ brew tap Fldicoahkiin/tap
 brew install --cask steam-cloud-file-manager
 ```
 
+> If the app is reported as damaged, run: `xattr -cr "/Applications/Steam Cloud File Manager.app"`
+
 **Install as Formula (Terminal launch command only):**
 
 ```bash

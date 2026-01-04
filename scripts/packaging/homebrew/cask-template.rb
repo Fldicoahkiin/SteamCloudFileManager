@@ -21,4 +21,9 @@ cask "steam-cloud-file-manager" do
     "~/Library/Application Support/com.flacier.steamcloudfilemanager",
     "~/Library/Saved Application State/com.flacier.steamcloudfilemanager.savedState",
   ]
+
+  caveats <<~EOS
+    如果应用提示"已损坏"或无法打开，请在终端运行以下命令修复：
+      xattr -cr "/Applications/Steam Cloud File Manager.app"
+  EOS
 end
