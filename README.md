@@ -73,8 +73,18 @@
 
 #### Homebrew
 
+#### Homebrew
+
+**安装（推荐，自动安装到应用程序）：**
+
 ```bash
 brew tap Fldicoahkiin/tap
+brew install --cask steam-cloud-file-manager
+```
+
+**作为 Formula 安装（仅提供终端启动命令）：**
+
+```bash
 brew install steam-cloud-file-manager
 ```
 

@@ -46,40 +46,86 @@ jobs:
 
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "检测到版本: $VERSION"
-      - name: 下载 macOS 构建产物
+      - name: 下载 macOS 构建产物 (Formula & Cask)
         run: |
           BASE_URL="https://github.com/${{ github.repository }}/releases/download"
           VERSION="${{ env.VERSION }}"
-          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-x86_64.tar.gz" \
-            -o macos-x86_64.tar.gz
-          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-aarch64.tar.gz" \
-            -o macos-aarch64.tar.gz
+
+          # 下载 tar.gz (Formula用)
+          echo "Downloading tar.gz for Formula..."
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-x86_64.tar.gz" -o macos-x86_64.tar.gz
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-aarch64.tar.gz" -o macos-aarch64.tar.gz
+
+          # 下载 dmg (Cask用)
+          echo "Downloading dmg for Cask..."
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-x86_64.dmg" -o macos-x86_64.dmg
+          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-macos-aarch64.dmg" -o macos-aarch64.dmg
+
       - name: 计算 SHA256
         run: |
+          # Formula (tar.gz) Hashes
           SHA256_X64=$(sha256sum macos-x86_64.tar.gz | cut -d' ' -f1)
           SHA256_ARM64=$(sha256sum macos-aarch64.tar.gz | cut -d' ' -f1)
           echo "SHA256_X64=$SHA256_X64" >> $GITHUB_ENV
           echo "SHA256_ARM64=$SHA256_ARM64" >> $GITHUB_ENV
-          echo "SHA256 x64: $SHA256_X64"
-          echo "SHA256 arm64: $SHA256_ARM64"
-      - name: 生成 Homebrew Formula
+
+          # Cask (dmg) Hashes
+          SHA256_X64_DMG=$(sha256sum macos-x86_64.dmg | cut -d' ' -f1)
+          SHA256_ARM64_DMG=$(sha256sum macos-aarch64.dmg | cut -d' ' -f1)
+          echo "SHA256_X64_DMG=$SHA256_X64_DMG" >> $GITHUB_ENV
+          echo "SHA256_ARM64_DMG=$SHA256_ARM64_DMG" >> $GITHUB_ENV
+
+          echo "Formula SHA256 (tar.gz):"
+          echo "  x64: $SHA256_X64"
+          echo "  arm: $SHA256_ARM64"
+          echo "Cask SHA256 (dmg):"
+          echo "  x64: $SHA256_X64_DMG"
+          echo "  arm: $SHA256_ARM64_DMG"
+
+      - name: 生成文件 (Formula & Cask)
         run: |
           chmod +x scripts/packaging/homebrew/generate-formula.sh
+          chmod +x scripts/packaging/homebrew/generate-cask.sh
+
+          # 生成 Formula (放在根目录)
           ./scripts/packaging/homebrew/generate-formula.sh \
             "${{ env.VERSION }}" \
             "${{ env.SHA256_X64 }}" \
             "${{ env.SHA256_ARM64 }}" \
             "steam-cloud-file-manager.rb"
-          cat steam-cloud-file-manager.rb
+
+          # 生成 Cask (放在 Casks/ 目录)
+          mkdir -p Casks
+          ./scripts/packaging/homebrew/generate-cask.sh \
+            "${{ env.VERSION }}" \
+            "${{ env.SHA256_X64_DMG }}" \
+            "${{ env.SHA256_ARM64_DMG }}" \
+            "Casks/steam-cloud-file-manager.rb"
+
       - name: 推送到 Homebrew Tap
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           git clone https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/${{ github.repository_owner }}/homebrew-tap.git tap-repo
-          cp steam-cloud-file-manager.rb tap-repo/
           cd tap-repo
+
+          # 配置 Git user
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add steam-cloud-file-manager.rb
-          git commit -m "Update steam-cloud-file-manager to ${{ env.VERSION }}" || echo "无更改需要提交"
-          git push
+
+          # 复制 Formula
+          cp ../steam-cloud-file-manager.rb .
+
+          # 复制 Cask
+          mkdir -p Casks
+          cp ../Casks/steam-cloud-file-manager.rb Casks/
+
+          # 添加所有更改
+          git add steam-cloud-file-manager.rb Casks/steam-cloud-file-manager.rb
+
+          if git diff --staged --quiet; then
+             echo "无更改需要提交"
+          else
+             git commit -m "Update steam-cloud-file-manager (Formula & Cask) to ${{ env.VERSION }}"
+             git push
+          fi

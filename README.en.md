@@ -73,8 +73,18 @@ Build artifacts include standard installers and portable versions (Generic Binar
 
 #### Homebrew
 
+#### Homebrew
+
+**Install (Recommended, auto-installs to Applications):**
+
 ```bash
 brew tap Fldicoahkiin/tap
+brew install --cask steam-cloud-file-manager
+```
+
+**Install as Formula (Terminal launch command only):**
+
+```bash
 brew install steam-cloud-file-manager
 ```
 

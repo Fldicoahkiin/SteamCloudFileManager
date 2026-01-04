@@ -39,13 +39,13 @@ class SteamCloudFileManager < Formula
 
   def caveats
     <<~EOS
-      Steam Cloud File Manager 已安装完成。
+      Steam Cloud File Manager 已安装。
       
-      从终端运行：
+      📱 **将应用添加到“应用程序”文件夹**（推荐）：
+        ln -s "#{prefix}/Steam Cloud File Manager.app" /Applications/
+      
+      🖥️ **从终端运行**：
         steam-cloud-file-manager
-      
-      或在 Finder 中打开：
-        open "#{prefix}/Steam Cloud File Manager.app"
     EOS
   end
 
