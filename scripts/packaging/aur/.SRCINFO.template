@@ -10,6 +10,7 @@ pkgbase = steam-cloud-file-manager-bin
 	optdepends = steam: Steam client integration
 	provides = steam-cloud-file-manager
 	conflicts = steam-cloud-file-manager
+	options = !strip
 	source = steam-cloud-file-manager-bin-{{VERSION}}.tar.gz::https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v{{VERSION}}/SteamCloudFileManager-{{VERSION}}-linux-x86_64.tar.gz
 	sha256sums = {{SHA256}}
 

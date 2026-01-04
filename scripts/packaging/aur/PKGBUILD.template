@@ -10,6 +10,7 @@ depends=('gtk3' 'webkit2gtk')
 optdepends=('steam: Steam client integration')
 provides=('steam-cloud-file-manager')
 conflicts=('steam-cloud-file-manager')
+options=('!strip')
 source=("${pkgname}-${pkgver}.tar.gz::https://github.com/Fldicoahkiin/SteamCloudFileManager/releases/download/v${pkgver}/SteamCloudFileManager-${pkgver}-linux-x86_64.tar.gz")
 sha256sums=('{{SHA256}}')
 
