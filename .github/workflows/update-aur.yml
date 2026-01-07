@@ -18,6 +18,8 @@ jobs:
   update-aur:
     name: Update AUR Package
     runs-on: ubuntu-latest
+    # 只有当 Release workflow 成功完成时才执行
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
