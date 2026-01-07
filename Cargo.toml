@@ -40,6 +40,11 @@ assets = [
         "755",
     ],
     [
+        "target/release/libsteam_api.so",
+        "usr/lib/steam-cloud-file-manager/libsteam_api.so",
+        "644",
+    ],
+    [
         "assets/steam-cloud-file-manager.desktop",
         "usr/share/applications/",
         "644",
@@ -60,6 +65,7 @@ assets = [
 [package.metadata.generate-rpm]
 assets = [
     { source = "target/release/SteamCloudFileManager", dest = "/usr/bin/steam-cloud-file-manager", mode = "755" },
+    { source = "target/release/libsteam_api.so", dest = "/usr/lib64/steam-cloud-file-manager/libsteam_api.so", mode = "644" },
     { source = "assets/steam-cloud-file-manager.desktop", dest = "/usr/share/applications/steam-cloud-file-manager.desktop", mode = "644" },
     { source = "assets/steam_cloud-macOS-Default-1024x1024@1x.png", dest = "/usr/share/icons/hicolor/512x512/apps/steam-cloud-file-manager.png", mode = "644" },
     { source = "README.md", dest = "/usr/share/doc/steam-cloud-file-manager/README.md", mode = "644", doc = true },
