@@ -233,6 +233,15 @@ jobs:
           # 确保项目已构建（不使用 --target，让二进制生成在 target/release/）
           cargo build --release
 
+          # 复制 Steam API 库到 target/release/（AppImage 需要）
+          STEAM_LIB=$(find target/release/build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
+          if [ -n "$STEAM_LIB" ]; then
+            cp "$STEAM_LIB" target/release/
+            echo "已复制 libsteam_api.so 到 target/release/"
+          else
+            echo "警告: 未找到 libsteam_api.so"
+          fi
+
           # 安装 cargo-appimage
           cargo install cargo-appimage
 
@@ -243,7 +252,7 @@ jobs:
 
           # 验证二进制文件存在
           echo "检查 target/release/ 目录："
-          ls -lh target/release/ | grep steam-cloud-file-manager || echo "未找到二进制文件！"
+          ls -lh target/release/ | grep -E "(steam-cloud-file-manager|libsteam_api)" || echo "未找到文件！"
 
           # 使用 cargo-appimage 构建（不使用 --target）
           cargo appimage

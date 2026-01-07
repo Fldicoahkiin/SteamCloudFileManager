@@ -78,6 +78,9 @@ auto_link_exclude_list = [
     "librt.so*",
     "ld-linux*.so*",
 ]
+assets = [
+    "target/release/libsteam_api.so",
+]
 
 # Arch Linux AUR configuration (cargo-aur)
 [package.metadata.aur]
