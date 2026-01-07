@@ -24,7 +24,7 @@
 <p align="center">
   <a href="https://github.com/Fldicoahkiin/homebrew-tap"><img src="https://img.shields.io/badge/Homebrew-tap-FBB040?logo=homebrew&logoColor=white" alt="Homebrew"></a>
   <a href="https://aur.archlinux.org/packages/steam-cloud-file-manager-bin"><img src="https://img.shields.io/aur/version/steam-cloud-file-manager-bin?logo=archlinux&logoColor=white&label=AUR" alt="AUR"></a>
-  <img src="https://img.shields.io/badge/Windows-0078D6?logo=microsoft&logoColor=white" alt="Windows">
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0id2hpdGUiPjxwYXRoIGQ9Ik0wIDMuNWw5LjktMS40djkuNUgwem0xMSAtMS42TDI0IDB2MTEuNUgxMXpNMCAxMi41aDkuOXY5LjVMMCAyMC41em0xMSAwSDI0VjI0bC0xMy0xLjh6Ii8+PC9zdmc+&logoColor=white" alt="Windows">
   <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" alt="macOS">
   <img src="https://img.shields.io/badge/Ubuntu-E95420?logo=ubuntu&logoColor=white" alt="Ubuntu">
   <img src="https://img.shields.io/badge/Debian-A81D33?logo=debian&logoColor=white" alt="Debian">
