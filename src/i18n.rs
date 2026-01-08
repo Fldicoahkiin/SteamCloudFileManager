@@ -263,6 +263,104 @@ impl I18n {
         }
     }
 
+    pub fn settings_advanced(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "高级",
+            Language::English => "Advanced",
+        }
+    }
+
+    // ========== 高级设置 ==========
+    pub fn steam_path_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Steam 安装路径",
+            Language::English => "Steam Install Path",
+        }
+    }
+
+    pub fn steam_path_auto_detect(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "自动检测",
+            Language::English => "Auto Detect",
+        }
+    }
+
+    pub fn steam_path_browse(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "浏览...",
+            Language::English => "Browse...",
+        }
+    }
+
+    pub fn steam_path_valid(&self, user_count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("✓ 路径有效 (检测到 {} 个用户)", user_count),
+            Language::English => format!(
+                "✓ Valid path ({} user{} found)",
+                user_count,
+                if user_count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn steam_path_not_exists(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✗ 路径不存在",
+            Language::English => "✗ Path not exists",
+        }
+    }
+
+    pub fn steam_path_no_userdata(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✗ 缺少 userdata 目录",
+            Language::English => "✗ Missing userdata folder",
+        }
+    }
+
+    pub fn steam_path_no_users(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "✗ 未找到用户",
+            Language::English => "✗ No users found",
+        }
+    }
+
+    pub fn steam_path_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "💡 如果 Steam 安装在非标准位置，请手动选择目录",
+            Language::English => {
+                "💡 Select directory manually if Steam is in non-standard location"
+            }
+        }
+    }
+
+    pub fn steam_path_restart_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "修改后需要重启应用生效",
+            Language::English => "Restart required after changing",
+        }
+    }
+
+    pub fn reset_all_settings(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "恢复默认设置",
+            Language::English => "Reset All Settings",
+        }
+    }
+
+    pub fn reset_confirm(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "确定要恢复所有设置为默认值吗？",
+            Language::English => "Reset all settings to default?",
+        }
+    }
+
+    pub fn config_file_location(&self, path: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("配置文件: {}", path),
+            Language::English => format!("Config file: {}", path),
+        }
+    }
+
     pub fn theme_mode_label(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "主题模式:",

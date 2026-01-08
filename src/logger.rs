@@ -23,53 +23,16 @@ pub fn set_log_enabled(enabled: bool) {
     CURRENT_CONFIG.store(enabled, Ordering::Relaxed);
 
     // 保存到配置文件
-    if let Err(e) = save_log_config(enabled) {
+    if let Err(e) = crate::config::update_config(|config| {
+        config.logging.enabled = enabled;
+    }) {
         tracing::warn!("保存日志配置失败: {}", e);
     }
 }
 
-// 获取配置目录
-fn get_config_dir() -> Result<PathBuf> {
-    let config_dir = if cfg!(target_os = "macos") {
-        let home = std::env::var("HOME")?;
-        PathBuf::from(home)
-            .join("Library")
-            .join("Application Support")
-            .join("SteamCloudFileManager")
-    } else if cfg!(target_os = "windows") {
-        let appdata = std::env::var("LOCALAPPDATA")?;
-        PathBuf::from(appdata).join("SteamCloudFileManager")
-    } else {
-        let home = std::env::var("HOME")?;
-        PathBuf::from(home)
-            .join(".config")
-            .join("SteamCloudFileManager")
-    };
-
-    if !config_dir.exists() {
-        std::fs::create_dir_all(&config_dir)?;
-    }
-
-    Ok(config_dir)
-}
-
-// 保存日志配置
-fn save_log_config(enabled: bool) -> Result<()> {
-    let config_dir = get_config_dir()?;
-    let config_file = config_dir.join("log_config.txt");
-    std::fs::write(config_file, if enabled { "enabled" } else { "disabled" })?;
-    Ok(())
-}
-
 // 加载日志配置
 fn load_log_config() -> bool {
-    if let Ok(config_dir) = get_config_dir() {
-        let config_file = config_dir.join("log_config.txt");
-        if let Ok(content) = std::fs::read_to_string(config_file) {
-            return content.trim() == "enabled";
-        }
-    }
-    true // 默认启用
+    crate::config::get_config().logging.enabled
 }
 
 // 获取日志目录路径

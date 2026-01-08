@@ -1,12 +1,14 @@
 use crate::i18n::I18n;
 use crate::icons;
 use egui;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum SettingsTab {
     #[default]
     Log,
     Appearance,
+    Advanced,
     Backup,
     About,
 }
@@ -15,14 +17,26 @@ pub struct SettingsWindowState {
     pub tab: SettingsTab,
     pub about_icon_texture: Option<egui::TextureHandle>,
     pub theme_mode: crate::ui::theme::ThemeMode,
+    pub steam_path_input: String,
+    pub steam_path_changed: bool,
+    pub show_reset_confirm: bool,
 }
 
 impl Default for SettingsWindowState {
     fn default() -> Self {
+        // 获取当前 Steam 路径显示
+        let current_path = crate::config::get_custom_steam_path()
+            .or_else(|| crate::vdf_parser::VdfParser::find_steam_path().ok())
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+
         Self {
             tab: SettingsTab::Log,
             about_icon_texture: None,
             theme_mode: crate::ui::theme::ThemeMode::default(),
+            steam_path_input: current_path,
+            steam_path_changed: false,
+            show_reset_confirm: false,
         }
     }
 }
@@ -101,6 +115,29 @@ pub fn draw_settings_window(
 
                     ui.add_space(4.0);
 
+                    // 高级
+                    let advanced_selected = state.tab == SettingsTab::Advanced;
+                    let advanced_response = ui.add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new(egui::RichText::new(i18n.settings_advanced()).color(
+                            if advanced_selected {
+                                accent_color
+                            } else {
+                                ui.style().visuals.text_color()
+                            },
+                        ))
+                        .fill(if advanced_selected {
+                            ui.style().visuals.selection.bg_fill
+                        } else {
+                            crate::ui::theme::transparent_color()
+                        }),
+                    );
+                    if advanced_response.clicked() {
+                        state.tab = SettingsTab::Advanced;
+                    }
+
+                    ui.add_space(4.0);
+
                     // 备份
                     let backup_selected = state.tab == SettingsTab::Backup;
                     let backup_response = ui.add_sized(
@@ -161,6 +198,9 @@ pub fn draw_settings_window(
                                 }
                                 SettingsTab::Appearance => {
                                     draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
+                                }
+                                SettingsTab::Advanced => {
+                                    draw_advanced_settings(ui, state, i18n);
                                 }
                                 SettingsTab::Backup => {
                                     draw_backup_settings(ui, i18n);
@@ -263,6 +303,167 @@ fn draw_appearance_settings(
                 }
             });
     });
+}
+
+// 高级设置内容
+fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &I18n) {
+    let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
+    let success_color = crate::ui::theme::success_color(ui.ctx());
+    let error_color = crate::ui::theme::error_color(ui.ctx());
+    let warning_color = crate::ui::theme::warning_color(ui.ctx());
+
+    // Steam 路径设置
+    ui.heading(i18n.steam_path_label());
+    ui.add_space(8.0);
+
+    // 路径输入框和浏览按钮
+    ui.horizontal(|ui| {
+        ui.add_sized(
+            [ui.available_width() - 80.0, 24.0],
+            egui::TextEdit::singleline(&mut state.steam_path_input)
+                .hint_text("Steam 安装路径")
+                .interactive(false), // 只读，通过浏览按钮修改
+        );
+
+        if ui.button(i18n.steam_path_browse()).clicked() {
+            if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                state.steam_path_input = path.display().to_string();
+                state.steam_path_changed = true;
+            }
+        }
+    });
+
+    // 验证路径并显示状态
+    let path = PathBuf::from(&state.steam_path_input);
+    let validation = crate::config::validate_steam_path(&path);
+
+    ui.add_space(4.0);
+    match &validation {
+        crate::config::SteamPathValidation::Valid { user_count } => {
+            ui.label(
+                egui::RichText::new(i18n.steam_path_valid(*user_count))
+                    .size(11.0)
+                    .color(success_color),
+            );
+        }
+        crate::config::SteamPathValidation::NotExists => {
+            ui.label(
+                egui::RichText::new(i18n.steam_path_not_exists())
+                    .size(11.0)
+                    .color(error_color),
+            );
+        }
+        crate::config::SteamPathValidation::InvalidStructure => {
+            ui.label(
+                egui::RichText::new(i18n.steam_path_no_userdata())
+                    .size(11.0)
+                    .color(error_color),
+            );
+        }
+        crate::config::SteamPathValidation::NoUsers => {
+            ui.label(
+                egui::RichText::new(i18n.steam_path_no_users())
+                    .size(11.0)
+                    .color(warning_color),
+            );
+        }
+    }
+
+    ui.add_space(8.0);
+
+    // 操作按钮
+    ui.horizontal(|ui| {
+        // 自动检测按钮
+        if ui.button(i18n.steam_path_auto_detect()).clicked() {
+            // 清除自定义路径，使用自动检测
+            if let Err(e) = crate::config::set_custom_steam_path(None) {
+                tracing::error!("清除自定义路径失败: {}", e);
+            }
+            // 更新显示路径
+            if let Ok(detected) = crate::vdf_parser::VdfParser::find_steam_path() {
+                state.steam_path_input = detected.display().to_string();
+            }
+            state.steam_path_changed = true;
+        }
+    });
+
+    // 显示需要重启提示
+    if state.steam_path_changed {
+        ui.add_space(8.0);
+        ui.label(
+            egui::RichText::new(format!(
+                "{} {}",
+                icons::WARNING,
+                i18n.steam_path_restart_hint()
+            ))
+            .size(11.0)
+            .color(warning_color),
+        );
+
+        // 保存按钮
+        if ui.button(i18n.ok()).clicked() && validation.is_valid() {
+            if let Err(e) = crate::config::set_custom_steam_path(Some(path.clone())) {
+                tracing::error!("保存 Steam 路径失败: {}", e);
+            } else {
+                tracing::info!("已保存 Steam 路径: {:?}", path);
+            }
+        }
+    }
+
+    ui.add_space(8.0);
+    ui.label(
+        egui::RichText::new(i18n.steam_path_hint())
+            .size(10.0)
+            .color(text_subtle),
+    );
+
+    ui.add_space(24.0);
+    ui.separator();
+    ui.add_space(16.0);
+
+    // 恢复默认设置
+    ui.horizontal(|ui| {
+        if ui
+            .button(egui::RichText::new(i18n.reset_all_settings()).color(error_color))
+            .clicked()
+        {
+            state.show_reset_confirm = true;
+        }
+    });
+
+    // 确认重置对话框
+    if state.show_reset_confirm {
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            ui.label(i18n.reset_confirm());
+            if ui.button(i18n.ok()).clicked() {
+                if let Err(e) = crate::config::reset_to_default() {
+                    tracing::error!("重置配置失败: {}", e);
+                }
+                state.show_reset_confirm = false;
+                // 更新状态
+                state.steam_path_input.clear();
+                if let Ok(path) = crate::vdf_parser::VdfParser::find_steam_path() {
+                    state.steam_path_input = path.display().to_string();
+                }
+                state.steam_path_changed = true;
+            }
+            if ui.button(i18n.cancel()).clicked() {
+                state.show_reset_confirm = false;
+            }
+        });
+    }
+
+    ui.add_space(24.0);
+
+    // 显示配置文件位置
+    if let Ok(config_path) = crate::config::get_config_path() {
+        ui.label(
+            egui::RichText::new(i18n.config_file_location(&config_path.display().to_string()))
+                .size(10.0)
+                .color(text_subtle),
+        );
+    }
 }
 
 // 备份设置内容

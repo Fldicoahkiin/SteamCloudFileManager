@@ -6,6 +6,7 @@ mod app_state;
 mod async_handlers;
 mod backup;
 mod cdp_client;
+mod config;
 mod conflict;
 mod downloader;
 mod file_manager;
@@ -35,6 +36,11 @@ fn main() -> Result<(), eframe::Error> {
         // Worker 模式：不初始化 GUI，只运行 Steam API 服务
         steam_worker::run_worker();
         return Ok(());
+    }
+
+    // 初始化配置系统
+    if let Err(e) = config::init_config() {
+        eprintln!("配置初始化失败: {}", e);
     }
 
     // 初始化日志系统（输出到文件和控制台）
