@@ -288,7 +288,7 @@ pub fn resolve_cloud_file_path(
     app_id: u32,
 ) -> Result<PathBuf> {
     let root_type = RootType::from_u32(root).unwrap_or_else(|| {
-        log::debug!("未知的 root 值: {}，使用 SteamRemote", root);
+        tracing::warn!("未知的 root 值: {}，使用 SteamRemote", root);
         RootType::SteamRemote
     });
 
@@ -392,7 +392,7 @@ pub fn collect_local_save_paths_from_ufs(
     use std::collections::HashMap;
 
     tracing::debug!(
-        "开始收集本地存档路径 (基于 appinfo.vdf): app_id={}, savefiles配置数={}",
+        "开始收集本地存档路径: app_id={}, savefiles={}",
         app_id,
         savefiles.len()
     );
@@ -408,7 +408,7 @@ pub fn collect_local_save_paths_from_ufs(
 
     if remote_path.exists() {
         let desc = get_root_description(0);
-        tracing::debug!("✓ {} (默认): {}", desc, remote_path.display());
+        tracing::debug!("✓ 默认路径: {}", remote_path.display());
         path_map.insert(0, (desc, remote_path));
     }
 
@@ -420,7 +420,7 @@ pub fn collect_local_save_paths_from_ufs(
         // 检查平台是否匹配
         if !platform_matches_current(&config.platforms) {
             tracing::debug!(
-                "跳过不匹配平台的配置: root={}, platforms={:?}",
+                "跳过不匹配平台: root={}, platforms={:?}",
                 config.root,
                 config.platforms
             );
@@ -431,7 +431,7 @@ pub fn collect_local_save_paths_from_ufs(
         let root_type = match &config.root_type {
             Some(rt) => *rt,
             None => {
-                tracing::debug!("无法解析 root 类型: {}", config.root);
+                tracing::warn!("无法解析 root 类型: {}", config.root);
                 continue;
             }
         };
@@ -454,7 +454,7 @@ pub fn collect_local_save_paths_from_ufs(
         if let Some(base_path) = base_path {
             if base_path.exists() {
                 let desc = get_root_description(root_num);
-                tracing::debug!("✓ {} (appinfo.vdf): {}", desc, base_path.display());
+                tracing::debug!("✓ {}: {}", desc, base_path.display());
                 path_map.insert(root_num, (desc, base_path));
             }
         }
@@ -463,10 +463,7 @@ pub fn collect_local_save_paths_from_ufs(
     let paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
 
     if !paths.is_empty() {
-        tracing::info!("检测到 {} 个本地存档根目录", paths.len());
-        for (desc, path) in &paths {
-            tracing::info!("  ✓ {}: {}", desc, path.display());
-        }
+        tracing::debug!("检测到 {} 个本地存档根目录", paths.len());
     } else {
         tracing::warn!("未找到任何本地存档路径 (app_id={})", app_id);
     }

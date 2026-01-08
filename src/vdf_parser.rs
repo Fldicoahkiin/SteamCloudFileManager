@@ -223,8 +223,6 @@ impl VdfParser {
             return Err(anyhow!("remotecache.vdf不存在: {:?}", vdf_path));
         }
 
-        tracing::debug!("解析 VDF 文件: {:?}", vdf_path);
-
         let content = fs::read_to_string(&vdf_path)?;
         let mut files = Vec::new();
 
@@ -296,7 +294,6 @@ impl VdfParser {
             }
         }
 
-        tracing::debug!("VDF 解析完成: {} 个文件条目", files.len());
         Ok(files)
     }
 
@@ -454,16 +451,10 @@ impl VdfParser {
 
         // 检查文件修改时间，确保不是过期缓存
         if let Ok(metadata) = fs::metadata(&appinfo_path) {
-            if let Ok(modified) = metadata.modified() {
-                let age = std::time::SystemTime::now()
-                    .duration_since(modified)
-                    .unwrap_or_default();
-                tracing::debug!("appinfo.vdf 最后修改: {:?} 前", age);
-            }
+            if let Ok(_modified) = metadata.modified() {}
         }
 
         let data = fs::read(&appinfo_path)?;
-        tracing::debug!("读取 appinfo.vdf: {} bytes", data.len());
 
         Self::parse_app_ufs_config(&data, app_id)
     }
@@ -480,7 +471,6 @@ impl VdfParser {
             _ => return Err(anyhow!("不支持的 appinfo.vdf 版本: 0x{:X}", magic)),
         };
 
-        tracing::debug!("appinfo.vdf 版本: {}", version);
         cursor.read_u32::<LittleEndian>()?; // universe
 
         // 版本 29+ 有字符串表
@@ -498,16 +488,9 @@ impl VdfParser {
         };
 
         // 查找 ufs 在字符串表中的索引
-        let ufs_index = string_table.iter().position(|s| s == "ufs");
-        let quota_index = string_table.iter().position(|s| s == "quota");
-        let maxnumfiles_index = string_table.iter().position(|s| s == "maxnumfiles");
-
-        tracing::debug!(
-            "字符串索引: ufs={:?}, quota={:?}, maxnumfiles={:?}",
-            ufs_index,
-            quota_index,
-            maxnumfiles_index
-        );
+        let _ufs_index = string_table.iter().position(|s| s == "ufs");
+        let _quota_index = string_table.iter().position(|s| s == "quota");
+        let _maxnumfiles_index = string_table.iter().position(|s| s == "maxnumfiles");
 
         loop {
             let entry_start = cursor.position();
@@ -541,8 +524,6 @@ impl VdfParser {
 
                 let mut vdf_data = vec![0u8; vdf_size];
                 cursor.read_exact(&mut vdf_data)?;
-
-                tracing::debug!("找到 app {} 的 VDF 数据: {} bytes", app_id, vdf_data.len());
 
                 // 使用简化的解析方法
                 return Self::extract_ufs_from_binary_vdf(&vdf_data, &string_table, version);
@@ -588,7 +569,6 @@ impl VdfParser {
             }
         }
 
-        tracing::debug!("解析字符串表: {} 个字符串", strings.len());
         Ok(strings)
     }
 
@@ -619,13 +599,8 @@ impl VdfParser {
                 ((ufs_idx >> 24) & 0xFF) as u8,
             ];
 
-            tracing::debug!("搜索 ufs 节: idx={}, pattern={:02x?}", ufs_idx, ufs_pattern);
-
             let ufs_start = match Self::find_pattern(data, &ufs_pattern) {
-                Some(pos) => {
-                    tracing::debug!("找到 ufs 节起始位置: {}", pos);
-                    pos + 5
-                }
+                Some(pos) => pos + 5,
                 None => {
                     config.raw_text = format!("未找到 ufs 配置 (模式 {:02x?} 未匹配)", ufs_pattern);
                     return Ok(config);
@@ -642,8 +617,6 @@ impl VdfParser {
 
             lines.push("}".to_string());
             config.raw_text = lines.join("\n");
-
-            tracing::debug!("解析 ufs 完成，共 {} 行", lines.len());
         } else {
             config.raw_text = "不支持的 appinfo.vdf 版本".to_string();
         }

@@ -65,23 +65,24 @@ impl FileListState {
     }
 
     // 更新同步状态
-    pub fn update_sync_status(&mut self) {
+    pub fn update_sync_status(&mut self) -> Vec<crate::conflict::FileComparison> {
         let comparisons = crate::conflict::detect_all(&self.files, &self.local_save_paths);
 
         self.sync_status_map.clear();
         self.comparison_map.clear();
 
-        for c in comparisons {
+        for c in &comparisons {
             self.sync_status_map.insert(c.filename.clone(), c.status);
             self.comparison_map.insert(
                 c.filename.clone(),
                 FileComparisonInfo {
                     status: c.status,
-                    diff_flags: c.diff_flags,
+                    diff_flags: c.diff_flags.clone(),
                     hash_status: c.hash_status,
                 },
             );
         }
+        comparisons
     }
 }
 

@@ -526,12 +526,10 @@ impl AppHandlers {
                 }
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
-                file_list.update_sync_status(); // 更新同步状态
+                let comparisons = file_list.update_sync_status(); // 更新同步状态
 
                 // 自动启动 Hash 检测
                 if app_id > 0 && !file_list.files.is_empty() {
-                    let comparisons =
-                        crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
                     dialogs.conflict_dialog.set_comparisons(comparisons.clone());
                     file_list.hash_checker.start(app_id, &comparisons);
                     file_list.hash_checked_app_id = None; // 正在检测中，尚未完成

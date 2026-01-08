@@ -183,23 +183,6 @@ impl CdpClient {
         // 等待页面加载完成
         std::thread::sleep(std::time::Duration::from_secs(5));
 
-        // 调试：检查页面内容
-        let debug_script = r#"
-            (function() {
-                return {
-                    url: window.location.href,
-                    title: document.title,
-                    bodyLength: document.body ? document.body.innerHTML.length : 0,
-                    hasAccountTable: document.querySelector('.accountTable') !== null,
-                    accountTableCount: document.querySelectorAll('.accountTable').length,
-                    allTables: document.querySelectorAll('table').length,
-                    bodyPreview: document.body ? document.body.innerText.substring(0, 500) : 'no body'
-                };
-            })()
-        "#;
-        let debug_info = self.evaluate(debug_script)?;
-        tracing::warn!("CDP 页面调试信息: {:?}", debug_info);
-
         let script = r#"
             (function() {
                 // 只选择 accountTable 下的行
@@ -226,7 +209,19 @@ impl CdpClient {
         "#;
 
         let value = self.evaluate(script)?;
-        tracing::debug!("CDP 原始游戏列表数据: {:?}", value);
+        if let Some(arr) = value.as_array() {
+            let summary: Vec<String> = arr
+                .iter()
+                .map(|v| {
+                    format!(
+                        "{}: {}",
+                        v["app_id"].as_u64().unwrap_or(0),
+                        v["game_name"].as_str().unwrap_or("unknown")
+                    )
+                })
+                .collect();
+            tracing::debug!("CDP 获取到 {} 个游戏: {:?}", arr.len(), summary);
+        }
 
         let mut games = Vec::new();
 

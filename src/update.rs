@@ -90,7 +90,7 @@ impl UpdateManager {
             .or_else(|_| std::env::var("http_proxy"))
         {
             if !proxy_url.is_empty() {
-                tracing::info!("使用代理: {}", proxy_url);
+                tracing::debug!("使用代理: {}", proxy_url);
                 if let Ok(proxy) = ureq::Proxy::new(&proxy_url) {
                     config_builder = config_builder.proxy(Some(proxy));
                 }
@@ -133,12 +133,12 @@ impl UpdateManager {
     // 检查更新
     pub fn check_update(&mut self) -> Result<()> {
         self.status = UpdateStatus::Checking;
-        tracing::info!("开始检查更新...");
+        tracing::debug!("检查更新...");
 
         match self.fetch_latest_release() {
             Ok(release) => {
                 let latest_version = release.tag_name.trim_start_matches('v');
-                tracing::info!(
+                tracing::debug!(
                     "最新版本: {}, 当前版本: {}",
                     latest_version,
                     self.current_version
@@ -148,7 +148,7 @@ impl UpdateManager {
                     tracing::info!("发现新版本: {}", latest_version);
                     self.status = UpdateStatus::Available(release);
                 } else {
-                    tracing::info!("当前已是最新版本");
+                    tracing::debug!("当前已是最新版本");
                     self.status = UpdateStatus::NoUpdate;
                 }
                 Ok(())
@@ -204,11 +204,11 @@ impl UpdateManager {
 
     // 启动异步下载
     pub fn start_download(&mut self, release: &ReleaseInfo) -> Receiver<Result<PathBuf, String>> {
-        tracing::info!("开始异步下载更新: {}", release.tag_name);
+        tracing::debug!("开始异步下载更新: {}", release.tag_name);
 
         // 打印下载目录
         if let Ok(update_dir) = Self::get_update_dir() {
-            tracing::info!("下载目录: {}", update_dir.display());
+            tracing::debug!("下载目录: {}", update_dir.display());
         }
 
         let (result_tx, result_rx) = channel();
@@ -234,22 +234,21 @@ impl UpdateManager {
     ) -> Result<PathBuf, String> {
         // 根据平台选择对应的资源文件
         let asset = Self::select_asset_for_platform(&release.assets).map_err(|e| e.to_string())?;
-        tracing::info!("选择资源文件: {}", asset.name);
+        tracing::debug!("选择资源文件: {}", asset.name);
 
         // 下载文件
         let update_dir = Self::get_update_dir().map_err(|e| e.to_string())?;
         let download_path = update_dir.join(&asset.name);
 
-        tracing::info!("下载文件: {}", asset.name);
-        tracing::info!("下载地址: {}", asset.browser_download_url);
-        tracing::info!("保存路径: {}", download_path.display());
-        tracing::info!("文件大小: {:.2} MB", asset.size as f64 / 1024.0 / 1024.0);
-
-        tracing::info!("开始下载...");
+        tracing::debug!(
+            "下载: {} ({:.2} MB)",
+            asset.name,
+            asset.size as f64 / 1024.0 / 1024.0
+        );
 
         // 如果文件已存在，先删除
         if download_path.exists() {
-            tracing::info!("删除已存在的旧文件");
+            tracing::debug!("删除已存在的旧文件");
             fs::remove_file(&download_path).map_err(|e| e.to_string())?;
         }
 
@@ -422,10 +421,10 @@ impl UpdateManager {
         exe_dir: &std::path::Path,
         temp_extract_dir: &std::path::Path,
     ) -> Result<()> {
-        tracing::info!("开始安装 Windows 更新...");
+        tracing::debug!("开始安装 Windows 更新...");
 
         // 使用 self_update 的 Extract 功能解压 ZIP
-        tracing::info!("解压更新包...");
+        tracing::debug!("解压更新包...");
         self_update::Extract::from_source(download_path)
             .extract_into(temp_extract_dir)
             .map_err(|e| anyhow!("解压 ZIP 失败: {}", e))?;
@@ -458,10 +457,10 @@ impl UpdateManager {
         content_with_bom.extend_from_slice(ps_content.as_bytes());
         fs::write(&update_script, content_with_bom)?;
 
-        tracing::info!("创建更新脚本: {}", update_script.display());
+        tracing::debug!("创建更新脚本: {}", update_script.display());
 
         // 启动 PowerShell 脚本并退出当前程序
-        tracing::info!("启动更新脚本并退出程序...");
+        tracing::debug!("启动更新脚本并退出程序...");
         {
             use std::os::windows::process::CommandExt;
             std::process::Command::new("powershell")
@@ -491,10 +490,10 @@ impl UpdateManager {
         current_exe: &std::path::Path,
         temp_extract_dir: &std::path::Path,
     ) -> Result<()> {
-        tracing::info!("开始安装 macOS 更新...");
+        tracing::debug!("开始安装 macOS 更新...");
 
         // 使用 self_update 解压 tar.gz
-        tracing::info!("解压更新包...");
+        tracing::debug!("解压更新包...");
         self_update::Extract::from_source(download_path)
             .extract_into(temp_extract_dir)
             .map_err(|e| anyhow!("解压 tar.gz 失败: {}", e))?;
@@ -523,8 +522,11 @@ impl UpdateManager {
             .and_then(|p| p.parent()) // .app
             .ok_or_else(|| anyhow!("无法获取 .app bundle 路径"))?;
 
-        tracing::info!("当前 App: {}", current_app.display());
-        tracing::info!("新 App: {}", new_app.display());
+        tracing::debug!(
+            "当前 App: {}, 新 App: {}",
+            current_app.display(),
+            new_app.display()
+        );
 
         // 使用模板脚本并替换占位符
         let update_script = temp_extract_dir.join("update.sh");
@@ -545,7 +547,7 @@ impl UpdateManager {
             fs::set_permissions(&update_script, perms)?;
         }
 
-        tracing::info!("启动更新脚本并退出程序...");
+        tracing::debug!("启动更新脚本并退出程序...");
         std::process::Command::new("bash")
             .arg(&update_script)
             .spawn()?;
@@ -562,10 +564,10 @@ impl UpdateManager {
         exe_dir: &std::path::Path,
         temp_extract_dir: &std::path::Path,
     ) -> Result<()> {
-        tracing::info!("开始安装 Linux 更新...");
+        tracing::debug!("开始安装 Linux 更新...");
 
         // 使用 self_update 解压 tar.gz
-        tracing::info!("解压更新包...");
+        tracing::debug!("解压更新包...");
         self_update::Extract::from_source(download_path)
             .extract_into(temp_extract_dir)
             .map_err(|e| anyhow!("解压 tar.gz 失败: {}", e))?;
@@ -601,7 +603,7 @@ impl UpdateManager {
             fs::set_permissions(&update_script, perms)?;
         }
 
-        tracing::info!("启动更新脚本并退出程序...");
+        tracing::debug!("启动更新脚本并退出程序...");
         std::process::Command::new("bash")
             .arg(&update_script)
             .spawn()?;

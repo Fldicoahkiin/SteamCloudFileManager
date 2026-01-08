@@ -174,7 +174,7 @@ impl FileService {
                                 }
                             }
 
-                            tracing::trace!(
+                            tracing::debug!(
                                 "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",
                                 f.name,
                                 f.root,
@@ -184,7 +184,7 @@ impl FileService {
                                 url
                             );
                         } else {
-                            tracing::trace!(
+                            tracing::debug!(
                                 "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | 保留原 root_description",
                                 f.name,
                                 f.root,
@@ -216,7 +216,7 @@ impl FileService {
                             cdp_file.exists = false;
                         }
 
-                        tracing::trace!(
+                        tracing::debug!(
                             "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
                             cdp_file.name,
                             cdp_file.root,
@@ -249,7 +249,7 @@ fn log_file_details(files: &[CloudFile], app_id: u32) {
         .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()))
         .unwrap_or_else(|| (std::path::PathBuf::new(), String::new()));
 
-    tracing::info!(
+    tracing::debug!(
         "========== 文件详情列表 ({} 个文件) | 平台: {} ==========",
         files.len(),
         get_platform_name()
@@ -284,7 +284,7 @@ fn log_file_details(files: &[CloudFile], app_id: u32) {
         };
 
         // 显示原始数据：VDF root 数字 + CDP 文件夹名称 + 本地路径
-        tracing::info!(
+        tracing::debug!(
             "[{:>3}] {} | VDF root={} | CDP folder={} | {} | {} | {} | {} | {}",
             i + 1,
             f.name,
@@ -298,7 +298,7 @@ fn log_file_details(files: &[CloudFile], app_id: u32) {
         );
     }
 
-    tracing::info!("========== 文件列表结束 ==========");
+    tracing::debug!("========== 文件列表结束 ==========");
 }
 
 // 获取当前平台名称

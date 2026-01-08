@@ -131,7 +131,7 @@ pub fn open_log_directory() -> Result<()> {
     Ok(())
 }
 
-// 初始化日志系统（输出到文件和控制台）
+// 初始化日志系统
 pub fn init_logger() -> Result<()> {
     use tracing_subscriber::layer::SubscriberExt;
     use tracing_subscriber::util::SubscriberInitExt;
@@ -141,12 +141,12 @@ pub fn init_logger() -> Result<()> {
     LOG_ENABLED.store(log_enabled, Ordering::Relaxed);
     CURRENT_CONFIG.store(log_enabled, Ordering::Relaxed);
 
-    // 环境过滤器（总是使用，确保控制台输出）
+    // 环境过滤器
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
         "info,SteamCloudFileManager=debug,ureq=warn,rustls=warn,tungstenite=warn".into()
     });
 
-    // 控制台输出层（总是启用）
+    // 控制台输出层
     let console_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
         .with_line_number(true)

@@ -263,8 +263,8 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     let mut games = Vec::new();
     let userdata_path = steam_path.join("userdata").join(user_id);
 
-    tracing::info!("Steam 路径: {:?}", steam_path);
-    tracing::info!("用户数据路径: {:?}", userdata_path);
+    tracing::info!("扫描用户: {}", user_id);
+    tracing::debug!("用户数据路径: {:?}", userdata_path);
 
     if !userdata_path.exists() {
         tracing::error!("用户数据路径不存在: {:?}", userdata_path);
@@ -283,21 +283,23 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
 
     if let Ok(entries) = fs::read_dir(&userdata_path) {
         let entries: Vec<_> = entries.flatten().collect();
-        tracing::info!("找到 {} 个用户数据目录条目", entries.len());
+        tracing::debug!("用户数据目录条目数: {}", entries.len());
 
         for entry in entries {
             let entry_name = entry.file_name().to_string_lossy().to_string();
             if let Ok(app_id) = entry_name.parse::<u32>() {
                 let vdf_path = entry.path().join("remotecache.vdf");
                 if vdf_path.exists() {
-                    tracing::debug!(app_id = app_id, "发现云存档游戏");
-
                     // 使用 VdfParser 解析文件
                     let files = if let Ok(parser) = crate::vdf_parser::VdfParser::new() {
                         parser.parse_remotecache(app_id).unwrap_or_default()
                     } else {
                         Vec::new()
                     };
+
+                    if !files.is_empty() {
+                        tracing::debug!("  -> App {}: 发现 {} 个云存档文件", app_id, files.len());
+                    }
 
                     let total_size: u64 = files.iter().map(|f| f.size).sum();
                     let config = get_game_config(steam_path, user_id, app_id).ok();

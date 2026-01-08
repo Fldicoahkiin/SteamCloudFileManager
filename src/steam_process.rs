@@ -91,7 +91,7 @@ fn wait_for_steam_shutdown(max_wait_secs: u64) -> bool {
 
     while start.elapsed() < max_duration {
         if !is_steam_running() {
-            tracing::info!("确认 Steam 进程已关闭");
+            tracing::debug!("确认 Steam 进程已关闭");
             return true;
         }
         std::thread::sleep(std::time::Duration::from_millis(500));
@@ -106,12 +106,12 @@ fn wait_for_steam_startup(max_wait_secs: u64) -> bool {
     let start = std::time::Instant::now();
     let max_duration = std::time::Duration::from_secs(max_wait_secs);
 
-    tracing::info!("等待 Steam 启动...");
+    tracing::debug!("等待 Steam 启动...");
 
     while start.elapsed() < max_duration {
         if is_steam_running() {
             let elapsed = start.elapsed().as_secs();
-            tracing::info!("确认 Steam 进程已启动（耗时 {} 秒）", elapsed);
+            tracing::debug!("确认 Steam 进程已启动（耗时 {} 秒）", elapsed);
             return true;
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
@@ -204,7 +204,7 @@ fn start_steam() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn close_steam_macos() -> Result<()> {
-    tracing::info!("正在关闭 macOS 上的 Steam 进程...");
+    tracing::debug!("正在关闭 macOS 上的 Steam 进程...");
 
     // 使用 AppleScript 优雅退出
     let quit_script = r#"
@@ -250,7 +250,7 @@ fn close_steam_macos() -> Result<()> {
 
 #[cfg(target_os = "macos")]
 fn start_steam_macos() -> Result<()> {
-    tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
+    tracing::debug!("正在启动 Steam，添加参数: -cef-enable-debugging");
     Command::new("open")
         .arg("-a")
         .arg("Steam")
@@ -272,7 +272,7 @@ fn start_steam_macos() -> Result<()> {
 
 #[cfg(target_os = "windows")]
 fn close_steam_windows() -> Result<()> {
-    tracing::info!("正在关闭 Windows 上的 Steam 进程...");
+    tracing::debug!("正在关闭 Windows 上的 Steam 进程...");
     use std::os::windows::process::CommandExt;
     Command::new("taskkill")
         .args(["/F", "/IM", "steam.exe"])
@@ -295,7 +295,7 @@ fn start_steam_windows() -> Result<()> {
         return Err(anyhow!("找不到 steam.exe"));
     }
 
-    tracing::info!(path = ?steam_exe, "正在启动 Steam，添加参数: -cef-enable-debugging");
+    tracing::debug!(path = ?steam_exe, "正在启动 Steam，添加参数: -cef-enable-debugging");
     Command::new(&steam_exe)
         .arg("-cef-enable-debugging")
         .spawn()
@@ -314,7 +314,7 @@ fn start_steam_windows() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 fn close_steam_linux() -> Result<()> {
-    tracing::info!("正在关闭 Linux 上的 Steam 进程...");
+    tracing::debug!("正在关闭 Linux 上的 Steam 进程...");
     Command::new("pkill").arg("-x").arg("steam").status().ok();
 
     if !wait_for_steam_shutdown(5) {
@@ -325,7 +325,7 @@ fn close_steam_linux() -> Result<()> {
 
 #[cfg(target_os = "linux")]
 fn start_steam_linux() -> Result<()> {
-    tracing::info!("正在启动 Steam，添加参数: -cef-enable-debugging");
+    tracing::debug!("正在启动 Steam，添加参数: -cef-enable-debugging");
 
     // 使用 sh -c 在后台启动 Steam，避免阻塞和闪退
     let result = Command::new("sh")
