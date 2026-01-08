@@ -320,7 +320,10 @@ impl VdfParser {
         &self.user_id
     }
 
-    // 解析 appinfo.vdf 文件获取游戏信息
+    // 解析 appinfo.vdf 文件获取游戏名称信息
+    // 注意：此函数已不再使用，游戏名称从 manifest + CDP 获取
+    // appinfo.vdf 仅用于 get_ufs_config() 按需查询单个游戏
+    #[allow(dead_code)]
     pub fn parse_appinfo_vdf(&self) -> Result<HashMap<u32, AppInfo>> {
         let appinfo_path = self.steam_path.join("appcache").join("appinfo.vdf");
 
@@ -337,9 +340,10 @@ impl VdfParser {
             }
         };
 
-        let mut cursor = Cursor::new(data);
+        let mut cursor = Cursor::new(&data);
         let mut apps = HashMap::new();
 
+        // 读取 Magic 确定版本
         let magic = match cursor.read_u32::<LittleEndian>() {
             Ok(m) => m,
             Err(_) => {
@@ -348,98 +352,208 @@ impl VdfParser {
             }
         };
 
-        if magic != 0x07564427 && magic != 0x07564428 && magic != 0x07564429 {
-            tracing::warn!("appinfo.vdf 格式不支持: 0x{:X}", magic);
-            return Ok(HashMap::new());
-        }
+        let version = match magic {
+            0x07564427 => 27,
+            0x07564428 => 28,
+            0x07564429 => 29,
+            _ => {
+                tracing::warn!("appinfo.vdf 版本不支持: 0x{:X}", magic);
+                return Ok(HashMap::new());
+            }
+        };
 
+        // 读取 Universe
         let _ = cursor.read_u32::<LittleEndian>();
 
+        // V29+ 需要读取 String Table Offset (8 bytes)
+        let string_table_offset = if version >= 29 {
+            cursor.read_u64::<LittleEndian>().unwrap_or(0)
+        } else {
+            0
+        };
+
+        // 解析字符串表 (V29+)
+        let string_table = if version >= 29 && string_table_offset > 0 {
+            Self::parse_string_table(&data, string_table_offset as usize).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        // 找到 "name" 和 "common" 在字符串表中的索引
+        let name_idx = string_table.iter().position(|s| s == "name");
+        let common_idx = string_table.iter().position(|s| s == "common");
+
         let mut count = 0;
-        while let Ok(app_id) = cursor.read_u32::<LittleEndian>() {
-            if app_id == 0 || count > 10000 {
+        loop {
+            let entry_start = cursor.position();
+            let app_id = match cursor.read_u32::<LittleEndian>() {
+                Ok(id) => id,
+                Err(_) => break,
+            };
+
+            if app_id == 0 || count > 100000 {
                 break;
             }
 
-            // 跳过 size, infostate, last_updated, access_token
-            for _ in 0..3 {
-                let _ = cursor.read_u32::<LittleEndian>();
-            }
-            let _ = cursor.read_u64::<LittleEndian>();
+            // 读取条目大小
+            let size = match cursor.read_u32::<LittleEndian>() {
+                Ok(s) => s,
+                Err(_) => break,
+            };
 
-            // 读取 SHA 哈希 (20 字节)
-            let mut sha = vec![0u8; 20];
+            // 头部字段大小
+            let header_size: usize = 4 + 4 + 8 + 20 + 4 + if version >= 28 { 20 } else { 0 };
+            let vdf_size = (size as usize).saturating_sub(header_size);
+
+            // 跳过头部元数据
+            let _ = cursor.read_u32::<LittleEndian>(); // infostate
+            let _ = cursor.read_u32::<LittleEndian>(); // last_updated
+            let _ = cursor.read_u64::<LittleEndian>(); // access_token
+
+            let mut sha = [0u8; 20];
             if cursor.read_exact(&mut sha).is_err() {
                 break;
             }
 
-            // 跳过 change_number (4 字节)
-            let _ = cursor.read_u32::<LittleEndian>();
+            let _ = cursor.read_u32::<LittleEndian>(); // change_number
 
-            // 尝试在 VDF 结构中找到游戏名称
-            if let Ok(name) = Self::parse_appinfo_name(&mut cursor, app_id) {
-                if !name.is_empty() && name.len() < 200 {
-                    apps.insert(
-                        app_id,
-                        AppInfo {
-                            app_id,
-                            name: Some(name),
-                            developer: None,
-                            publisher: None,
-                        },
-                    );
-                }
-            }
-
-            // 跳到下一个条目（读取剩余数据）
-            let mut buf = vec![0u8; 4096];
-            let mut skipped = 0;
-            while skipped < 500000 {
-                if cursor.read(&mut buf).is_err() {
-                    break;
-                }
-                skipped += buf.len();
-                // 寻找下一个 app_id 标记或结束
-                if buf.starts_with(&[0, 0, 0, 0]) {
+            if version >= 28 {
+                let mut binary_sha = [0u8; 20];
+                if cursor.read_exact(&mut binary_sha).is_err() {
                     break;
                 }
             }
 
+            // 读取 VDF 数据
+            if vdf_size > 0 && vdf_size < 10_000_000 {
+                let mut vdf_data = vec![0u8; vdf_size];
+                if cursor.read_exact(&mut vdf_data).is_ok() {
+                    // 从 VDF 数据中提取游戏名称
+                    if let Some(name) = Self::extract_name_from_vdf(
+                        &vdf_data,
+                        &string_table,
+                        version,
+                        name_idx,
+                        common_idx,
+                    ) {
+                        if !name.is_empty() && name.len() < 200 {
+                            apps.insert(
+                                app_id,
+                                AppInfo {
+                                    app_id,
+                                    name: Some(name),
+                                    developer: None,
+                                    publisher: None,
+                                },
+                            );
+                        }
+                    }
+                }
+            }
+
+            // 移动到下一个条目
+            cursor.set_position(entry_start + 8 + size as u64);
             count += 1;
         }
-
-        tracing::info!("从 appinfo.vdf 解析到 {} 个游戏", apps.len());
+        // V29 名称提取仍需改进，但名称可从 manifest/CDP 获取
+        if apps.is_empty() && version >= 29 {
+            tracing::debug!(
+                "appinfo.vdf V{} 名称提取尚未完善，使用 manifest/CDP 获取名称",
+                version
+            );
+        } else {
+            tracing::debug!("appinfo.vdf V{} 解析到 {} 个游戏名称", version, apps.len());
+        }
         Ok(apps)
     }
 
-    fn parse_appinfo_name(cursor: &mut Cursor<Vec<u8>>, app_id: u32) -> Result<String> {
-        // VDF 二进制格式：尝试找到 "name" 字段
-        let mut buf = vec![0u8; 1024];
-        if cursor.read(&mut buf).is_err() {
-            return Err(anyhow!("无法读取"));
-        }
+    // 从二进制 VDF 数据中提取游戏名称
+    fn extract_name_from_vdf(
+        data: &[u8],
+        string_table: &[String],
+        version: u32,
+        name_idx: Option<usize>,
+        _common_idx: Option<usize>,
+    ) -> Option<String> {
+        if version >= 29 && !string_table.is_empty() {
+            if let Some(name_i) = name_idx {
+                // V29 格式 1: 0x01 (string type) + key_idx (4 bytes) + inline string value
+                // 格式: 0x01 + [name_idx LE] + "Game Name\0"
+                let inline_pattern = [
+                    0x01u8, // string type with inline value
+                    (name_i & 0xFF) as u8,
+                    ((name_i >> 8) & 0xFF) as u8,
+                    ((name_i >> 16) & 0xFF) as u8,
+                    ((name_i >> 24) & 0xFF) as u8,
+                ];
 
-        // 寻找 "common" 部分和 "name" 字段
-        let buf_str = String::from_utf8_lossy(&buf);
+                if let Some(pos) = Self::find_pattern(data, &inline_pattern) {
+                    let start = pos + 5;
+                    if start < data.len() {
+                        if let Some(end) = data[start..].iter().position(|&b| b == 0) {
+                            if end > 0 && end < 200 {
+                                if let Ok(name) =
+                                    String::from_utf8(data[start..start + end].to_vec())
+                                {
+                                    if !name.is_empty()
+                                        && name.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+                                    {
+                                        return Some(name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
 
-        // 尝试找到 name 模式
-        if let Some(name_pos) = buf_str.find("name\0") {
-            let start = name_pos + 5; // 跳过 "name\0"
-            if start < buf.len() {
-                // 找到 "name" 后的字符串
-                let remaining = &buf[start..];
-                if let Some(null_pos) = remaining.iter().position(|&b| b == 0) {
-                    if let Ok(name) = String::from_utf8(remaining[..null_pos].to_vec()) {
-                        if !name.is_empty() && name.is_ascii() {
-                            tracing::debug!("App {} 名称: {}", app_id, name);
-                            return Ok(name);
+                // V29 格式 2: 0x09 (string_idx type) + key_idx + value_idx
+                // 格式: 0x09 + [name_idx LE] + [value_idx LE]
+                let idx_pattern = [
+                    0x09u8, // string_idx type
+                    (name_i & 0xFF) as u8,
+                    ((name_i >> 8) & 0xFF) as u8,
+                    ((name_i >> 16) & 0xFF) as u8,
+                    ((name_i >> 24) & 0xFF) as u8,
+                ];
+
+                if let Some(pos) = Self::find_pattern(data, &idx_pattern) {
+                    if pos + 9 <= data.len() {
+                        let value_idx = u32::from_le_bytes([
+                            data[pos + 5],
+                            data[pos + 6],
+                            data[pos + 7],
+                            data[pos + 8],
+                        ]) as usize;
+
+                        if value_idx < string_table.len() {
+                            let name = &string_table[value_idx];
+                            if !name.is_empty() && name.chars().all(|c| !c.is_control()) {
+                                return Some(name.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // V27/V28: 直接搜索 "name\0" + 字符串
+            let name_pattern = b"name\0";
+            if let Some(pos) = Self::find_pattern(data, name_pattern) {
+                let start = pos + 5;
+                if start < data.len() {
+                    if let Some(end) = data[start..].iter().position(|&b| b == 0) {
+                        if end > 0 && end < 200 {
+                            if let Ok(name) = String::from_utf8(data[start..start + end].to_vec()) {
+                                if !name.is_empty() && name.is_ascii() {
+                                    return Some(name);
+                                }
+                            }
                         }
                     }
                 }
             }
         }
 
-        Err(anyhow!("未找到游戏名称"))
+        None
     }
 
     // 获取指定 app_id 的 ufs 云存储配置

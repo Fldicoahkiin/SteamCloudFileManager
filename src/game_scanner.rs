@@ -274,13 +274,6 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     let all_manifests = scan_app_manifests(steam_path).unwrap_or_default();
     let all_categories = parse_shared_config(steam_path, user_id).unwrap_or_default();
 
-    // 解析 appinfo.vdf
-    let all_appinfo = if let Ok(parser) = crate::vdf_parser::VdfParser::new() {
-        parser.parse_appinfo_vdf().unwrap_or_default()
-    } else {
-        HashMap::new()
-    };
-
     if let Ok(entries) = fs::read_dir(&userdata_path) {
         let entries: Vec<_> = entries.flatten().collect();
         tracing::debug!("用户数据目录条目数: {}", entries.len());
@@ -305,12 +298,9 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
                     let config = get_game_config(steam_path, user_id, app_id).ok();
                     let manifest = all_manifests.get(&app_id);
                     let category = all_categories.get(&app_id);
-                    let appinfo = all_appinfo.get(&app_id);
 
-                    let game_name = manifest
-                        .as_ref()
-                        .map(|m| m.name.clone())
-                        .or_else(|| appinfo.and_then(|a| a.name.clone()));
+                    // 游戏名称从 manifest 获取，未安装游戏由 CDP 补充
+                    let game_name = manifest.as_ref().map(|m| m.name.clone());
 
                     games.push(CloudGameInfo {
                         app_id,
