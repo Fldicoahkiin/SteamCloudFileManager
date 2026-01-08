@@ -1,6 +1,6 @@
 [package]
 name = "steam-cloud-file-manager"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 authors = ["Flacier <https://github.com/Fldicoahkiin>"]
 description = "Steam云文件管理器 - Steam Cloud File Manager"
@@ -170,6 +170,7 @@ winapi = { version = "0.3.9", features = [
     "winbase",
     "tlhelp32",
     "handleapi",
+    "winreg",
 ] }
 
 # Windows specific

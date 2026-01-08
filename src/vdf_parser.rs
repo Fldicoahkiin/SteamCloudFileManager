@@ -60,9 +60,18 @@ impl VdfParser {
         #[cfg(target_os = "windows")]
         {
             let mut candidates: Vec<PathBuf> = Vec::new();
+
+            // 环境变量
             if let Ok(p) = std::env::var("STEAM_PATH") {
                 candidates.push(PathBuf::from(p));
             }
+
+            // 从 Windows 注册表读取
+            if let Some(path) = Self::read_steam_path_from_registry() {
+                candidates.push(path);
+            }
+
+            // 默认位置
             if let Ok(p) = std::env::var("PROGRAMFILES(X86)") {
                 candidates.push(PathBuf::from(p).join("Steam"));
             }
@@ -75,8 +84,10 @@ impl VdfParser {
             if let Ok(p) = std::env::var("APPDATA") {
                 candidates.push(PathBuf::from(p).join("Steam"));
             }
+
             for c in candidates {
                 if c.join("userdata").exists() || c.join("steam.exe").exists() {
+                    tracing::debug!("找到 Steam 安装路径: {:?}", c);
                     return Ok(c);
                 }
             }
@@ -116,6 +127,77 @@ impl VdfParser {
         Err(anyhow!(
             "未找到 Steam 安装目录\n\n请确保：\n1. 已安装 Steam 客户端\n2. Steam 安装在标准位置\n3. 至少运行过一次 Steam\n\n如果 Steam 安装在非标准位置，请设置环境变量 STEAM_PATH"
         ))
+    }
+
+    /// 从 Windows 注册表读取 Steam 安装路径
+    #[cfg(target_os = "windows")]
+    fn read_steam_path_from_registry() -> Option<PathBuf> {
+        use std::ptr::null_mut;
+        use winapi::um::winnt::{KEY_READ, REG_SZ};
+        use winapi::um::winreg::{
+            RegCloseKey, RegOpenKeyExA, RegQueryValueExA, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE,
+        };
+
+        // 尝试的注册表路径
+        let registry_paths = [
+            // 64 位系统上的 32 位 Steam
+            (HKEY_LOCAL_MACHINE, "SOFTWARE\\WOW6432Node\\Valve\\Steam\0"),
+            // 32 位系统或 64 位 Steam
+            (HKEY_LOCAL_MACHINE, "SOFTWARE\\Valve\\Steam\0"),
+            // 当前用户
+            (HKEY_CURRENT_USER, "SOFTWARE\\Valve\\Steam\0"),
+        ];
+
+        for (root_key, sub_key) in registry_paths {
+            unsafe {
+                let mut hkey: winapi::shared::minwindef::HKEY = null_mut();
+
+                // 打开注册表键
+                let result = RegOpenKeyExA(
+                    root_key,
+                    sub_key.as_ptr() as *const i8,
+                    0,
+                    KEY_READ,
+                    &mut hkey,
+                );
+
+                if result != 0 {
+                    continue; // 打开失败，尝试下一个路径
+                }
+
+                // 读取 InstallPath 值
+                let value_name = "InstallPath\0";
+                let mut buffer = [0u8; 512];
+                let mut buffer_size = buffer.len() as u32;
+                let mut value_type: u32 = 0;
+
+                let result = RegQueryValueExA(
+                    hkey,
+                    value_name.as_ptr() as *const i8,
+                    null_mut(),
+                    &mut value_type,
+                    buffer.as_mut_ptr(),
+                    &mut buffer_size,
+                );
+
+                RegCloseKey(hkey);
+
+                if result == 0 && value_type == REG_SZ && buffer_size > 1 {
+                    // 移除末尾的 null 字符
+                    let path_len = buffer_size as usize - 1;
+                    if let Ok(path_str) = String::from_utf8(buffer[..path_len].to_vec()) {
+                        let path = PathBuf::from(path_str.trim());
+                        if path.exists() {
+                            tracing::info!("从注册表读取到 Steam 路径: {:?}", path);
+                            return Some(path);
+                        }
+                    }
+                }
+            }
+        }
+
+        tracing::debug!("未能从注册表读取 Steam 路径");
+        None
     }
 
     // 解析remotecache.vdf文件
