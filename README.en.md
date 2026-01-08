@@ -451,6 +451,7 @@ src/
 ├── game_scanner.rs         # Game scanning (merge VDF + CDP)
 ├── user_manager.rs         # User management
 │
+├── config.rs               # Configuration management (settings persistence)
 ├── update.rs               # Auto update
 ├── logger.rs               # Logging system
 ├── i18n.rs                 # Internationalization
@@ -482,11 +483,11 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ### Core Dependencies
 
-- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs)
-- [egui](https://github.com/emilk/egui)
-- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe)
-- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs)
-- [tungstenite](https://github.com/snapview/tungstenite-rs)
+- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs) - Rust bindings for Steamworks SDK
+- [egui](https://github.com/emilk/egui) - Immediate mode GUI framework
+- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) - Cross-platform framework for egui
+- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs) - VDF text format parser
+- [tungstenite](https://github.com/snapview/tungstenite-rs) - WebSocket client (CDP communication)
 
 ### Utility Libraries
 
@@ -505,7 +506,6 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 - [uuid](https://github.com/uuid-rs/uuid) - UUID generation
 - [sha1](https://github.com/RustCrypto/hashes) - Hash computation
 - [byteorder](https://github.com/BurntSushi/byteorder) - Byte order handling
-- [url](https://github.com/servo/rust-url) - URL parsing
 
 ### UI Extensions
 
@@ -514,26 +514,32 @@ This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details
 
 ### Packaging Tools
 
-- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .dmg
-- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb
-- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm
-- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - Universal AppImage
-- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .app/.dmg packaging
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb packaging
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm packaging
+- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - Universal AppImage packaging
+- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD generation
 
 ### Reference Projects
 
-- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite)
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
-- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools)
+- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite) - Lightweight C# implementation
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - Steamworks C# wrapper
+- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools) - Open source Steam toolkit
+- [SteamDatabase/SteamAppInfo](https://github.com/SteamDatabase/SteamAppInfo) - appinfo.vdf binary format documentation
+- [tormak9970/new-vdf-parser](https://lib.rs/crates/new-vdf-parser) - Rust binary VDF parser library
+- [tralph3/Steam-Metadata-Editor](https://github.com/tralph3/Steam-Metadata-Editor) - Python Steam metadata editor
 
 ### Documentation
 
-- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api)
-- [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud)
-- [VDF Parser (Python)](https://github.com/ValvePython/vdf)
-- [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
-- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
-- [Elena Temple Dev Blog: Steam Cloud Saves](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html)
+- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api) - Official SDK documentation
+- [Steamworks Steam Cloud](https://partner.steamgames.com/doc/features/cloud) - Official Steam Cloud documentation
+- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - Steam Cloud API reference
+- [Steam Cloud Best Practices](https://partner.steamgames.com/doc/features/cloud#best_practices) - Official best practices
+- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - Python VDF parser library
+- [Stack Exchange: Steam Cloud](https://gaming.stackexchange.com/questions/146644) - Root path community verification
+- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - Developer cloud save guide
+- [A Gentle Introduction to Steamworks](https://www.gamedeveloper.com/business/a-gentle-introduction-to-steamworks) - Steamworks integration tutorial
+- [Elena Temple Dev Blog](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html) - Unity cloud save configuration example
 
 ## Star History
 

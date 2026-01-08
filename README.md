@@ -451,6 +451,7 @@ src/
 ├── game_scanner.rs         # 游戏扫描（合并 VDF + CDP）
 ├── user_manager.rs         # 用户管理
 │
+├── config.rs               # 配置管理（设置持久化）
 ├── update.rs               # 自动更新
 ├── logger.rs               # 日志系统
 ├── i18n.rs                 # 国际化
@@ -482,11 +483,11 @@ src/
 
 ### 核心依赖
 
-- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs)
-- [egui](https://github.com/emilk/egui)
-- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe)
-- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs)
-- [tungstenite](https://github.com/snapview/tungstenite-rs)
+- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs) - Steamworks SDK 的 Rust 绑定
+- [egui](https://github.com/emilk/egui) - 即时模式 GUI 框架
+- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) - egui 的跨平台框架
+- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs) - VDF 文本格式解析器
+- [tungstenite](https://github.com/snapview/tungstenite-rs) - WebSocket 客户端（CDP 通信）
 
 ### 工具库
 
@@ -505,7 +506,6 @@ src/
 - [uuid](https://github.com/uuid-rs/uuid) - UUID 生成
 - [sha1](https://github.com/RustCrypto/hashes) - 哈希计算
 - [byteorder](https://github.com/BurntSushi/byteorder) - 字节序处理
-- [url](https://github.com/servo/rust-url) - URL 解析
 
 ### UI 扩展
 
@@ -514,26 +514,32 @@ src/
 
 ### 打包工具
 
-- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .dmg
-- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb
-- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm
-- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - 通用 AppImage
-- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .app/.dmg 打包
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb 打包
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm 打包
+- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - 通用 AppImage 打包
+- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD 生成
 
 ### 参考项目
 
-- [SteamCloudFileManagerLite](<https://github.com/GMMan/SteamCloudFileManagerLite>)
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks)
-- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools)
+- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite) - C# 实现的轻量版本
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - Steamworks C# 封装
+- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools) - 开源 Steam 工具箱
+- [SteamDatabase/SteamAppInfo](https://github.com/SteamDatabase/SteamAppInfo) - appinfo.vdf 二进制格式文档
+- [tormak9970/new-vdf-parser](https://lib.rs/crates/new-vdf-parser) - Rust 二进制 VDF 解析库
+- [tralph3/Steam-Metadata-Editor](https://github.com/tralph3/Steam-Metadata-Editor) - Python Steam 元数据编辑器
 
 ### 文档资料
 
-- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api)
-- [Steamworks Steam Cloud Documentation](https://partner.steamgames.com/doc/features/cloud)
-- [VDF Parser (Python)](https://github.com/ValvePython/vdf)
-- [Stack Exchange: Steam Cloud Data](https://gaming.stackexchange.com/questions/146644)
-- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves)
-- [Elena Temple Dev Blog: Steam Cloud Saves](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html)
+- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api) - 官方 SDK 文档
+- [Steamworks Steam Cloud](https://partner.steamgames.com/doc/features/cloud) - 官方 Steam Cloud 文档
+- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - Steam Cloud API 参考
+- [Steam Cloud Best Practices](https://partner.steamgames.com/doc/features/cloud#best_practices) - 官方最佳实践
+- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - Python VDF 解析库
+- [Stack Exchange: Steam Cloud](https://gaming.stackexchange.com/questions/146644) - Root 路径社区验证
+- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - 开发者云存档指南
+- [A Gentle Introduction to Steamworks](https://www.gamedeveloper.com/business/a-gentle-introduction-to-steamworks) - Steamworks 集成入门教程
+- [Elena Temple Dev Blog](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html) - Unity 云存档配置实例
 
 ## Star History
 
