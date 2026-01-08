@@ -51,8 +51,8 @@ fn main() {
     println!("cargo:rustc-env=FULL_VERSION={}", full_version);
 
     // 获取编译时间
-    let build_time = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    println!("cargo:rustc-env=BUILD_TIME={}", build_time);
+    let build_timestamp = chrono::Utc::now().timestamp();
+    println!("cargo:rustc-env=BUILD_TIMESTAMP={}", build_timestamp);
 
     // 当 git 状态改变时重新运行
     println!("cargo:rerun-if-changed=.git/HEAD");

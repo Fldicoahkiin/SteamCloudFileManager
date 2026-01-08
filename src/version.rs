@@ -46,8 +46,14 @@ pub fn os_arch() -> &'static str {
 }
 
 // 获取编译时间
-pub fn build_time() -> &'static str {
-    env!("BUILD_TIME")
+pub fn build_time() -> String {
+    use chrono::{Local, TimeZone};
+    let timestamp: i64 = env!("BUILD_TIMESTAMP").parse().unwrap_or(0);
+    Local
+        .timestamp_opt(timestamp, 0)
+        .single()
+        .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+        .unwrap_or_else(|| "unknown".to_string())
 }
 
 // 获取编译配置 (debug/release)
