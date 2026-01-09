@@ -7,7 +7,7 @@ use std::sync::{Mutex, OnceLock};
 static CONFIG: OnceLock<Mutex<AppConfig>> = OnceLock::new();
 
 // 应用配置结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
     // 路径设置
     #[serde(default)]
@@ -82,17 +82,6 @@ impl Default for LoggingConfig {
     fn default() -> Self {
         Self {
             enabled: default_log_enabled(),
-        }
-    }
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            paths: PathsConfig::default(),
-            appearance: AppearanceConfig::default(),
-            logging: LoggingConfig::default(),
-            symlinks: Vec::new(),
         }
     }
 }
