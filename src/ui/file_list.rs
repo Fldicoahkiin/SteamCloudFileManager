@@ -399,7 +399,7 @@ fn render_tree_body(
         body,
         nodes,
         selected_files,
-        0,
+        1, // 从 depth=1 开始，让根级节点也显示树状线
         &[],
         &render_ctx,
         ctx.last_selected_index,
@@ -419,11 +419,18 @@ fn render_tree_body_recursive(
     last_selected_index: &mut Option<usize>,
     visible_indices: &[usize],
 ) {
-    let node_count = nodes.len();
+    // 先计算过滤后最后一个可见节点的索引
+    let last_visible_idx = nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| {
+            node_or_children_match(node, ctx.search_query)
+                && node_or_children_match_filter(node, ctx.show_only_local, ctx.show_only_cloud)
+        })
+        .map(|(idx, _)| idx)
+        .next_back();
 
     for (idx, node) in nodes.iter_mut().enumerate() {
-        let is_last_node = idx == node_count - 1;
-
         // 检查节点是否匹配搜索条件
         if !node_or_children_match(node, ctx.search_query) {
             continue;
@@ -433,6 +440,9 @@ fn render_tree_body_recursive(
         if !node_or_children_match_filter(node, ctx.show_only_local, ctx.show_only_cloud) {
             continue;
         }
+
+        // 判断是否是过滤后的最后一个可见节点
+        let is_last_node = last_visible_idx == Some(idx);
 
         // 收集索引
         let indices_for_folder = if node.is_folder() {
