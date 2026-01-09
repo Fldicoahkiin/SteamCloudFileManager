@@ -20,6 +20,9 @@ pub struct SettingsWindowState {
     pub steam_path_input: String,
     pub steam_path_changed: bool,
     pub show_reset_confirm: bool,
+    pub log_dir_display: String,
+    pub config_path_display: String,
+    pub backup_dir_display: String,
 }
 
 impl Default for SettingsWindowState {
@@ -30,6 +33,17 @@ impl Default for SettingsWindowState {
             .map(|p| p.display().to_string())
             .unwrap_or_default();
 
+        // 获取只读路径
+        let log_dir = crate::logger::get_log_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let config_path = crate::config::get_config_path()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let backup_dir = crate::backup::get_backup_root_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+
         Self {
             tab: SettingsTab::Log,
             about_icon_texture: None,
@@ -37,6 +51,9 @@ impl Default for SettingsWindowState {
             steam_path_input: current_path,
             steam_path_changed: false,
             show_reset_confirm: false,
+            log_dir_display: log_dir,
+            config_path_display: config_path,
+            backup_dir_display: backup_dir,
         }
     }
 }
@@ -92,6 +109,29 @@ pub fn draw_settings_window(
 
                     ui.add_space(4.0);
 
+                    // 备份
+                    let backup_selected = state.tab == SettingsTab::Backup;
+                    let backup_response = ui.add_sized(
+                        [ui.available_width(), 28.0],
+                        egui::Button::new(egui::RichText::new(i18n.backup()).color(
+                            if backup_selected {
+                                accent_color
+                            } else {
+                                ui.style().visuals.text_color()
+                            },
+                        ))
+                        .fill(if backup_selected {
+                            ui.style().visuals.selection.bg_fill
+                        } else {
+                            crate::ui::theme::transparent_color()
+                        }),
+                    );
+                    if backup_response.clicked() {
+                        state.tab = SettingsTab::Backup;
+                    }
+
+                    ui.add_space(4.0);
+
                     // 外观
                     let appearance_selected = state.tab == SettingsTab::Appearance;
                     let appearance_response = ui.add_sized(
@@ -138,29 +178,6 @@ pub fn draw_settings_window(
 
                     ui.add_space(4.0);
 
-                    // 备份
-                    let backup_selected = state.tab == SettingsTab::Backup;
-                    let backup_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.backup()).color(
-                            if backup_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if backup_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if backup_response.clicked() {
-                        state.tab = SettingsTab::Backup;
-                    }
-
-                    ui.add_space(4.0);
-
                     // 关于
                     let about_selected = state.tab == SettingsTab::About;
                     let about_response = ui.add_sized(
@@ -194,7 +211,7 @@ pub fn draw_settings_window(
                             ui.add_space(8.0);
                             match state.tab {
                                 SettingsTab::Log => {
-                                    draw_log_settings(ui, i18n);
+                                    draw_log_settings(ui, state, i18n);
                                 }
                                 SettingsTab::Appearance => {
                                     draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
@@ -203,7 +220,7 @@ pub fn draw_settings_window(
                                     draw_advanced_settings(ui, state, i18n);
                                 }
                                 SettingsTab::Backup => {
-                                    draw_backup_settings(ui, i18n);
+                                    draw_backup_settings(ui, state, i18n);
                                 }
                                 SettingsTab::About => {
                                     download_release = draw_about_content(
@@ -223,7 +240,7 @@ pub fn draw_settings_window(
 }
 
 // 日志设置内容
-fn draw_log_settings(ui: &mut egui::Ui, i18n: &I18n) {
+fn draw_log_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &I18n) {
     let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
 
     // 日志启用提示
@@ -255,24 +272,41 @@ fn draw_log_settings(ui: &mut egui::Ui, i18n: &I18n) {
         }
     }
 
-    ui.add_space(16.0);
-
-    // 打开日志目录
-    if ui.button(i18n.open_log_dir()).clicked() {
-        if let Err(e) = crate::logger::open_log_directory() {
-            tracing::error!("打开日志目录失败: {}", e);
-        }
-    }
-
     // 日志目录路径
-    if let Ok(log_dir) = crate::logger::get_log_dir() {
-        ui.add_space(8.0);
-        ui.label(
-            egui::RichText::new(i18n.log_location(&log_dir.display().to_string()))
-                .size(10.0)
-                .color(text_subtle),
+    ui.add_space(16.0);
+    ui.label(
+        egui::RichText::new(i18n.log_dir_label())
+            .size(11.0)
+            .color(text_subtle),
+    );
+    ui.add_space(4.0);
+
+    // 获取原始路径用于重置
+    let original_path = crate::logger::get_log_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+
+    ui.horizontal(|ui| {
+        let response = ui.add_sized(
+            [ui.available_width() - 32.0, 20.0],
+            egui::TextEdit::singleline(&mut state.log_dir_display),
         );
-    }
+
+        // 编辑后自动重置（失去焦点时）
+        if response.lost_focus() && state.log_dir_display != original_path {
+            state.log_dir_display = original_path.clone();
+        }
+
+        if ui
+            .button(icons::FOLDER_OPEN)
+            .on_hover_text(i18n.open_log_dir())
+            .clicked()
+        {
+            if let Err(e) = crate::logger::open_log_directory() {
+                tracing::error!("打开日志目录失败: {}", e);
+            }
+        }
+    });
 }
 
 // 外观设置内容
@@ -319,7 +353,7 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
     // 路径输入框和浏览按钮
     ui.horizontal(|ui| {
         ui.add_sized(
-            [ui.available_width() - 80.0, 24.0],
+            [ui.available_width() - 60.0, 24.0],
             egui::TextEdit::singleline(&mut state.steam_path_input)
                 .hint_text("Steam 安装路径")
                 .interactive(false), // 只读，通过浏览按钮修改
@@ -457,37 +491,78 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
     ui.add_space(24.0);
 
     // 显示配置文件位置
-    if let Ok(config_path) = crate::config::get_config_path() {
-        ui.label(
-            egui::RichText::new(i18n.config_file_location(&config_path.display().to_string()))
-                .size(10.0)
-                .color(text_subtle),
+    let original_config_path = crate::config::get_config_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let config_path_for_open = crate::config::get_config_path().ok();
+
+    ui.label(
+        egui::RichText::new(i18n.config_dir_label())
+            .size(11.0)
+            .color(text_subtle),
+    );
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let response = ui.add_sized(
+            [ui.available_width() - 32.0, 20.0],
+            egui::TextEdit::singleline(&mut state.config_path_display),
         );
-    }
+
+        if response.lost_focus() && state.config_path_display != original_config_path {
+            state.config_path_display = original_config_path.clone();
+        }
+
+        if ui
+            .button(icons::FOLDER_OPEN)
+            .on_hover_text(i18n.open_config_dir())
+            .clicked()
+        {
+            if let Some(ref config_path) = config_path_for_open {
+                if let Some(parent) = config_path.parent() {
+                    let _ = open::that(parent);
+                }
+            }
+        }
+    });
 }
 
 // 备份设置内容
-fn draw_backup_settings(ui: &mut egui::Ui, i18n: &I18n) {
+fn draw_backup_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &I18n) {
     let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
 
-    // 打开备份目录按钮
-    if ui.button(i18n.backup_open_dir()).clicked() {
-        if let Ok(manager) = crate::backup::BackupManager::new() {
-            if let Err(e) = manager.open_backup_dir() {
-                tracing::error!("打开备份目录失败: {}", e);
+    // 备份目录路径
+    let original_backup_path = crate::backup::get_backup_root_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+
+    ui.label(
+        egui::RichText::new(i18n.backup_dir_label())
+            .size(11.0)
+            .color(text_subtle),
+    );
+    ui.add_space(4.0);
+    ui.horizontal(|ui| {
+        let response = ui.add_sized(
+            [ui.available_width() - 32.0, 20.0],
+            egui::TextEdit::singleline(&mut state.backup_dir_display),
+        );
+
+        if response.lost_focus() && state.backup_dir_display != original_backup_path {
+            state.backup_dir_display = original_backup_path.clone();
+        }
+
+        if ui
+            .button(icons::FOLDER_OPEN)
+            .on_hover_text(i18n.backup_open_dir())
+            .clicked()
+        {
+            if let Ok(manager) = crate::backup::BackupManager::new() {
+                if let Err(e) = manager.open_backup_dir() {
+                    tracing::error!("打开备份目录失败: {}", e);
+                }
             }
         }
-    }
-
-    // 备份目录路径
-    if let Ok(backup_dir) = crate::backup::get_backup_root_dir() {
-        ui.add_space(8.0);
-        ui.label(
-            egui::RichText::new(i18n.backup_location(&backup_dir.display().to_string()))
-                .size(10.0)
-                .color(text_subtle),
-        );
-    }
+    });
 }
 
 // 关于内容
@@ -722,7 +797,9 @@ fn draw_about_content(
                     .color(text_subtle),
             );
             ui.hyperlink_to(
-                egui::RichText::new("GitHub").size(11.0).color(steam_blue),
+                egui::RichText::new("Fldicoahkiin/SteamCloudFileManager")
+                    .size(11.0)
+                    .color(steam_blue),
                 "https://github.com/Fldicoahkiin/SteamCloudFileManager",
             );
             ui.end_row();

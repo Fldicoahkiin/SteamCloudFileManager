@@ -116,37 +116,18 @@ impl SymlinkConfig {
     }
 }
 
-// 配置文件结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SymlinkConfigFile {
-    pub version: u32,
-    pub configs: Vec<SymlinkConfig>,
-}
-
-impl Default for SymlinkConfigFile {
-    fn default() -> Self {
-        Self {
-            version: 1,
-            configs: Vec::new(),
-        }
-    }
-}
-
 // 软链接管理器
 pub struct SymlinkManager {
     steam_path: PathBuf,
     user_id: String,
-    config_path: PathBuf,
 }
 
 impl SymlinkManager {
     // 创建管理器
     pub fn new(steam_path: PathBuf, user_id: String) -> Result<Self> {
-        let config_path = get_config_path()?;
         Ok(Self {
             steam_path,
             user_id,
-            config_path,
         })
     }
 
@@ -262,49 +243,48 @@ impl SymlinkManager {
         generate_symlink_commands(&target_path, &link_path)
     }
 
-    // 加载配置
-    pub fn load_configs(&self) -> Result<SymlinkConfigFile> {
-        if !self.config_path.exists() {
-            return Ok(SymlinkConfigFile::default());
-        }
-
-        let content = fs::read_to_string(&self.config_path)?;
-        let config: SymlinkConfigFile = serde_json::from_str(&content)?;
-        Ok(config)
-    }
-
-    // 保存配置
-    pub fn save_configs(&self, configs: &SymlinkConfigFile) -> Result<()> {
-        if let Some(parent) = self.config_path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-
-        let content = serde_json::to_string_pretty(configs)?;
-        fs::write(&self.config_path, content)?;
-        Ok(())
-    }
-
     // 添加配置
     pub fn add_config(&self, config: SymlinkConfig) -> Result<()> {
-        let mut file = self.load_configs()?;
-        file.configs.push(config);
-        self.save_configs(&file)
+        let entry = crate::config::SymlinkConfigEntry {
+            id: config.id,
+            app_id: config.app_id,
+            direction: match config.direction {
+                LinkDirection::LocalToRemote => "local_to_remote".to_string(),
+                LinkDirection::RemoteToLocal => "remote_to_local".to_string(),
+            },
+            local_path: config.local_path,
+            remote_subfolder: config.remote_subfolder,
+            platform: config.platform,
+            created_at: config.created_at,
+            note: config.note,
+        };
+        crate::config::add_symlink_config(entry)
     }
 
     // 删除配置
     pub fn remove_config(&self, id: &str) -> Result<()> {
-        let mut file = self.load_configs()?;
-        file.configs.retain(|c| c.id != id);
-        self.save_configs(&file)
+        crate::config::remove_symlink_config(id)
     }
 
     // 获取指定游戏的配置
     pub fn get_configs_for_app(&self, app_id: u32) -> Result<Vec<SymlinkConfig>> {
-        let file = self.load_configs()?;
-        Ok(file
-            .configs
+        let configs = crate::config::get_symlink_configs_for_app(app_id);
+        Ok(configs
             .into_iter()
-            .filter(|c| c.app_id == app_id)
+            .map(|entry| SymlinkConfig {
+                id: entry.id,
+                app_id: entry.app_id,
+                direction: if entry.direction == "local_to_remote" {
+                    LinkDirection::LocalToRemote
+                } else {
+                    LinkDirection::RemoteToLocal
+                },
+                local_path: entry.local_path,
+                remote_subfolder: entry.remote_subfolder,
+                platform: entry.platform,
+                created_at: entry.created_at,
+                note: entry.note,
+            })
             .collect())
     }
 
@@ -381,15 +361,6 @@ impl SymlinkManager {
 
         Ok(files)
     }
-}
-
-// 获取配置文件路径
-fn get_config_path() -> Result<PathBuf> {
-    let config_dir = dirs::config_dir()
-        .or_else(dirs::data_local_dir)
-        .ok_or_else(|| anyhow!("无法获取配置目录"))?;
-
-    Ok(config_dir.join("scfm").join("symlink_configs.json"))
 }
 
 // 获取当前平台名称

@@ -135,12 +135,12 @@ pub fn draw_conflict_dialog(
 
     let mut new_filter = current_filter;
     let mut new_selected = current_selected;
-    let mut should_close = false;
     let mut retry_hash_filename: Option<String> = None;
 
     // 渲染对话框窗口
     egui::Window::new(i18n.file_comparison_title())
         .id(egui::Id::new("conflict_dialog"))
+        .open(&mut dialog.show)
         .default_size([900.0, 600.0])
         .resizable(true)
         .collapsible(false)
@@ -160,18 +160,21 @@ pub fn draw_conflict_dialog(
                 retry_hash_filename = render_detail_panel(ui, comparison, i18n);
             }
 
-            ui.separator();
-
-            // 底部操作栏
-            should_close = render_footer(ui, stats.conflicts, i18n);
+            // 底部状态栏
+            if stats.conflicts > 0 {
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(i18n.conflicts_warning(stats.conflicts))
+                            .color(crate::ui::theme::error_color(ui.ctx())),
+                    );
+                });
+            }
         });
 
     // 应用状态更改
     dialog.filter = new_filter;
     dialog.selected_index = new_selected;
-    if should_close {
-        dialog.show = false;
-    }
 
     // 返回事件
     if let Some(filename) = retry_hash_filename {
@@ -516,28 +519,6 @@ fn render_detail_panel(
     });
 
     retry_filename
-}
-
-// 渲染底部操作栏
-fn render_footer(ui: &mut egui::Ui, conflicts: usize, i18n: &I18n) -> bool {
-    let mut should_close = false;
-
-    ui.horizontal(|ui| {
-        if conflicts > 0 {
-            ui.label(
-                egui::RichText::new(i18n.conflicts_warning(conflicts))
-                    .color(crate::ui::theme::error_color(ui.ctx())),
-            );
-        }
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(i18n.close()).clicked() {
-                should_close = true;
-            }
-        });
-    });
-
-    should_close
 }
 
 // 获取同步状态的显示文本和颜色

@@ -9,7 +9,6 @@ use std::sync::{Arc, Mutex};
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SymlinkAction {
     None,
-    Close,
 }
 
 // 待执行的操作
@@ -302,7 +301,7 @@ impl SymlinkDialog {
     }
 
     pub fn draw(&mut self, ctx: &egui::Context, i18n: &I18n) -> SymlinkAction {
-        let mut action = SymlinkAction::None;
+        let action = SymlinkAction::None;
 
         if !self.show {
             return action;
@@ -318,11 +317,11 @@ impl SymlinkDialog {
         let mut commands_to_copy: Option<Vec<String>> = None;
 
         egui::Window::new(i18n.symlink_title())
+            .open(&mut self.show)
             .resizable(true)
             .collapsible(false)
             .min_width(600.0)
             .default_size([650.0, 500.0])
-            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
             .show(ctx, |ui| {
                 // 游戏信息
                 ui.horizontal(|ui| {
@@ -333,19 +332,22 @@ impl SymlinkDialog {
                 ui.add_space(4.0);
 
                 // 实验性功能警告
-                egui::Frame::new()
-                    .fill(egui::Color32::from_rgb(255, 243, 205))
-                    .inner_margin(8.0)
-                    .corner_radius(4.0)
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.label(
-                                RichText::new(i18n.symlink_experimental_warning())
-                                    .size(11.0)
-                                    .color(egui::Color32::from_rgb(133, 100, 4)),
-                            );
-                        });
-                    });
+                ui.horizontal(|ui| {
+                    ui.label(
+                        RichText::new(format!(
+                            "{} {}",
+                            icons::WARNING,
+                            i18n.symlink_experimental_title()
+                        ))
+                        .size(11.0)
+                        .color(crate::ui::theme::warning_color(ctx)),
+                    );
+                });
+                ui.label(
+                    RichText::new(i18n.symlink_experimental_desc())
+                        .size(10.0)
+                        .color(crate::ui::theme::muted_color(ctx)),
+                );
 
                 ui.add_space(8.0);
 
@@ -600,13 +602,6 @@ impl SymlinkDialog {
                     {
                         pending.refresh = true;
                     }
-
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(i18n.close()).clicked() {
-                            action = SymlinkAction::Close;
-                            self.show = false;
-                        }
-                    });
                 });
             });
 

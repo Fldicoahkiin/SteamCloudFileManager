@@ -647,7 +647,7 @@ impl AppHandlers {
     ) {
         // 如果已经完成过 Hash 检测且是同一个 app_id，直接打开对话框显示缓存结果
         if file_list.hash_checked_app_id == Some(app_id) {
-            tracing::info!("使用缓存的 Hash 检测结果 (app_id={})", app_id);
+            tracing::debug!("使用缓存的 Hash 检测结果 (app_id={})", app_id);
             dialogs.conflict_dialog.show = true;
             return;
         }

@@ -519,8 +519,8 @@ impl eframe::App for SteamCloudApp {
         // Symlink 管理对话框
         let mut close_symlink_dialog = false;
         if let Some(ref mut dialog) = self.dialogs.symlink_dialog {
-            let action = dialog.draw(ctx, &self.misc.i18n);
-            if matches!(action, crate::ui::SymlinkAction::Close) || !dialog.show {
+            let _action = dialog.draw(ctx, &self.misc.i18n);
+            if !dialog.show {
                 close_symlink_dialog = true;
             }
         }

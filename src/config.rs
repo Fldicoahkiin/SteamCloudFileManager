@@ -24,6 +24,26 @@ pub struct AppConfig {
     // 日志设置
     #[serde(default)]
     pub logging: LoggingConfig,
+
+    // 软链接配置
+    #[serde(default)]
+    pub symlinks: Vec<SymlinkConfigEntry>,
+}
+
+// 软链接配置项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymlinkConfigEntry {
+    pub id: String,
+    pub app_id: u32,
+    pub direction: String, // "remote_to_local" or "local_to_remote"
+    pub local_path: PathBuf,
+    pub remote_subfolder: String,
+    #[serde(default)]
+    pub platform: String, // "windows", "macos", "linux"
+    #[serde(default)]
+    pub created_at: i64,
+    #[serde(default)]
+    pub note: String,
 }
 
 fn default_version() -> u32 {
@@ -81,6 +101,7 @@ impl Default for AppConfig {
             paths: PathsConfig::default(),
             appearance: AppearanceConfig::default(),
             logging: LoggingConfig::default(),
+            symlinks: Vec::new(),
         }
     }
 }
@@ -282,4 +303,47 @@ impl SteamPathValidation {
     pub fn is_valid(&self) -> bool {
         matches!(self, SteamPathValidation::Valid { .. })
     }
+}
+
+// 获取软链接配置
+pub fn get_symlink_configs() -> Vec<SymlinkConfigEntry> {
+    get_config().symlinks
+}
+
+// 获取指定游戏的软链接配置
+pub fn get_symlink_configs_for_app(app_id: u32) -> Vec<SymlinkConfigEntry> {
+    get_symlink_configs()
+        .into_iter()
+        .filter(|c| c.app_id == app_id)
+        .collect()
+}
+
+// 添加软链接配置
+pub fn add_symlink_config(entry: SymlinkConfigEntry) -> Result<()> {
+    let config = CONFIG
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
+    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
+    config.symlinks.push(entry);
+
+    // 保存到文件
+    let config_path = get_config_path()?;
+    let content = toml::to_string_pretty(&*config)?;
+    std::fs::write(&config_path, content)?;
+    Ok(())
+}
+
+// 删除软链接配置
+pub fn remove_symlink_config(id: &str) -> Result<()> {
+    let config = CONFIG
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
+    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
+    config.symlinks.retain(|c| c.id != id);
+
+    // 保存到文件
+    let config_path = get_config_path()?;
+    let content = toml::to_string_pretty(&*config)?;
+    std::fs::write(&config_path, content)?;
+    Ok(())
 }

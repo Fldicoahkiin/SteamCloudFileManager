@@ -58,7 +58,7 @@ pub fn draw_appinfo_dialog(ctx: &egui::Context, dialog: &AppInfoDialog, i18n: &I
             ui.label(ufs_label);
 
             egui::ScrollArea::vertical()
-                .max_height(300.0)
+                .auto_shrink([false, false])
                 .show(ui, |ui| {
                     ui.add(
                         egui::TextEdit::multiline(&mut dialog.config.raw_text.as_str())

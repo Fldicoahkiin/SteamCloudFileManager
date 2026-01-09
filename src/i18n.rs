@@ -354,10 +354,17 @@ impl I18n {
         }
     }
 
-    pub fn config_file_location(&self, path: &str) -> String {
+    pub fn config_dir_label(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => format!("配置文件: {}", path),
-            Language::English => format!("Config file: {}", path),
+            Language::Chinese => "配置文件:",
+            Language::English => "Config File:",
+        }
+    }
+
+    pub fn open_config_dir(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "打开配置目录",
+            Language::English => "Open Config Directory",
         }
     }
 
@@ -589,10 +596,10 @@ impl I18n {
         }
     }
 
-    pub fn log_location(&self, path: &str) -> String {
+    pub fn log_dir_label(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => format!("日志位置: {}", path),
-            Language::English => format!("Log location: {}", path),
+            Language::Chinese => "日志目录:",
+            Language::English => "Log Directory:",
         }
     }
 
@@ -1609,10 +1616,10 @@ impl I18n {
         }
     }
 
-    pub fn backup_location(&self, path: &str) -> String {
+    pub fn backup_dir_label(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => format!("备份目录: {}", path),
-            Language::English => format!("Backup directory: {}", path),
+            Language::Chinese => "备份目录:",
+            Language::English => "Backup Directory:",
         }
     }
 
@@ -1829,18 +1836,17 @@ impl I18n {
         }
     }
 
-    pub fn symlink_experimental_warning(&self) -> String {
+    pub fn symlink_experimental_title(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => format!(
-                "{} 实验性功能：创建软链接后会自动同步目录下的文件到云端。点击 {} 按钮可手动同步新增文件。",
-                icons::WARNING,
-                icons::CLOUD_UPLOAD
-            ),
-            Language::English => format!(
-                "{} Experimental: Files in the directory are auto-synced after symlink creation. Click {} to manually sync new files.",
-                icons::WARNING,
-                icons::CLOUD_UPLOAD
-            ),
+            Language::Chinese => "实验性功能",
+            Language::English => "Experimental Feature",
+        }
+    }
+
+    pub fn symlink_experimental_desc(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "创建软链接后会自动同步目录下的文件到云端。点击云端上传按钮可手动同步新增文件。",
+            Language::English => "Files in the directory are auto-synced after symlink creation. Use the cloud upload button to manually sync new files.",
         }
     }
 
