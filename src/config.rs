@@ -9,10 +9,6 @@ static CONFIG: OnceLock<Mutex<AppConfig>> = OnceLock::new();
 // 应用配置结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    // 配置版本
-    #[serde(default = "default_version")]
-    pub version: u32,
-
     // 路径设置
     #[serde(default)]
     pub paths: PathsConfig,
@@ -44,10 +40,6 @@ pub struct SymlinkConfigEntry {
     pub created_at: i64,
     #[serde(default)]
     pub note: String,
-}
-
-fn default_version() -> u32 {
-    1
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -97,7 +89,6 @@ impl Default for LoggingConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            version: 1,
             paths: PathsConfig::default(),
             appearance: AppearanceConfig::default(),
             logging: LoggingConfig::default(),

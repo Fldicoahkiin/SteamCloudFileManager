@@ -1,8 +1,4 @@
 # Steam Cloud File Manager 配置文件
-# 此文件会在应用启动时自动加载
-
-# 配置版本（请勿手动修改）
-version = 1
 
 [paths]
 # 自定义 Steam 安装路径
@@ -16,3 +12,6 @@ theme_mode = "system"
 [logging]
 # 是否启用日志文件存储
 enabled = true
+
+# 软链接配置
+# [[symlinks]]
