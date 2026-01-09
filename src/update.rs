@@ -442,7 +442,7 @@ impl UpdateManager {
         let update_script = exe_dir.join("update.ps1");
 
         // 使用模板脚本并替换占位符
-        let ps_content = include_str!("scripts/update_windows.ps1")
+        let ps_content = include_str!("../scripts/update_windows.ps1")
             .replace("{{NEW_EXE}}", &new_exe.display().to_string())
             .replace("{{CURRENT_EXE}}", &current_exe.display().to_string())
             .replace("{{NEW_DLL}}", &new_dll.display().to_string())
@@ -530,7 +530,7 @@ impl UpdateManager {
 
         // 使用模板脚本并替换占位符
         let update_script = temp_extract_dir.join("update.sh");
-        let sh_content = include_str!("scripts/update_macos.sh")
+        let sh_content = include_str!("../scripts/update_macos.sh")
             .replace("{{CURRENT_APP}}", &current_app.display().to_string())
             .replace("{{NEW_APP}}", &new_app.display().to_string())
             .replace("{{TEMP_DIR}}", &temp_extract_dir.display().to_string())
@@ -584,7 +584,7 @@ impl UpdateManager {
 
         // 使用模板脚本并替换占位符
         let update_script = temp_extract_dir.join("update.sh");
-        let sh_content = include_str!("scripts/update_linux.sh")
+        let sh_content = include_str!("../scripts/update_linux.sh")
             .replace("{{NEW_EXE}}", &new_exe.display().to_string())
             .replace("{{CURRENT_EXE}}", &current_exe.display().to_string())
             .replace("{{NEW_SO}}", &new_so.display().to_string())
