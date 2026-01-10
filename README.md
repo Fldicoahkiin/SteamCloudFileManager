@@ -1,4 +1,4 @@
-# SteamCloudFileManager
+# Steam Cloud File Manager
 
 [English](README.en.md) | **简体中文**
 
@@ -97,7 +97,7 @@ brew install steam-cloud-file-manager
 2. 打开 DMG 文件
 3. 将应用拖入 Applications 文件夹
 4. 如遇 "损坏" 或 "无法打开" 提示，请在终端执行以下命令修复签名：
-   
+
    ```bash
    xattr -c "/Applications/Steam Cloud File Manager.app"
    ```
@@ -127,7 +127,6 @@ cd SteamCloudFileManager-*-linux-x86_64-aur
 makepkg -si
 steam-cloud-file-manager
 ```
-
 
 ### Debian/Ubuntu
 
@@ -379,7 +378,6 @@ graph TD
 
 > **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。
 
-
 ## TODO
 
 ### 功能开发
@@ -416,6 +414,7 @@ graph TD
 - 🔧 **提交代码**：修复 Bug 或实现新功能
 
 当前支持的语言：
+
 - 简体中文
 - English
 

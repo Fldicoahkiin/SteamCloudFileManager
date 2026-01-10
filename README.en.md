@@ -1,4 +1,4 @@
-# SteamCloudFileManager
+# Steam Cloud File Manager
 
 **English** | [简体中文](README.md)
 
@@ -97,7 +97,7 @@ brew install steam-cloud-file-manager
 2. Open the DMG file
 3. Drag the app to the Applications folder
 4. If you encounter a "Damaged" or "Cannot be opened" error, run the following command in Terminal to fix the signature:
-   
+
    ```bash
    xattr -c "/Applications/Steam Cloud File Manager.app"
    ```
@@ -127,7 +127,6 @@ cd SteamCloudFileManager-*-linux-x86_64-aur
 makepkg -si
 steam-cloud-file-manager
 ```
-
 
 ### Debian/Ubuntu
 
@@ -379,7 +378,6 @@ The tool parses `remotecache.vdf` in real-time for file lists, and parses **`app
 
 > **Note**: The Root path mapping table is continuously updated. Different games may use different Root values, and cross-platform behavior may vary.
 
-
 ## TODO
 
 ### Feature Development
@@ -416,6 +414,7 @@ Welcome to submit Issues and Pull Requests! See [CONTRIBUTING.md](CONTRIBUTING.m
 - 🔧 **Submit Code**: Fix bugs or implement new features
 
 Currently supported languages:
+
 - 简体中文
 - English
 
