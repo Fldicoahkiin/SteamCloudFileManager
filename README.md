@@ -43,7 +43,7 @@
 - **VDF 文件树可视化**：完整解析 `remotecache.vdf`，还原云端目录结构。
 - **批量传输**：支持多文件选择与拖拽上传/下载。
 - **深度控制**：直接删除云端文件，强制更新同步状态。
-- **Root 路径映射**：自动转换 Root ID (0-12) 为本地磁盘绝对路径。
+- **Root 路径映射**：解析 `remotecache.vdf` 中的数字 Root ID (0-12)，自动转换为本地磁盘绝对路径（该映射关系在官方文档中未公开）。
 - **搜索与过滤**：支持文件名、路径及同步状态的正则表达式检索。
 - **游戏库扫描**：通过解析 `libraryfolders.vdf` 自动发现本地游戏。
 - **软链接同步**：支持将非原生支持的本地文件通过软链接挂载至 Steam Cloud（实验性）。
@@ -257,21 +257,81 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 ### 云同步机制
 
 ```mermaid
-graph TD
-    User([用户操作]) -->|选择游戏/文件| App[Steam 云文件管理器]
-    App --> VDF["VDF 解析器: remotecache.vdf"]
-    VDF --> PathResolver["路径解析器: Root ID 映射"]
-    PathResolver --> FileList[文件列表视图]
-    FileList --> CDP["CDP 客户端: 获取下载链接"]
-    CDP --> SteamBrowser["Steam 内置浏览器 127.0.0.1:8080"]
-    SteamBrowser --> CloudPage["云存储页面 store.steampowered.com"]
-    CloudPage -->|文件列表+下载链接| FileList
-    FileList -->|上传/下载/删除| SteamAPI["Steam API: ISteamRemoteStorage"]
-    SteamAPI --> LocalCache["本地缓存 userdata/uid/appid/remote/"]
-    LocalCache -.->|后台异步同步| CloudServer[Steam 云端服务器]
-    CloudServer -.->|同步到其他设备| LocalCache
-    LocalCache -->|刷新| VDF
+graph TB
+    subgraph dev["开发者"]
+        Steamworks["Steamworks 后台<br/>配置 ufs"]
+    end
+    
+    subgraph client["Steam 客户端"]
+        AppInfo[(appinfo.vdf)]
+        RemoteCache[(remotecache.vdf)]
+        
+        subgraph sync["Steam Cloud 同步机制"]
+            Auto["Auto-Cloud<br/>自动扫描匹配"]
+            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        end
+        
+        SteamBrowser["Steam 内置浏览器<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
+    
+    Cloud(("☁️ Steam 服务器<br/>store.steampowered.com"))
+    
+    subgraph tool["本工具"]
+        App["Steam 云文件管理器"]
+        Parser["VDF 解析器"]
+        Resolver["Root ID 路径映射"]
+        UI["文件管理界面"]
+    end
+    
+    %% 配置流程（Steamworks → 服务器 → 客户端）
+    Steamworks --> Cloud
+    Cloud -->|下发配置| AppInfo
+    AppInfo --> Auto
+    
+    %% 同步机制
+    Auto --> RemoteCache
+    API -->|写入文件| RemoteCache
+    RemoteCache <===>|双向同步| Cloud
+    
+    %% 浏览器
+    CDP --> SteamBrowser
+    SteamBrowser --> Cloud
+    
+    %% 本工具
+    App --> Parser
+    Parser -.-> RemoteCache
+    Parser -.-> AppInfo
+    Parser --> Resolver
+    Resolver --> UI
+    UI -->|上传/删除/同步/移除| API
+    UI -->|获取下载链接| CDP
+    Cloud -.-> SteamBrowser
+    SteamBrowser -.返回下载链接.-> UI
 ```
+
+
+
+#### Steam 云同步的两种方式
+
+Steam 提供两种云同步机制：
+
+**自动云（Auto-Cloud）**  
+开发者在 Steamworks 后台配置，Steam 自动扫描指定目录：
+- Steam 会主动扫描配置的目录
+- 根据 pattern（如 `*.sav`）自动匹配文件
+- 新文件会自动添加到 remotecache.vdf 并同步
+- 配置存储在 appinfo.vdf 的 `ufs` 节中
+
+**Steam Cloud API**  
+游戏代码调用 `ISteamRemoteStorage::FileWrite()` 显式注册文件：
+- Steam 不会主动扫描
+- 需要游戏调用 API 注册文件
+- 用户手动创建的文件不会自动同步
+
+**本工具的定位**：  
+作为第三方工具，我们只能使用 Steam Cloud API。主要解决的场景是：游戏不会写入软链接目录中的配置文件，导致这些文件无法同步。我们通过手动调用 API 注册这些文件，让它们进入云同步。
 
 ### 数据流
 
@@ -367,16 +427,28 @@ graph TD
 
 工具实时解析 `remotecache.vdf` 获取文件列表，同时解析 **`appinfo.vdf`** 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统：
 
-| Root ID | 含义 | 示例路径 (Windows) |
-|---------|------|-------------------|
-| 0 | Cloud (Steam 云目录) | `userdata/{uid}/{appid}/remote/` |
-| 1 | InstallDir (游戏安装目录) | `steamapps/common/GameName/` |
-| 2 | Documents (我的文档) | `C:/Users/xxx/Documents/` |
-| 3 | SavedGames | `C:/Users/xxx/Saved Games/` |
+**什么是 Root ID？**
 
-- **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的路径映射规则
+Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位置。**这个数字 ID 到路径的映射关系在任何官方文档中都没有公开**，是通过解析 VDF 文件和实际游戏测试验证得出的。
 
-> **注意**：Root 路径映射表仍在持续更新中，不同游戏可能使用不同的 Root 值，且跨平台行为可能不一致。
+| Root ID | Steamworks 根名称 | Windows 路径示例 |
+|---------|------------------|------------------|
+| 0 | `SteamCloudDocuments` | `userdata/{uid}/{appid}/remote/` |
+| 1 | `App Install Directory` | `steamapps/common/GameName/` |
+| 2 | `WinMyDocuments` | `%USERPROFILE%\Documents\` |
+| 4 | `WinAppDataLocal` | `%LOCALAPPDATA%\` |
+| 9 | `WinSavedGames` | `%USERPROFILE%\Saved Games\` |
+| 12 | `WinAppDataLocalLow` | `%USERPROFILE%\AppData\LocalLow\` |
+
+**详细说明**：
+
+- 开发者在 Steamworks 后台配置时使用**字符串名称**（如 `WinMyDocuments`）
+- Steam 客户端在 `remotecache.vdf` 中存储为**数字 ID**（如 `2`）
+- 官方只公开了字符串名称，**数字 ID 需要通过解析 remotecache.vdf 获取**
+
+- **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的验证数据和跨平台映射
+
+> **注意**：Root 路径映射表通过实际游戏测试验证，欢迎提交新的验证数据！
 
 ## TODO
 
@@ -410,7 +482,7 @@ graph TD
 - ✨ **请求功能**：分享你的想法和建议
 - 📖 **完善文档**：帮助改进 README 和技术文档
 - 🌐 **贡献翻译**：添加新的语言支持，请查看 [i18n 贡献指南](I18N_GUIDE.md)
-- 🗺️ **补充 Root 映射**：帮助完善 [Root 路径映射表](ROOT_PATH_MAPPING.md)
+- 🗺️ **补充 Root 映射**：提交游戏的 remotecache.vdf 验证数据，帮助完善 [Root 路径映射表](ROOT_PATH_MAPPING.md)
 - 🔧 **提交代码**：修复 Bug 或实现新功能
 
 当前支持的语言：

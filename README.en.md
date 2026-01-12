@@ -43,7 +43,7 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 - **VDF File Tree Visualization**: Fully parses `remotecache.vdf` to reconstruct the cloud directory structure.
 - **Batch Transfer**: Supports multi-file selection and drag-and-drop for uploads/downloads.
 - **Deep Control**: Directly delete cloud files and force sync status updates.
-- **Root Path Mapping**: Automatically resolves Root IDs (0-12) to absolute local disk paths.
+- **Root Path Mapping**: Parses numeric Root IDs (0-12) from `remotecache.vdf` and automatically resolves them to absolute local disk paths (this mapping is undocumented in official sources).
 - **Search & Filter**: Supports regex search for filenames, paths, and sync status.
 - **Game Library Scanning**: Automatically discovers local games by parsing `libraryfolders.vdf`.
 - **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
@@ -252,26 +252,84 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 > - **Data Safety**: We recommend backing up original files before batch operations.
 > - **Sync Mechanism**: Changes are written to the local cache and uploaded asynchronously by Steam. Do not kill the Steam process before sync completes.
 
-## Technical Architecture
-
-### Core Flow
+### Cloud Sync Mechanism
 
 ```mermaid
-graph TD
-    User([User Action]) -->|Select Game/File| App[Steam Cloud File Manager]
-    App --> VDF["VDF Parser: remotecache.vdf"]
-    VDF --> PathResolver["Path Resolver: Root ID Mapping"]
-    PathResolver --> FileList[File List View]
-    FileList --> CDP["CDP Client: Get Download Links"]
-    CDP --> SteamBrowser["Steam Built-in Browser 127.0.0.1:8080"]
-    SteamBrowser --> CloudPage["Cloud Storage Page store.steampowered.com"]
-    CloudPage -->|File List + Download Links| FileList
-    FileList -->|Upload/Download/Delete| SteamAPI["Steam API: ISteamRemoteStorage"]
-    SteamAPI --> LocalCache["Local Cache userdata/uid/appid/remote/"]
-    LocalCache -.->|Background Async Sync| CloudServer[Steam Cloud Server]
-    CloudServer -.->|Sync to Other Devices| LocalCache
-    LocalCache -->|Refresh| VDF
+graph TB
+    subgraph dev["Developer"]
+        Steamworks["Steamworks Backend<br/>Configure ufs"]
+    end
+    
+    subgraph client["Steam Client"]
+        AppInfo[(appinfo.vdf)]
+        RemoteCache[(remotecache.vdf)]
+        
+        subgraph sync["Steam Cloud Sync Mechanism"]
+            Auto["Auto-Cloud<br/>Auto Scan & Match"]
+            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        end
+        
+        SteamBrowser["Steam Built-in Browser<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
+    
+    Cloud(("☁️ Steam Server<br/>store.steampowered.com"))
+    
+    subgraph tool["This Tool"]
+        App["Steam Cloud File Manager"]
+        Parser["VDF Parser"]
+        Resolver["Root ID Path Mapping"]
+        UI["File Management UI"]
+    end
+    
+    %% Config Flow (Steamworks → Server → Client)
+    Steamworks --> Cloud
+    Cloud -->|Deliver Config| AppInfo
+    AppInfo --> Auto
+    
+    %% Sync Mechanism
+    Auto --> RemoteCache
+    API -->|Write File| RemoteCache
+    RemoteCache <===>|Bidirectional Sync| Cloud
+    
+    %% Browser
+    CDP --> SteamBrowser
+    SteamBrowser --> Cloud
+    
+    %% This Tool
+    App --> Parser
+    Parser -.-> RemoteCache
+    Parser -.-> AppInfo
+    Parser --> Resolver
+    Resolver --> UI
+    UI -->|Upload/Delete/Sync/Remove| API
+    UI -->|Get Download Link| CDP
+    Cloud -.-> SteamBrowser
+    SteamBrowser -.Return Download Link.-> UI
 ```
+
+
+
+#### Two Types of Steam Cloud Sync
+
+Steam provides two cloud sync mechanisms:
+
+**Auto-Cloud**  
+Developers configure in Steamworks backend, Steam automatically scans specified directories:
+- Steam actively scans configured directories
+- Automatically matches files based on patterns (e.g., `*.sav`)
+- New files are automatically added to remotecache.vdf and synced
+- Configuration stored in appinfo.vdf's `ufs` section
+
+**Steam Cloud API**  
+Game code calls `ISteamRemoteStorage::FileWrite()` to explicitly register files:
+- Steam does not actively scan
+- Requires game to call API to register files
+- User-created files are not automatically synced
+
+**This Tool's Positioning**:  
+As a third-party tool, we can only use Steam Cloud API. The main scenario we address: games don't write to symlinked config directories, so those files won't sync. We manually call the API to register these files and enable cloud sync.
 
 ### Data Flow
 
@@ -367,16 +425,28 @@ Fetches real-time cloud data via Steam's CEF (Chromium Embedded Framework) debug
 
 The tool parses `remotecache.vdf` in real-time for file lists, and parses **`appinfo.vdf`** to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping:
 
-| Root ID | Meaning | Example Path (Windows) |
-|---------|---------|----------------------|
-| 0 | Cloud (Steam cloud directory) | `userdata/{uid}/{appid}/remote/` |
-| 1 | InstallDir (Game install directory) | `steamapps/common/GameName/` |
-| 2 | Documents (My Documents) | `C:/Users/xxx/Documents/` |
-| 3 | SavedGames | `C:/Users/xxx/Saved Games/` |
+**What is Root ID?**
 
-- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete path mapping rules
+Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage locations. **This numeric ID to path mapping is not documented in any official sources** - it has been verified through VDF file parsing and actual game testing.
 
-> **Note**: The Root path mapping table is continuously updated. Different games may use different Root values, and cross-platform behavior may vary.
+| Root ID | Steamworks Root Name | Windows Path Example |
+|---------|---------------------|---------------------|
+| 0 | `SteamCloudDocuments` | `userdata/{uid}/{appid}/remote/` |
+| 1 | `App Install Directory` | `steamapps/common/GameName/` |
+| 2 | `WinMyDocuments` | `%USERPROFILE%\Documents\` |
+| 4 | `WinAppDataLocal` | `%LOCALAPPDATA%\` |
+| 9 | `WinSavedGames` | `%USERPROFILE%\Saved Games\` |
+| 12 | `WinAppDataLocalLow` | `%USERPROFILE%\AppData\LocalLow\` |
+
+**Details**:
+
+- Developers use **string names** in Steamworks backend configuration (e.g., `WinMyDocuments`)
+- Steam client stores as **numeric IDs** in `remotecache.vdf` (e.g., `2`)  
+- Official docs only publish string names; **numeric IDs are obtained by parsing remotecache.vdf**
+
+- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete validation data and cross-platform mappings
+
+> **Note**: The Root path mapping table is verified through actual game testing. Contributions of new validation data are welcome!
 
 ## TODO
 
@@ -410,7 +480,7 @@ Welcome to submit Issues and Pull Requests! See [CONTRIBUTING.md](CONTRIBUTING.m
 - ✨ **Request Features**: Share your ideas and suggestions
 - 📖 **Improve Documentation**: Help improve README and technical docs
 - 🌐 **Contribute Translations**: Add new languages, see [i18n Contribution Guide](I18N_GUIDE.md)
-- 🗺️ **Add Root Mappings**: Help improve the [Root Path Mapping Table](ROOT_PATH_MAPPING.md)
+- 🗺️ **Add Root Mappings**: Submit game remotecache.vdf validation data to help improve the [Root Path Mapping Table](ROOT_PATH_MAPPING.md)
 - 🔧 **Submit Code**: Fix bugs or implement new features
 
 Currently supported languages:

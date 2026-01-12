@@ -1,528 +1,249 @@
 # Steam Cloud Root 路径映射表
 
-> **📋 数据来源**  
-> 此映射表通过 **appinfo.vdf (ufs)** 和 **运行日志** 验证。
+> **重要说明**  
+> Steam 官方文档只公开了根路径的字符串名称。数字 Root ID (0-12) 在任何官方文档中都未公开，仅在 `remotecache.vdf` 文件中使用。
 
 ---
 
-## 数据来源说明
+## Steam 自动云的工作机制
 
-### 1. appinfo.vdf (ufs 配置)
+### 开发者配置（Steamworks 后台）
 
-Steam 在本地缓存了每个游戏的云存储配置，位于：
+开发者配置自动云时使用**字符串名称**：
+
 ```
-{Steam安装目录}/appcache/appinfo.vdf
+根路径：WinAppDataLocal
+子目录：MyCompany/MyGame/Saves/
+模式（pattern）：*.sav
+递归：是
 ```
 
-**查看方法**：
-1. 在 SteamCloudFileManager 中连接到游戏
-2. 点击状态栏的 **"显示 appinfo.vdf"** 按钮
+Steam 会自动扫描目录并同步匹配的文件。
 
-**ufs 配置示例** (The Witcher 3)：
+**appinfo.vdf 中存储的配置**：
 ```vdf
 "ufs"
 {
-    "quota" "1000000000"
-    "maxnumfiles" "1000"
     "savefiles"
     {
         "0"
         {
-            "root" "WinMyDocuments"      // ← 字符串形式
-            "path" "/The Witcher 3/gamesaves/"
-            "pattern" "*"
-            "platforms"
-            {
-                "1" "Windows"
-            }
+            "root"       "WinAppDataLocal"    ← 字符串名称
+            "path"       "MyCompany/MyGame/Saves/"
+            "pattern"    "*.sav"
+            "platforms"  "windows"
         }
     }
 }
 ```
 
-> ⚠️ **注意**：appinfo.vdf 中的 `root` 是**字符串名称**（如 "WinMyDocuments"），需要与日志中的数字对照。
+### 本地存储（remotecache.vdf）
 
-### 2. 运行日志 (root 数字)
+Steam 客户端在本地使用**数字 ID**：
 
-运行程序时，日志会显示 root 的**数字编号**：
-
-```log
-[文件名] | VDF root=2 | CDP folder=WinMyDocuments | [大小] | [时间] | [本地路径]
-```
-
-**日志示例**：
-```
-The Witcher 3/gamesaves/save.sav | VDF root=2 | CDP folder=WinMyDocuments | 3.02 MB
-freebirdgames/findingparadise/Save4.rxdata | VDF root=7 | CDP folder=MacAppSupport | 316 KB
-```
-
-### 3. 数据来源对照表
-
-| 来源 | root 格式 | 示例 |
-|------|-----------|------|
-| **appinfo.vdf (ufs)** | 字符串名称 | `"root" "WinMyDocuments"` |
-| **remotecache.vdf** | 数字 | `"root" "2"` |
-| **运行日志** | 数字 + 名称 | `VDF root=2 \| CDP folder=WinMyDocuments` |
-
-### 4. 字符串名称与数字对照
-
-| 数字 | 字符串名称 | 说明 |
-|:----:|------------|------|
-| 0 | `SteamCloudDocuments` | Steam Cloud 默认 |
-| 1 | `GameInstall` | 游戏安装目录 |
-| 2 | `WinMyDocuments` | 文档 |
-| 3 | `WinAppDataRoaming` | AppData/Roaming |
-| 4 | `WinAppDataLocal` | AppData/Local |
-| 5 | `WinPictures` | 图片 |
-| 6 | `WinMusic` | 音乐 |
-| 7 | `MacAppSupport` / `WinVideos` | macOS: Application Support |
-| 8 | `LinuxXdgDataHome` | Linux: ~/.local/share |
-| 9 | `WinSavedGames` | Saved Games |
-| 10 | `WinDownloads` | 下载 |
-| 11 | `WinPublic` | Public |
-| 12 | `WinAppDataLocalLow` | AppData/LocalLow |
-
----
-
-## Root 映射总表
-
-| Root | CDP 文件夹名 | Windows | macOS | Linux | 状态 |
-|:----:|-------------|---------|-------|-------|:----:|
-| [0](#root0) | `Steam Cloud` | `{Steam}/userdata/{UID}/{AppID}/remote/` | `{Steam}/userdata/{UID}/{AppID}/remote/` | `{Steam}/userdata/{UID}/{AppID}/remote/` | ⚠️ |
-| [1](#root1) | `GameInstall` | `{Steam}/steamapps/common/{Game}/` | `{Steam}/steamapps/common/{Game}/` | `{Steam}/steamapps/common/{Game}/` | ⚠️ |
-| [2](#root2) | `Documents` | `%USERPROFILE%\Documents\` | `~/Documents/` | `~/Documents/` | ⚠️ |
-| [3](#root3) | `AppData Roaming` | `%APPDATA%\` | `~/Library/Application Support/` | `~/.config/` | ⚠️ |
-| [4](#root4) | `AppData Local` | `%LOCALAPPDATA%\` | `~/Library/Caches/` | `~/.local/share/` | ⚠️ |
-| [5](#root5) | `Pictures` | `%USERPROFILE%\Pictures\` | `~/Pictures/` | `~/Pictures/` | ⚠️ |
-| [6](#root6) | `Music` | `%USERPROFILE%\Music\` | `~/Music/` | `~/Music/` | ⚠️ |
-| [7](#root7) | `Videos`/`MacAppSupport` | `%USERPROFILE%\Videos\` | `~/Library/Application Support/` ⚠️ | `~/Videos/` | ⚠️ |
-| [8](#root8) | `Desktop` | `%USERPROFILE%\Desktop\` | `~/Desktop/` | `~/Desktop/` | ⚠️ |
-| [9](#root9) | `Saved Games` | `%USERPROFILE%\Saved Games\` | `~/Documents/Saved Games/` | `~/Documents/Saved Games/` | ⚠️ |
-| [10](#root10) | `Downloads` | `%USERPROFILE%\Downloads\` | `~/Downloads/` | `~/Downloads/` | ⚠️ |
-| [11](#root11) | `Public` | `%PUBLIC%\` | `/Users/Shared/` | `/tmp/` | ⚠️ |
-| [12](#root12) | `AppData LocalLow` | `%LOCALAPPDATA%Low\` | `~/Library/Caches/` | `~/.local/share/` | ⚠️ |
-
-> ⚠️ Root=7 macOS 特殊：映射到 `Application Support` 而非 `Movies`
-
-**状态**: ✅ 已验证 | ⚠️ 未测试 | ❌ 错误
-
----
-
-## 详细路径映射
-
-### Root=0 - Steam Cloud {#root0}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `{Steam}/userdata/{UID}/{AppID}/remote/` | ⚠️ 未测试 |
-| macOS | `{Steam}/userdata/{UID}/{AppID}/remote/` | ⚠️ 未测试 |
-| Linux | `{Steam}/userdata/{UID}/{AppID}/remote/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root0-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root0-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root0-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=1 - GameInstall {#root1}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `{Steam}/steamapps/common/{GameDir}/` | ⚠️ 未测试 |
-| macOS | `{Steam}/steamapps/common/{GameDir}/` 或 `~/Library/Application Support/{Game}/` | ⚠️ 未测试 |
-| Linux | `{Steam}/steamapps/common/{GameDir}/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root1-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root1-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root1-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=2 - Documents {#root2}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Documents\` | ⚠️ 未测试 |
-| macOS | `~/Documents/` | ⚠️ 未测试 |
-| Linux | `~/Documents/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root2-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root2-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root2-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=3 - AppData Roaming {#root3}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%APPDATA%\` | ⚠️ 未测试 |
-| macOS | `~/Library/Application Support/` | ⚠️ 未测试 |
-| Linux | `~/.config/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root3-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root3-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root3-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=4 - AppData Local {#root4}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%LOCALAPPDATA%\` | ⚠️ 未测试 |
-| macOS | `~/Library/Caches/` | ⚠️ 未测试 |
-| Linux | `~/.local/share/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root4-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root4-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root4-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=5 - Pictures {#root5}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Pictures\` | ⚠️ 未测试 |
-| macOS | `~/Pictures/` | ⚠️ 未测试 |
-| Linux | `~/Pictures/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root5-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root5-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root5-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=6 - Music {#root6}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Music\` | ⚠️ 未测试 |
-| macOS | `~/Music/` | ⚠️ 未测试 |
-| Linux | `~/Music/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root6-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root6-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root6-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=7 - Videos / MacAppSupport {#root7}
-
-| 平台 | 预期路径 | CDP 名称 | 验证状态 |
-|------|----------|----------|----------|
-| Windows | `%USERPROFILE%\Videos\` | `Videos` | ⚠️ 未测试 |
-| macOS | `~/Library/Application Support/` ⚠️特殊 | `MacAppSupport` | ⚠️ 未测试 |
-| Linux | `~/Videos/` | `Videos` | ⚠️ 未测试 |
-
-> ⚠️ **macOS 特殊映射**: Root=7 在 macOS 上映射到 Application Support 而非 Movies
-
-#### Windows 验证 {#root7-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root7-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root7-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=8 - Desktop {#root8}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Desktop\` | ⚠️ 未测试 |
-| macOS | `~/Desktop/` | ⚠️ 未测试 |
-| Linux | `~/Desktop/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root8-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root8-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root8-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=9 - Saved Games {#root9}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Saved Games\` | ⚠️ 未测试 |
-| macOS | `~/Documents/Saved Games/` | ⚠️ 未测试 |
-| Linux | `~/Documents/Saved Games/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root9-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root9-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root9-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=10 - Downloads {#root10}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%USERPROFILE%\Downloads\` | ⚠️ 未测试 |
-| macOS | `~/Downloads/` | ⚠️ 未测试 |
-| Linux | `~/Downloads/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root10-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root10-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root10-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=11 - Public {#root11}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%PUBLIC%\` | ⚠️ 未测试 |
-| macOS | `/Users/Shared/` | ⚠️ 未测试 |
-| Linux | `/tmp/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root11-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root11-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root11-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-### Root=12 - AppData LocalLow {#root12}
-
-| 平台 | 预期路径 | 验证状态 |
-|------|----------|----------|
-| Windows | `%LOCALAPPDATA%Low\` | ⚠️ 未测试 |
-| macOS | `~/Library/Caches/` | ⚠️ 未测试 |
-| Linux | `~/.local/share/` | ⚠️ 未测试 |
-
-#### Windows 验证 {#root12-windows}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### macOS 验证 {#root12-macos}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
-#### Linux 验证 {#root12-linux}
-```日志
-<!-- 游戏: ??? | App ID: ??? -->
-待验证，请提交日志
-```
-
----
-
-## 如何贡献验证数据
-
-### 1. 获取验证数据
-
-**方法 A - ufs 配置**：
-1. 运行 SteamCloudFileManager，连接到游戏
-2. 点击 **"显示 appinfo.vdf"** 按钮
-3. 复制 ufs 配置中的 `savefiles` 部分
-
-**方法 B - 运行日志**：
-1. 运行程序 `RUST_LOG=info cargo run`
-2. 连接到游戏后查看日志输出
-3. 复制包含 `VDF root=X | CDP folder=XXX` 的行
-
-### 2. 提交格式
-
-在对应的 Root 下添加验证案例（包含 ufs 和日志）：
-
-```
-游戏: The Witcher 3 | App ID: 292030 | 平台: Windows
-
-ufs 配置:
-"0"
+```vdf
+"{AppID}"
 {
-    "root" "WinMyDocuments"
-    "path" "/The Witcher 3/gamesaves/"
-    "pattern" "*"
+    "MyCompany/MyGame/Saves/quicksave.sav"
+    {
+        "root"   "4"    ← 数字 Root ID
+        "size"   "1024"
+        "sha"    "..."
+    }
 }
-
-运行日志:
-The Witcher 3/gamesaves/save.sav | VDF root=2 | CDP folder=WinMyDocuments | 3.02 MB
-
-实际路径: C:\Users\XXX\Documents\The Witcher 3\gamesaves\
 ```
 
-### 3. 更新验证状态
+### 为什么需要这个映射表
 
-验证成功后，将对应 Root 的 `⚠️` 改为 `✅`
-
----
-
-## 参考资料
-
-- [Steamworks Steam Cloud](https://partner.steamgames.com/doc/features/cloud) - 官方文档
-- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - API 参考
+- 开发者看到的是字符串名称（如 `WinAppDataLocal`）
+- remotecache.vdf 中存储的是数字（如 `4`）
+- 官方未公开它们的对应关系，仅在 `remotecache.vdf` 文件中使用
+- 本文档通过实际游戏验证，建立这个映射
 
 ---
 
-**最后更新**: 2025-12-22  
-**维护者**: [@Fldicoahkiin](https://github.com/Fldicoahkiin)
+## 根路径映射表
+
+来源：https://partner.steamgames.com/doc/features/cloud
+
+**为什么需要这个映射表？**  
+本工具的"跳转到本地文件"功能需要将 remotecache.vdf 中的数字 Root ID 转换为实际的文件系统路径。以下映射关系基于代码实现和实际测试，**但官方未公开，需要验证**。
+
+| Root ID | Steamworks 根名称 | Windows 路径 | macOS 路径 | Linux 路径 |
+|:-------:|------------------|--------------|-----------|-----------|
+| **0** | `SteamCloudDocuments` | `{Steam}\userdata\{UID}\{AppID}\remote\` | `{Steam}/userdata/{UID}/{AppID}/remote/` | `{Steam}/userdata/{UID}/{AppID}/remote/` |
+| **1** | `App Install Directory` | `{Steam}\steamapps\common\{GameFolder}\` | `{Steam}/steamapps/common/{GameFolder}/` | `{Steam}/steamapps/common/{GameFolder}/` |
+| **2?** | `WinMyDocuments` / `MacDocuments` / `LinuxHome` | `%USERPROFILE%\Documents\` | `~/Documents/` | `~/Documents/` |
+| **3?** | `WinAppDataRoaming` / `MacAppSupport` / `LinuxXdgConfigHome` | `%APPDATA%\` | `~/Library/Application Support/` | `~/.config/` |
+| **4?** | `WinAppDataLocal` / `MacHome` / `LinuxXdgDataHome` | `%LOCALAPPDATA%\` | `~/Library/Caches/` | `~/.local/share/` |
+| **5?** | `WinPictures` | `%USERPROFILE%\Pictures\` | `~/Pictures/` | `~/Pictures/` |
+| **6?** | `WinMusic` | `%USERPROFILE%\Music\` | `~/Music/` | `~/Music/` |
+| **7?** | `MacAppSupport` / `WinVideos` | `%USERPROFILE%\Videos\` | `~/Library/Application Support/` | `~/Videos/` |
+| **8?** | （未知）| `%USERPROFILE%\Desktop\` | `~/Desktop/` | `~/Desktop/` |
+| **9?** | `WinSavedGames` | `%USERPROFILE%\Saved Games\` | `~/Documents/Saved Games/` ※  | `~/Documents/Saved Games/` ※ |
+| **10?** | （未知）| `%USERPROFILE%\Downloads\` | `~/Downloads/` | `~/Downloads/` |
+| **11?** | （未知）| `%PUBLIC%\` | `/Users/Shared/` | `/tmp/` ※ |
+| **12?** | `WinAppDataLocalLow` | `%USERPROFILE%\AppData\LocalLow\` | `~/Library/Caches/` ※ | `~/.local/share/` ※ |
+
+**符号说明**：
+- **数字?**：基于代码实现，但**未经实际游戏验证**
+- **※**：推测的跨平台映射，需要验证
+
+### Windows 环境变量
+
+| 变量 | 典型值 |
+|------|--------|
+| `%USERPROFILE%` | `C:\Users\{Username}` |
+| `%APPDATA%` | `C:\Users\{Username}\AppData\Roaming` |
+| `%LOCALAPPDATA%` | `C:\Users\{Username}\AppData\Local` |
+
+---
+
+## 已验证的游戏案例
+
+### SteamCloudDocuments
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### App Install Directory
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### WinMyDocuments
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### MacDocuments
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### LinuxHome
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### WinAppDataLocal
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### MacHome
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### LinuxXdgDataHome
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### WinAppDataLocalLow
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### WinAppDataRoaming
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### MacAppSupport
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### LinuxXdgConfigHome
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+### WinSavedGames
+
+| 游戏 | AppID | 平台 | Root ID | 实际路径 |
+|------|-------|------|:-------:|---------|
+| | | | | |
+
+---
+
+## 如何验证
+
+### 使用本工具
+
+1. 连接游戏
+2. 查看日志：`[文件名] | VDF root=X | appinfo.vdf root=YYY`
+3. 确认：数字 X 对应字符串 YYY
+
+### 手动验证
+
+1. **查看 remotecache.vdf**：
+   ```bash
+   cat ~/Library/Application\ Support/Steam/userdata/*/12345/remotecache.vdf
+   ```
+   找到 `"root" "X"`
+
+2. **查看 appinfo.vdf ufs 配置**：
+   使用本工具连接游戏，自动解析显示
+   找到 `"root" "YYY"`
+
+3. **确认映射**：X ↔ YYY
+
+---
+
+## 技术参考
+
+### remotecache.vdf 格式
+
+```vdf
+"{AppID}"
+{
+    "{文件相对路径}"
+    {
+        "root"          "{0-12}"
+        "size"          "{字节}"
+        "localtime"     "{时间戳}"
+        "sha"           "{SHA-1}"
+        "syncstate"     "{0-2}"
+    }
+}
+```
+
+### appinfo.vdf ufs 配置格式
+
+```vdf
+"ufs"
+{
+    "quota"         "104857600"
+    "maxnumfiles"   "500"
+    "savefiles"
+    {
+        "0"
+        {
+            "root"       "字符串名称"
+            "path"       "路径"
+            "pattern"    "*.sav"
+            "platforms"  "操作系统"
+        }
+    }
+}
+```
+
+---
+
+**最后更新**：2026-01-12  
+**维护者**：[@Fldicoahkiin](https://github.com/Fldicoahkiin)
