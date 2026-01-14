@@ -8,6 +8,18 @@ use eframe::egui;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+// 系统级 App ID，这些 App ID 不需要通过 Steam API 连接
+// 它们通常是 Steam 客户端本身的组件，无法通过常规方式初始化 Steam API
+// 但可以通过 CDP (Chrome DevTools Protocol) 从 Steam 浏览器获取文件列表
+const SYSTEM_APP_IDS: [u32; 1] = [
+    7, // Steam Client
+];
+
+// 检查是否为系统级 App ID
+fn is_system_app_id(app_id: u32) -> bool {
+    SYSTEM_APP_IDS.contains(&app_id)
+}
+
 pub struct AppHandlers {
     pub steam_manager: Arc<Mutex<SteamWorkerManager>>,
     vdf_parser: Option<VdfParser>,
@@ -34,6 +46,16 @@ impl AppHandlers {
         connection.reset();
         connection.is_connecting = true;
         misc.status_message = misc.i18n.connecting_to_steam(app_id);
+
+        // 系统级 App ID 不需要通过 Steam API 连接
+        // 直接模拟连接成功，后续通过 CDP 获取文件列表
+        if is_system_app_id(app_id) {
+            tracing::info!("App ID {} 是系统级应用，跳过 Steam API 连接", app_id);
+            let (tx, rx) = std::sync::mpsc::channel();
+            let _ = tx.send(Ok(app_id));
+            async_handlers.connect_rx = Some(rx);
+            return;
+        }
 
         let rx = SteamWorkerManager::connect_async(self.steam_manager.clone(), app_id);
         async_handlers.connect_rx = Some(rx);
@@ -83,19 +105,30 @@ impl AppHandlers {
         std::thread::spawn(move || {
             let file_service = crate::file_manager::FileService::with_steam_manager(steam_manager);
 
-            let files = match file_service.get_cloud_files(app_id) {
-                Ok(files) => {
-                    if app_id > 0 {
-                        file_service
-                            .merge_cdp_files(files, app_id)
-                            .unwrap_or_else(|_| Vec::new())
-                    } else {
-                        files
+            // 系统级 App ID 只使用 CDP 获取文件列表
+            let files = if is_system_app_id(app_id) {
+                tracing::info!("App ID {} 是系统级应用，只使用 CDP 获取文件列表", app_id);
+                file_service
+                    .get_files_from_cdp_only(app_id)
+                    .unwrap_or_else(|e| {
+                        tracing::error!("CDP 获取文件列表失败: {}", e);
+                        Vec::new()
+                    })
+            } else {
+                match file_service.get_cloud_files(app_id) {
+                    Ok(files) => {
+                        if app_id > 0 {
+                            file_service
+                                .merge_cdp_files(files, app_id)
+                                .unwrap_or_else(|_| Vec::new())
+                        } else {
+                            files
+                        }
                     }
-                }
-                Err(e) => {
-                    tracing::error!("获取文件列表失败: {}", e);
-                    Vec::new()
+                    Err(e) => {
+                        tracing::error!("获取文件列表失败: {}", e);
+                        Vec::new()
+                    }
                 }
             };
 

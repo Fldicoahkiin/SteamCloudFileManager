@@ -240,6 +240,56 @@ impl FileService {
 
         Ok(files)
     }
+
+    pub fn get_files_from_cdp_only(&self, app_id: u32) -> Result<Vec<CloudFile>> {
+        if app_id == 0 {
+            return Err(anyhow!("未设置 App ID"));
+        }
+
+        if !crate::cdp_client::CdpClient::is_cdp_running() {
+            return Err(anyhow!(
+                "CDP 服务未运行，请确保 Steam 客户端已打开并访问云存储页面"
+            ));
+        }
+
+        tracing::info!("通过 CDP 获取系统级 App ID {} 的文件列表", app_id);
+
+        let mut client =
+            crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList)
+                .map_err(|e| anyhow!("CDP 连接失败: {}", e))?;
+
+        let cdp_files = client
+            .fetch_game_files(app_id)
+            .map_err(|e| anyhow!("CDP 获取文件失败: {}", e))?;
+
+        tracing::info!(count = cdp_files.len(), "CDP 返回文件");
+
+        // 验证本地文件存在性
+        let parser = VdfParser::new().ok();
+        let files: Vec<CloudFile> = cdp_files
+            .into_iter()
+            .map(|mut cdp_file| {
+                if let Some(p) = parser.as_ref() {
+                    let steam_path = p.get_steam_path();
+                    let user_id = p.get_user_id().to_string();
+                    cdp_file.exists = resolve_cloud_file_path(
+                        cdp_file.root,
+                        &cdp_file.name,
+                        steam_path,
+                        &user_id,
+                        app_id,
+                    )
+                    .map(|p| p.exists())
+                    .unwrap_or(false);
+                }
+                cdp_file
+            })
+            .collect();
+
+        log_file_details(&files, app_id);
+
+        Ok(files)
+    }
 }
 
 // 输出每个文件的详细信息日志
