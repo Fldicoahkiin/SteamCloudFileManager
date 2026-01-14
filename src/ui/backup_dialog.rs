@@ -248,10 +248,10 @@ impl BackupProgressDialog {
                     ui.add_space(12.0);
 
                     ui.horizontal(|ui| {
-                        if ui.button(i18n.backup_open_dir()).clicked() {
-                            if let Err(e) = open_path(&result.backup_path) {
-                                tracing::warn!("打开目录失败: {}", e);
-                            }
+                        if ui.button(i18n.backup_open_dir()).clicked()
+                            && let Err(e) = open_path(&result.backup_path)
+                        {
+                            tracing::warn!("打开目录失败: {}", e);
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -404,10 +404,10 @@ impl DownloadProgressDialog {
                     ui.add_space(12.0);
 
                     ui.horizontal(|ui| {
-                        if ui.button(i18n.download_open_dir()).clicked() {
-                            if let Err(e) = open_path(&result.target_dir) {
-                                tracing::warn!("打开目录失败: {}", e);
-                            }
+                        if ui.button(i18n.download_open_dir()).clicked()
+                            && let Err(e) = open_path(&result.target_dir)
+                        {
+                            tracing::warn!("打开目录失败: {}", e);
                         }
 
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {

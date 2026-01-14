@@ -1,8 +1,8 @@
 use crate::steam_api::CloudFile;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
-use std::sync::Arc;
 
 #[derive(Default)]
 pub struct AsyncHandlers {

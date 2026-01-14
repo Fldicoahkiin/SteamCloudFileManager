@@ -107,85 +107,84 @@ impl SymlinkDialog {
         let mut message: Option<(String, bool)> = None;
 
         // 删除配置
-        if let Some(id) = ops.delete_config {
-            if let Some(manager) = &self.manager {
-                if let Err(e) = manager.remove_config(&id) {
-                    message = Some((format!("删除配置失败: {}", e), true));
-                } else {
-                    need_refresh = true;
-                    message = Some((i18n.symlink_config_deleted().to_string(), false));
-                }
+        if let Some(id) = ops.delete_config
+            && let Some(manager) = &self.manager
+        {
+            if let Err(e) = manager.remove_config(&id) {
+                message = Some((format!("删除配置失败: {}", e), true));
+            } else {
+                need_refresh = true;
+                message = Some((i18n.symlink_config_deleted().to_string(), false));
             }
         }
 
         // 创建链接
-        if let Some(i) = ops.create_link {
-            if let (Some(manager), Some(config)) = (&self.manager, self.configs.get(i)) {
-                if let Err(e) = manager.create_symlink(config) {
-                    message = Some((format!("{}: {}", i18n.symlink_create_failed(), e), true));
-                } else {
-                    need_refresh = true;
-                    message = Some((i18n.symlink_created().to_string(), false));
-                }
+        if let Some(i) = ops.create_link
+            && let (Some(manager), Some(config)) = (&self.manager, self.configs.get(i))
+        {
+            if let Err(e) = manager.create_symlink(config) {
+                message = Some((format!("{}: {}", i18n.symlink_create_failed(), e), true));
+            } else {
+                need_refresh = true;
+                message = Some((i18n.symlink_created().to_string(), false));
             }
         }
 
         // 删除链接
-        if let Some(i) = ops.remove_link {
-            if let (Some(manager), Some(config)) = (&self.manager, self.configs.get(i)) {
-                if let Err(e) = manager.remove_symlink(config) {
-                    message = Some((format!("{}: {}", i18n.symlink_remove_failed(), e), true));
-                } else {
-                    need_refresh = true;
-                    message = Some((i18n.symlink_removed().to_string(), false));
-                }
+        if let Some(i) = ops.remove_link
+            && let (Some(manager), Some(config)) = (&self.manager, self.configs.get(i))
+        {
+            if let Err(e) = manager.remove_symlink(config) {
+                message = Some((format!("{}: {}", i18n.symlink_remove_failed(), e), true));
+            } else {
+                need_refresh = true;
+                message = Some((i18n.symlink_removed().to_string(), false));
             }
         }
 
         // 添加配置
-        if let Some(config) = ops.add_config {
-            if let Some(manager) = &self.manager {
-                if let Err(e) = manager.add_config(config) {
-                    message = Some((format!("{}: {}", i18n.symlink_add_failed(), e), true));
-                } else {
-                    self.new_local_path.clear();
-                    self.new_remote_subfolder.clear();
-                    need_refresh = true;
-                    message = Some((i18n.symlink_config_added().to_string(), false));
-                }
+        if let Some(config) = ops.add_config
+            && let Some(manager) = &self.manager
+        {
+            if let Err(e) = manager.add_config(config) {
+                message = Some((format!("{}: {}", i18n.symlink_add_failed(), e), true));
+            } else {
+                self.new_local_path.clear();
+                self.new_remote_subfolder.clear();
+                need_refresh = true;
+                message = Some((i18n.symlink_config_added().to_string(), false));
             }
         }
 
         // 添加并创建
-        if let Some(config) = ops.add_and_create {
-            if let Some(manager) = &self.manager {
-                if let Err(e) = manager.add_config(config.clone()) {
-                    message = Some((format!("{}: {}", i18n.symlink_add_failed(), e), true));
-                } else {
-                    match manager.create_symlink(&config) {
-                        Ok(_) => {
-                            // 创建成功后自动同步文件
-                            let sync_result = self.sync_files_for_config(&config, i18n);
-                            message = Some(sync_result);
-                        }
-                        Err(e) => {
-                            message =
-                                Some((format!("{}: {}", i18n.symlink_create_failed(), e), true));
-                        }
+        if let Some(config) = ops.add_and_create
+            && let Some(manager) = &self.manager
+        {
+            if let Err(e) = manager.add_config(config.clone()) {
+                message = Some((format!("{}: {}", i18n.symlink_add_failed(), e), true));
+            } else {
+                match manager.create_symlink(&config) {
+                    Ok(_) => {
+                        // 创建成功后自动同步文件
+                        let sync_result = self.sync_files_for_config(&config, i18n);
+                        message = Some(sync_result);
                     }
-                    self.new_local_path.clear();
-                    self.new_remote_subfolder.clear();
-                    need_refresh = true;
+                    Err(e) => {
+                        message = Some((format!("{}: {}", i18n.symlink_create_failed(), e), true));
+                    }
                 }
+                self.new_local_path.clear();
+                self.new_remote_subfolder.clear();
+                need_refresh = true;
             }
         }
 
         // 同步文件到云端
-        if let Some(i) = ops.sync_files {
-            if let Some(config) = self.configs.get(i).cloned() {
-                let sync_result = self.sync_files_for_config(&config, i18n);
-                message = Some(sync_result);
-            }
+        if let Some(i) = ops.sync_files
+            && let Some(config) = self.configs.get(i).cloned()
+        {
+            let sync_result = self.sync_files_for_config(&config, i18n);
+            message = Some(sync_result);
         }
 
         // 刷新
@@ -263,10 +262,10 @@ impl SymlinkDialog {
         }
 
         // 触发云同步
-        if success_count > 0 {
-            if let Ok(mut mgr) = steam_mgr.lock() {
-                let _ = mgr.sync_cloud_files();
-            }
+        if success_count > 0
+            && let Ok(mut mgr) = steam_mgr.lock()
+        {
+            let _ = mgr.sync_cloud_files();
         }
 
         tracing::info!(
@@ -527,10 +526,9 @@ impl SymlinkDialog {
                         .button(icons::FOLDER_OPEN)
                         .on_hover_text(i18n.symlink_browse())
                         .clicked()
+                        && let Some(path) = rfd::FileDialog::new().pick_folder()
                     {
-                        if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                            self.new_local_path = path.to_string_lossy().to_string();
-                        }
+                        self.new_local_path = path.to_string_lossy().to_string();
                     }
                 });
 
@@ -606,12 +604,11 @@ impl SymlinkDialog {
             });
 
         // 处理复制命令
-        if let Some(i) = pending.copy_command {
-            if let Some(manager) = &self.manager {
-                if let Some(config) = self.configs.get(i) {
-                    commands_to_copy = Some(manager.generate_commands(config));
-                }
-            }
+        if let Some(i) = pending.copy_command
+            && let Some(manager) = &self.manager
+            && let Some(config) = self.configs.get(i)
+        {
+            commands_to_copy = Some(manager.generate_commands(config));
         }
 
         if let Some(commands) = commands_to_copy {

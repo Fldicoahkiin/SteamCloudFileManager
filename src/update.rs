@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 
 const GITHUB_API_RELEASES: &str =
     "https://api.github.com/repos/Fldicoahkiin/SteamCloudFileManager/releases/latest";
@@ -88,12 +88,11 @@ impl UpdateManager {
             .or_else(|_| std::env::var("https_proxy"))
             .or_else(|_| std::env::var("HTTP_PROXY"))
             .or_else(|_| std::env::var("http_proxy"))
+            && !proxy_url.is_empty()
         {
-            if !proxy_url.is_empty() {
-                tracing::debug!("使用代理: {}", proxy_url);
-                if let Ok(proxy) = ureq::Proxy::new(&proxy_url) {
-                    config_builder = config_builder.proxy(Some(proxy));
-                }
+            tracing::debug!("使用代理: {}", proxy_url);
+            if let Ok(proxy) = ureq::Proxy::new(&proxy_url) {
+                config_builder = config_builder.proxy(Some(proxy));
             }
         }
 

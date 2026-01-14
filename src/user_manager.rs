@@ -1,5 +1,5 @@
 use crate::vdf_parser::UserInfo;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
@@ -16,44 +16,39 @@ pub fn find_user_id_from_loginusers(steam_path: &Path) -> Option<(String, Option
     for line in s.lines() {
         let trimmed = line.trim();
 
-        if trimmed.starts_with('"') && trimmed.ends_with('"') {
-            if let Ok(id64) = trimmed.trim_matches('"').parse::<u64>() {
-                current_id64 = Some(id64);
-            }
+        if trimmed.starts_with('"')
+            && trimmed.ends_with('"')
+            && let Ok(id64) = trimmed.trim_matches('"').parse::<u64>()
+        {
+            current_id64 = Some(id64);
         }
 
         if let Some(id64) = current_id64 {
-            if trimmed.contains("\"PersonaName\"") {
-                if let Some(name) = trimmed.split('"').nth(3) {
-                    if trimmed.contains("\"MostRecent\"") || trimmed.contains("\"Timestamp\"") {
-                        if let Some(ts_str) = trimmed.split('"').nth(3) {
-                            if let Ok(ts) = ts_str.parse::<i64>() {
-                                if ts > most_recent_timestamp {
-                                    most_recent_timestamp = ts;
-                                    most_recent_id64 = Some(id64);
-                                    most_recent_name = Some(name.to_string());
-                                }
-                            }
-                        }
-                    }
-                }
+            if trimmed.contains("\"PersonaName\"")
+                && let Some(name) = trimmed.split('"').nth(3)
+                && (trimmed.contains("\"MostRecent\"") || trimmed.contains("\"Timestamp\""))
+                && let Some(ts_str) = trimmed.split('"').nth(3)
+                && let Ok(ts) = ts_str.parse::<i64>()
+                && ts > most_recent_timestamp
+            {
+                most_recent_timestamp = ts;
+                most_recent_id64 = Some(id64);
+                most_recent_name = Some(name.to_string());
             }
 
-            if trimmed.contains("\"PersonaName\"") {
-                if let Some(name) = trimmed.split('"').nth(3) {
-                    most_recent_name = Some(name.to_string());
-                }
+            if trimmed.contains("\"PersonaName\"")
+                && let Some(name) = trimmed.split('"').nth(3)
+            {
+                most_recent_name = Some(name.to_string());
             }
 
-            if trimmed.contains("\"Timestamp\"") {
-                if let Some(ts_str) = trimmed.split('"').nth(3) {
-                    if let Ok(ts) = ts_str.parse::<i64>() {
-                        if ts > most_recent_timestamp {
-                            most_recent_timestamp = ts;
-                            most_recent_id64 = Some(id64);
-                        }
-                    }
-                }
+            if trimmed.contains("\"Timestamp\"")
+                && let Some(ts_str) = trimmed.split('"').nth(3)
+                && let Ok(ts) = ts_str.parse::<i64>()
+                && ts > most_recent_timestamp
+            {
+                most_recent_timestamp = ts;
+                most_recent_id64 = Some(id64);
             }
         }
     }
@@ -75,10 +70,10 @@ pub fn find_user_id(steam_path: &Path) -> Result<(String, Option<String>)> {
     let userdata_path = steam_path.join("userdata");
     if let Ok(entries) = fs::read_dir(&userdata_path) {
         for entry in entries.flatten() {
-            if let Some(name) = entry.file_name().to_str() {
-                if name.parse::<u64>().is_ok() {
-                    return Ok((name.to_string(), None));
-                }
+            if let Some(name) = entry.file_name().to_str()
+                && name.parse::<u64>().is_ok()
+            {
+                return Ok((name.to_string(), None));
             }
         }
     }
@@ -99,21 +94,21 @@ pub fn get_all_users_info(steam_path: &Path, current_user_id: &str) -> Result<Ve
         for line in content.lines() {
             let trimmed = line.trim();
 
-            if trimmed.starts_with('"') && trimmed.ends_with('"') {
-                if let Ok(id64) = trimmed.trim_matches('"').parse::<u64>() {
-                    current_id64 = Some(id64);
-                }
+            if trimmed.starts_with('"')
+                && trimmed.ends_with('"')
+                && let Ok(id64) = trimmed.trim_matches('"').parse::<u64>()
+            {
+                current_id64 = Some(id64);
             }
 
-            if let Some(id64) = current_id64 {
-                if trimmed.contains("\"PersonaName\"") {
-                    if let Some(name) = trimmed.split('"').nth(3) {
-                        let base: u64 = 76561197960265728;
-                        if id64 > base {
-                            let user_id = (id64 - base).to_string();
-                            login_users.insert(user_id, name.to_string());
-                        }
-                    }
+            if let Some(id64) = current_id64
+                && trimmed.contains("\"PersonaName\"")
+                && let Some(name) = trimmed.split('"').nth(3)
+            {
+                let base: u64 = 76561197960265728;
+                if id64 > base {
+                    let user_id = (id64 - base).to_string();
+                    login_users.insert(user_id, name.to_string());
                 }
             }
         }
@@ -122,18 +117,18 @@ pub fn get_all_users_info(steam_path: &Path, current_user_id: &str) -> Result<Ve
     // 扫描 userdata 目录
     if let Ok(entries) = fs::read_dir(&userdata_path) {
         for entry in entries.flatten() {
-            if let Some(name) = entry.file_name().to_str() {
-                if name.parse::<u64>().is_ok() {
-                    let user_id = name.to_string();
-                    let persona_name = login_users.get(&user_id).cloned();
-                    let is_current = user_id == current_user_id;
+            if let Some(name) = entry.file_name().to_str()
+                && name.parse::<u64>().is_ok()
+            {
+                let user_id = name.to_string();
+                let persona_name = login_users.get(&user_id).cloned();
+                let is_current = user_id == current_user_id;
 
-                    users.push(UserInfo {
-                        user_id,
-                        persona_name,
-                        is_current,
-                    });
-                }
+                users.push(UserInfo {
+                    user_id,
+                    persona_name,
+                    is_current,
+                });
             }
         }
     }

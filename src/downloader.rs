@@ -1,8 +1,8 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
-use std::sync::Arc;
 
 use crate::steam_api::CloudFile;
 
@@ -163,10 +163,10 @@ pub fn download_file_full(
     steam_manager: Option<&Arc<std::sync::Mutex<crate::steam_worker::SteamWorkerManager>>>,
 ) -> Result<()> {
     // 创建父目录
-    if let Some(parent) = target_path.parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent)?;
-        }
+    if let Some(parent) = target_path.parent()
+        && !parent.exists()
+    {
+        std::fs::create_dir_all(parent)?;
     }
 
     // 使用 CDP URL 下载
@@ -193,15 +193,15 @@ pub fn download_file_full(
     }
 
     // Steam API 下载
-    if file.is_persisted {
-        if let Some(manager) = steam_manager {
-            tracing::debug!("使用 Steam API 下载: {}", file.name);
-            if let Ok(mut mgr) = manager.lock() {
-                if let Ok(data) = mgr.read_file(&file.name) {
-                    std::fs::write(target_path, &data)?;
-                    return Ok(());
-                }
-            }
+    if file.is_persisted
+        && let Some(manager) = steam_manager
+    {
+        tracing::debug!("使用 Steam API 下载: {}", file.name);
+        if let Ok(mut mgr) = manager.lock()
+            && let Ok(data) = mgr.read_file(&file.name)
+        {
+            std::fs::write(target_path, &data)?;
+            return Ok(());
         }
     }
 

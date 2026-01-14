@@ -301,10 +301,9 @@ fn draw_log_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &
             .button(icons::FOLDER_OPEN)
             .on_hover_text(i18n.open_log_dir())
             .clicked()
+            && let Err(e) = crate::logger::open_log_directory()
         {
-            if let Err(e) = crate::logger::open_log_directory() {
-                tracing::error!("打开日志目录失败: {}", e);
-            }
+            tracing::error!("打开日志目录失败: {}", e);
         }
     });
 }
@@ -359,11 +358,11 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
                 .interactive(false), // 只读，通过浏览按钮修改
         );
 
-        if ui.button(i18n.steam_path_browse()).clicked() {
-            if let Some(path) = rfd::FileDialog::new().pick_folder() {
-                state.steam_path_input = path.display().to_string();
-                state.steam_path_changed = true;
-            }
+        if ui.button(i18n.steam_path_browse()).clicked()
+            && let Some(path) = rfd::FileDialog::new().pick_folder()
+        {
+            state.steam_path_input = path.display().to_string();
+            state.steam_path_changed = true;
         }
     });
 
@@ -516,12 +515,10 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
             .button(icons::FOLDER_OPEN)
             .on_hover_text(i18n.open_config_dir())
             .clicked()
+            && let Some(ref config_path) = config_path_for_open
+            && let Some(parent) = config_path.parent()
         {
-            if let Some(ref config_path) = config_path_for_open {
-                if let Some(parent) = config_path.parent() {
-                    let _ = open::that(parent);
-                }
-            }
+            let _ = open::that(parent);
         }
     });
 }
@@ -555,12 +552,10 @@ fn draw_backup_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n
             .button(icons::FOLDER_OPEN)
             .on_hover_text(i18n.backup_open_dir())
             .clicked()
+            && let Ok(manager) = crate::backup::BackupManager::new()
+            && let Err(e) = manager.open_backup_dir()
         {
-            if let Ok(manager) = crate::backup::BackupManager::new() {
-                if let Err(e) = manager.open_backup_dir() {
-                    tracing::error!("打开备份目录失败: {}", e);
-                }
-            }
+            tracing::error!("打开备份目录失败: {}", e);
         }
     });
 }

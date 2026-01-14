@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::process::Command;
 use std::sync::mpsc::Sender;
 
@@ -20,7 +20,7 @@ pub fn is_steam_running() -> bool {
             use std::ffi::CStr;
             use winapi::um::handleapi::CloseHandle;
             use winapi::um::tlhelp32::{
-                CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+                CreateToolhelp32Snapshot, PROCESSENTRY32, Process32First, Process32Next,
                 TH32CS_SNAPPROCESS,
             };
 
@@ -59,10 +59,11 @@ pub fn is_steam_running() -> bool {
             .arg("/Applications/Steam.app")
             .output();
 
-        if let Ok(output) = result {
-            if output.status.success() && !output.stdout.is_empty() {
-                return true;
-            }
+        if let Ok(output) = result
+            && output.status.success()
+            && !output.stdout.is_empty()
+        {
+            return true;
         }
 
         Command::new("pgrep")

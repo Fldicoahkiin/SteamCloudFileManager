@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -50,12 +50,12 @@ pub fn discover_library_steamapps(steam_path: &Path) -> Vec<PathBuf> {
     let libraryfolders_path = main.join("libraryfolders.vdf");
     if let Ok(content) = fs::read_to_string(&libraryfolders_path) {
         for line in content.lines() {
-            if line.contains("\"path\"") {
-                if let Some(path_str) = line.split('"').nth(3) {
-                    let lib_path = PathBuf::from(path_str).join("steamapps");
-                    if lib_path.exists() && lib_path != main {
-                        libs.push(lib_path);
-                    }
+            if line.contains("\"path\"")
+                && let Some(path_str) = line.split('"').nth(3)
+            {
+                let lib_path = PathBuf::from(path_str).join("steamapps");
+                if lib_path.exists() && lib_path != main {
+                    libs.push(lib_path);
                 }
             }
         }
@@ -86,10 +86,10 @@ pub fn parse_app_manifest(path: &Path) -> Result<AppManifest> {
             if let Some(dir) = line.split('"').nth(3) {
                 install_dir = Some(dir.to_string());
             }
-        } else if line.starts_with("\"SizeOnDisk\"") {
-            if let Some(size_str) = line.split('"').nth(3) {
-                size_on_disk = size_str.parse().ok();
-            }
+        } else if line.starts_with("\"SizeOnDisk\"")
+            && let Some(size_str) = line.split('"').nth(3)
+        {
+            size_on_disk = size_str.parse().ok();
         }
     }
 
@@ -112,10 +112,11 @@ pub fn scan_app_manifests(steam_path: &Path) -> Result<HashMap<u32, AppManifest>
         if let Ok(entries) = fs::read_dir(&steamapps_path) {
             for entry in entries.flatten() {
                 let filename = entry.file_name().to_string_lossy().to_string();
-                if filename.starts_with("appmanifest_") && filename.ends_with(".acf") {
-                    if let Ok(manifest) = parse_app_manifest(&entry.path()) {
-                        manifests.entry(manifest.app_id).or_insert(manifest);
-                    }
+                if filename.starts_with("appmanifest_")
+                    && filename.ends_with(".acf")
+                    && let Ok(manifest) = parse_app_manifest(&entry.path())
+                {
+                    manifests.entry(manifest.app_id).or_insert(manifest);
                 }
             }
         }
@@ -164,10 +165,10 @@ pub fn get_game_config(steam_path: &Path, user_id: &str, app_id: u32) -> Result<
                 if let Some(val) = trimmed.split('"').nth(3) {
                     playtime = val.parse().ok();
                 }
-            } else if trimmed.starts_with("\"LaunchOptions\"") {
-                if let Some(val) = trimmed.split('"').nth(3) {
-                    launch_options = Some(val.to_string());
-                }
+            } else if trimmed.starts_with("\"LaunchOptions\"")
+                && let Some(val) = trimmed.split('"').nth(3)
+            {
+                launch_options = Some(val.to_string());
             }
         }
     }
@@ -204,26 +205,27 @@ pub fn parse_shared_config(steam_path: &Path, user_id: &str) -> Result<HashMap<u
     for line in content.lines() {
         let trimmed = line.trim();
 
-        if trimmed.starts_with('"') && trimmed.ends_with('"') {
-            if let Ok(app_id) = trimmed.trim_matches('"').parse::<u32>() {
-                if let Some(prev_app_id) = current_app_id {
-                    categories.insert(
-                        prev_app_id,
-                        GameCategory {
-                            app_id: prev_app_id,
-                            tags: current_tags.clone(),
-                            is_favorite,
-                            is_hidden,
-                        },
-                    );
-                }
-
-                current_app_id = Some(app_id);
-                current_tags.clear();
-                is_favorite = false;
-                is_hidden = false;
-                in_tags_section = false;
+        if trimmed.starts_with('"')
+            && trimmed.ends_with('"')
+            && let Ok(app_id) = trimmed.trim_matches('"').parse::<u32>()
+        {
+            if let Some(prev_app_id) = current_app_id {
+                categories.insert(
+                    prev_app_id,
+                    GameCategory {
+                        app_id: prev_app_id,
+                        tags: current_tags.clone(),
+                        is_favorite,
+                        is_hidden,
+                    },
+                );
             }
+
+            current_app_id = Some(app_id);
+            current_tags.clear();
+            is_favorite = false;
+            is_hidden = false;
+            in_tags_section = false;
         }
 
         if trimmed.starts_with("\"tags\"") {
@@ -340,46 +342,44 @@ pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Sca
 
     let mut cdp_count = 0;
     let mut cdp_order = std::collections::HashMap::new();
-    if crate::cdp_client::CdpClient::is_cdp_running() {
-        if let Ok(mut client) =
+    if crate::cdp_client::CdpClient::is_cdp_running()
+        && let Ok(mut client) =
             crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::GameList)
-        {
-            if let Ok(cdp_games) = client.fetch_game_list() {
-                cdp_count = cdp_games.len();
-                let map: std::collections::HashMap<u32, usize> = games
-                    .iter()
-                    .enumerate()
-                    .map(|(i, g)| (g.app_id, i))
-                    .collect();
+        && let Ok(cdp_games) = client.fetch_game_list()
+    {
+        cdp_count = cdp_games.len();
+        let map: std::collections::HashMap<u32, usize> = games
+            .iter()
+            .enumerate()
+            .map(|(i, g)| (g.app_id, i))
+            .collect();
 
-                let mut added = 0;
-                let mut updated = 0;
+        let mut added = 0;
+        let mut updated = 0;
 
-                for (idx, cdp_game) in cdp_games.into_iter().enumerate() {
-                    cdp_order.insert(cdp_game.app_id, idx);
+        for (idx, cdp_game) in cdp_games.into_iter().enumerate() {
+            cdp_order.insert(cdp_game.app_id, idx);
 
-                    if let Some(&i) = map.get(&cdp_game.app_id) {
-                        let g = &mut games[i];
-                        g.file_count = cdp_game.file_count;
-                        g.total_size = cdp_game.total_size;
-                        if let Some(name) = cdp_game.game_name {
-                            if g.game_name.is_none() || g.game_name.as_deref() == Some("") {
-                                g.game_name = Some(name);
-                                updated += 1;
-                            }
-                        }
-                    } else {
-                        games.push(cdp_game);
-                        added += 1;
-                    }
+            if let Some(&i) = map.get(&cdp_game.app_id) {
+                let g = &mut games[i];
+                g.file_count = cdp_game.file_count;
+                g.total_size = cdp_game.total_size;
+                if let Some(name) = cdp_game.game_name
+                    && (g.game_name.is_none() || g.game_name.as_deref() == Some(""))
+                {
+                    g.game_name = Some(name);
+                    updated += 1;
                 }
-                tracing::info!(
-                    "CDP 合并完成: 新增 {} 个游戏, 更新 {} 个信息",
-                    added,
-                    updated
-                );
+            } else {
+                games.push(cdp_game);
+                added += 1;
             }
         }
+        tracing::info!(
+            "CDP 合并完成: 新增 {} 个游戏, 更新 {} 个信息",
+            added,
+            updated
+        );
     }
 
     // 排序：已安装 -> CDP顺序 -> 名称

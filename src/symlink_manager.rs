@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -180,12 +180,12 @@ impl SymlinkManager {
         let link_path = config.get_link_path(&remote_dir);
 
         // 检查是否是软链接
-        if let Ok(metadata) = link_path.symlink_metadata() {
-            if metadata.file_type().is_symlink() {
-                remove_symlink_platform(&link_path)?;
-                tracing::info!("删除软链接: {:?}", link_path);
-                return Ok(());
-            }
+        if let Ok(metadata) = link_path.symlink_metadata()
+            && metadata.file_type().is_symlink()
+        {
+            remove_symlink_platform(&link_path)?;
+            tracing::info!("删除软链接: {:?}", link_path);
+            return Ok(());
         }
 
         Err(anyhow!("路径不是软链接: {:?}", link_path))

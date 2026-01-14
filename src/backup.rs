@@ -1,13 +1,13 @@
 use crate::downloader::download_single_file;
 use crate::path_resolver::get_root_type_name;
 use crate::steam_api::CloudFile;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 // 备份清单文件格式
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -193,14 +193,14 @@ impl BackupManager {
             let target_path = target_dir.join(&file.name);
 
             // 创建父目录
-            if let Some(parent) = target_path.parent() {
-                if let Err(e) = std::fs::create_dir_all(parent) {
-                    let err_msg = format!("创建目录失败: {}", e);
-                    tracing::warn!("{}: {}", file.name, err_msg);
-                    progress.failed_files.push((file.name.clone(), err_msg));
-                    progress.completed_files += 1;
-                    continue;
-                }
+            if let Some(parent) = target_path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                let err_msg = format!("创建目录失败: {}", e);
+                tracing::warn!("{}: {}", file.name, err_msg);
+                progress.failed_files.push((file.name.clone(), err_msg));
+                progress.completed_files += 1;
+                continue;
             }
 
             // 下载文件（使用共享下载模块）

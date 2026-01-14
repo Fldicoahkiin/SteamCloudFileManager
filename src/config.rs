@@ -198,11 +198,11 @@ pub fn update_config<F>(f: F) -> Result<()>
 where
     F: FnOnce(&mut AppConfig),
 {
-    if let Some(mutex) = CONFIG.get() {
-        if let Ok(mut config) = mutex.lock() {
-            f(&mut config);
-            save_config(&config)?;
-        }
+    if let Some(mutex) = CONFIG.get()
+        && let Ok(mut config) = mutex.lock()
+    {
+        f(&mut config);
+        save_config(&config)?;
     }
     Ok(())
 }
@@ -210,10 +210,10 @@ where
 // 重置为默认配置
 pub fn reset_to_default() -> Result<()> {
     let default_config = AppConfig::default();
-    if let Some(mutex) = CONFIG.get() {
-        if let Ok(mut config) = mutex.lock() {
-            *config = default_config.clone();
-        }
+    if let Some(mutex) = CONFIG.get()
+        && let Ok(mut config) = mutex.lock()
+    {
+        *config = default_config.clone();
     }
     save_config(&default_config)?;
     tracing::info!("配置已重置为默认值");

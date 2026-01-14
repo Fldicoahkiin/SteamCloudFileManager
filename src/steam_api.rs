@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{DateTime, Local, TimeZone};
 use std::io::Read;
 use std::path::Path;
@@ -113,19 +113,19 @@ impl SteamCloudManager {
     }
 
     pub fn disconnect(&mut self) {
-        if let Ok(mut guard) = self.client.lock() {
-            if guard.is_some() {
-                tracing::info!("断开 Steam 连接 (App ID: {})", self.app_id);
-                *guard = None;
-                drop(guard);
-                unsafe {
-                    steamworks_sys::SteamAPI_Shutdown();
-                }
-                tracing::info!("Steam API 已关闭");
-
-                // 等待 Steam 客户端处理断开
-                std::thread::sleep(std::time::Duration::from_millis(100));
+        if let Ok(mut guard) = self.client.lock()
+            && guard.is_some()
+        {
+            tracing::info!("断开 Steam 连接 (App ID: {})", self.app_id);
+            *guard = None;
+            drop(guard);
+            unsafe {
+                steamworks_sys::SteamAPI_Shutdown();
             }
+            tracing::info!("Steam API 已关闭");
+
+            // 等待 Steam 客户端处理断开
+            std::thread::sleep(std::time::Duration::from_millis(100));
         }
         self.app_id = 0;
         Self::cleanup_app_id_file();

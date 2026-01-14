@@ -271,15 +271,15 @@ impl SteamCloudApp {
 
     fn poll_async_results(&mut self) {
         // 连接结果
-        if let Some(result) = self.async_handlers.poll_connect() {
-            if self.handlers.handle_connect_result(
+        if let Some(result) = self.async_handlers.poll_connect()
+            && self.handlers.handle_connect_result(
                 result,
                 &mut self.connection,
                 &mut self.misc,
                 &mut self.dialogs,
-            ) {
-                self.refresh_files();
-            }
+            )
+        {
+            self.refresh_files();
         }
 
         // 文件加载结果
@@ -338,14 +338,14 @@ impl SteamCloudApp {
         }
 
         // 备份结果
-        if let Some(ref rx) = self.async_handlers.backup_rx {
-            if let Ok(result) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.backup_progress {
-                    dialog.set_result(result);
-                }
-                self.async_handlers.backup_rx = None;
-                self.async_handlers.backup_progress_rx = None;
+        if let Some(ref rx) = self.async_handlers.backup_rx
+            && let Ok(result) = rx.try_recv()
+        {
+            if let Some(ref mut dialog) = self.dialogs.backup_progress {
+                dialog.set_result(result);
             }
+            self.async_handlers.backup_rx = None;
+            self.async_handlers.backup_progress_rx = None;
         }
 
         // 下载进度
@@ -358,14 +358,14 @@ impl SteamCloudApp {
         }
 
         // 下载结果
-        if let Some(ref rx) = self.async_handlers.download_rx {
-            if let Ok(result) = rx.try_recv() {
-                if let Some(ref mut dialog) = self.dialogs.download_progress {
-                    dialog.set_result(result);
-                }
-                self.async_handlers.download_rx = None;
-                self.async_handlers.download_progress_rx = None;
+        if let Some(ref rx) = self.async_handlers.download_rx
+            && let Ok(result) = rx.try_recv()
+        {
+            if let Some(ref mut dialog) = self.dialogs.download_progress {
+                dialog.set_result(result);
             }
+            self.async_handlers.download_rx = None;
+            self.async_handlers.download_progress_rx = None;
         }
 
         // Steam 重启状态
@@ -382,16 +382,16 @@ impl SteamCloudApp {
             }
 
             // 检查超时（30秒）
-            if !self.connection.remote_ready && self.file_list.is_refreshing {
-                if let Some(since) = self.connection.since_connected {
-                    if since.elapsed() >= Duration::from_secs(30) {
-                        tracing::warn!("Steam API 加载超时，停止等待");
-                        self.file_list.is_refreshing = false;
-                        self.connection.remote_ready = true;
-                        self.async_handlers.loader_rx = None;
-                        self.misc.status_message = "加载超时，请重试".to_string();
-                    }
-                }
+            if !self.connection.remote_ready
+                && self.file_list.is_refreshing
+                && let Some(since) = self.connection.since_connected
+                && since.elapsed() >= Duration::from_secs(30)
+            {
+                tracing::warn!("Steam API 加载超时，停止等待");
+                self.file_list.is_refreshing = false;
+                self.connection.remote_ready = true;
+                self.async_handlers.loader_rx = None;
+                self.misc.status_message = "加载超时，请重试".to_string();
             }
         }
     }
@@ -474,10 +474,10 @@ impl eframe::App for SteamCloudApp {
             crate::ui::BottomPanelEvent::SyncToCloud => self.sync_to_cloud(),
             crate::ui::BottomPanelEvent::CompareFiles => self.compare_files(),
             crate::ui::BottomPanelEvent::ToggleCloud => {
-                if let Ok(mut manager) = self.steam_manager.lock() {
-                    if let Ok(enabled) = manager.is_cloud_enabled_for_app() {
-                        let _ = manager.set_cloud_enabled_for_app(!enabled);
-                    }
+                if let Ok(mut manager) = self.steam_manager.lock()
+                    && let Ok(enabled) = manager.is_cloud_enabled_for_app()
+                {
+                    let _ = manager.set_cloud_enabled_for_app(!enabled);
                 }
             }
             crate::ui::BottomPanelEvent::ShowAppInfo(app_id) => {
@@ -510,10 +510,10 @@ impl eframe::App for SteamCloudApp {
         }
 
         // AppInfo 对话框
-        if let Some(ref dialog) = self.dialogs.appinfo_dialog.clone() {
-            if !crate::ui::draw_appinfo_dialog(ctx, dialog, &self.misc.i18n) {
-                self.dialogs.appinfo_dialog = None;
-            }
+        if let Some(ref dialog) = self.dialogs.appinfo_dialog.clone()
+            && !crate::ui::draw_appinfo_dialog(ctx, dialog, &self.misc.i18n)
+        {
+            self.dialogs.appinfo_dialog = None;
         }
 
         // Symlink 管理对话框
@@ -570,14 +570,14 @@ impl eframe::App for SteamCloudApp {
 
         // 用户切换对话框
         if self.game_library.show_user_selector {
-            if self.game_library.all_users.is_empty() {
-                if let Ok(parser) = VdfParser::new() {
-                    self.game_library.all_users = crate::user_manager::get_all_users_info(
-                        parser.get_steam_path(),
-                        parser.get_user_id(),
-                    )
-                    .unwrap_or_default();
-                }
+            if self.game_library.all_users.is_empty()
+                && let Ok(parser) = VdfParser::new()
+            {
+                self.game_library.all_users = crate::user_manager::get_all_users_info(
+                    parser.get_steam_path(),
+                    parser.get_user_id(),
+                )
+                .unwrap_or_default();
             }
 
             let selected_user_id = crate::ui::draw_user_selector_window(
@@ -627,11 +627,11 @@ impl eframe::App for SteamCloudApp {
         }
 
         // 上传完成对话框
-        if let Some(complete) = &mut self.dialogs.upload_complete {
-            if complete.draw(ctx, &self.misc.i18n) {
-                self.dialogs.upload_complete = None;
-                self.refresh_files();
-            }
+        if let Some(complete) = &mut self.dialogs.upload_complete
+            && complete.draw(ctx, &self.misc.i18n)
+        {
+            self.dialogs.upload_complete = None;
+            self.refresh_files();
         }
 
         // 文件对比对话框（只读信息展示）
@@ -648,18 +648,18 @@ impl eframe::App for SteamCloudApp {
         }
 
         let was_showing_settings = self.dialogs.show_settings;
-        if self.dialogs.show_settings {
-            if let Some(release) = crate::ui::draw_settings_window(
+        if self.dialogs.show_settings
+            && let Some(release) = crate::ui::draw_settings_window(
                 ctx,
                 &mut self.dialogs.show_settings,
                 &mut self.dialogs.settings_state,
                 &mut self.update_manager,
                 &self.misc.i18n,
-            ) {
-                // 启动异步下载
-                let rx = self.update_manager.start_download(&release);
-                self.async_handlers.update_download_rx = Some(rx);
-            }
+            )
+        {
+            // 启动异步下载
+            let rx = self.update_manager.start_download(&release);
+            self.async_handlers.update_download_rx = Some(rx);
         }
 
         // 关闭设置窗口时，如果是 NoUpdate 状态则重置为 Idle

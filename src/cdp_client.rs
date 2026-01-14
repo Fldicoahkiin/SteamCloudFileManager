@@ -1,11 +1,11 @@
 use crate::game_scanner::CloudGameInfo;
 use crate::steam_api::CloudFile;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Datelike, Local};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::net::TcpStream;
-use tungstenite::{stream::MaybeTlsStream, WebSocket};
+use tungstenite::{WebSocket, stream::MaybeTlsStream};
 
 #[derive(Debug, Deserialize)]
 struct Target {
@@ -131,15 +131,14 @@ impl CdpClient {
 
         loop {
             let msg = self.socket.read()?;
-            if let tungstenite::Message::Text(text) = msg {
-                if let Ok(resp) = serde_json::from_str::<CdpResponse>(&text) {
-                    if resp.id == id {
-                        if let Some(error) = resp.error {
-                            return Err(anyhow!("CDP 错误: {:?}", error));
-                        }
-                        return Ok(resp.result.unwrap_or(Value::Null));
-                    }
+            if let tungstenite::Message::Text(text) = msg
+                && let Ok(resp) = serde_json::from_str::<CdpResponse>(&text)
+                && resp.id == id
+            {
+                if let Some(error) = resp.error {
+                    return Err(anyhow!("CDP 错误: {:?}", error));
                 }
+                return Ok(resp.result.unwrap_or(Value::Null));
             }
         }
     }

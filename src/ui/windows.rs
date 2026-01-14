@@ -166,22 +166,22 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Optio
                 }
 
                 // 最后运行时间
-                if let Some(last_played) = game.last_played {
-                    if last_played > 0 {
-                        use chrono::{DateTime, Local};
-                        use std::time::{Duration, UNIX_EPOCH};
-                        let dt = UNIX_EPOCH + Duration::from_secs(last_played as u64);
-                        let local: DateTime<Local> = dt.into();
-                        let label = match i18n.language() {
-                            crate::i18n::Language::Chinese => {
-                                format!("最后运行: {}", local.format("%Y-%m-%d %H:%M"))
-                            }
-                            crate::i18n::Language::English => {
-                                format!("Last played: {}", local.format("%Y-%m-%d %H:%M"))
-                            }
-                        };
-                        ui.label(label);
-                    }
+                if let Some(last_played) = game.last_played
+                    && last_played > 0
+                {
+                    use chrono::{DateTime, Local};
+                    use std::time::{Duration, UNIX_EPOCH};
+                    let dt = UNIX_EPOCH + Duration::from_secs(last_played as u64);
+                    let local: DateTime<Local> = dt.into();
+                    let label = match i18n.language() {
+                        crate::i18n::Language::Chinese => {
+                            format!("最后运行: {}", local.format("%Y-%m-%d %H:%M"))
+                        }
+                        crate::i18n::Language::English => {
+                            format!("Last played: {}", local.format("%Y-%m-%d %H:%M"))
+                        }
+                    };
+                    ui.label(label);
                 }
             });
 
@@ -198,11 +198,7 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Optio
         });
     });
 
-    if clicked {
-        Some(game.app_id)
-    } else {
-        None
-    }
+    if clicked { Some(game.app_id) } else { None }
 }
 
 // 绘制用户选择器窗口

@@ -2,11 +2,11 @@
 //在独立子进程中运行 Steam API，断开时杀死子进程，
 //使 Steam 客户端立即识别游戏已退出。
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::thread;
 
 // IPC 请求

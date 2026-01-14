@@ -1,7 +1,7 @@
 use crate::path_resolver::{get_root_description, resolve_cloud_file_path};
 use crate::steam_api::CloudFile;
 use crate::vdf_parser::{VdfFileEntry, VdfParser};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{Local, TimeZone};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -61,6 +61,13 @@ impl FileService {
 
         let parser = VdfParser::new()?;
         let vdf_entries = parser.parse_remotecache(app_id)?;
+
+        // 获取并缓存 rootoverrides 配置
+        if let Ok(ufs_config) = parser.get_ufs_config(app_id)
+            && !ufs_config.rootoverrides.is_empty()
+        {
+            crate::path_resolver::set_root_overrides_cache(app_id, ufs_config.rootoverrides);
+        }
 
         let steam_path = parser.get_steam_path().clone();
         let user_id = parser.get_user_id().to_string();
@@ -132,99 +139,98 @@ impl FileService {
 
         if let Ok(mut client) =
             crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList)
+            && let Ok(cdp_files) = client.fetch_game_files(app_id)
         {
-            if let Ok(cdp_files) = client.fetch_game_files(app_id) {
-                tracing::info!(count = cdp_files.len(), "CDP 返回文件");
+            tracing::info!(count = cdp_files.len(), "CDP 返回文件");
 
-                let file_map: std::collections::HashMap<String, usize> = files
-                    .iter()
-                    .enumerate()
-                    .map(|(i, f)| (f.name.clone(), i))
-                    .collect();
+            let file_map: std::collections::HashMap<String, usize> = files
+                .iter()
+                .enumerate()
+                .map(|(i, f)| (f.name.clone(), i))
+                .collect();
 
-                for cdp_file in cdp_files {
-                    if let Some(&idx) = file_map.get(&cdp_file.name) {
-                        let f = &mut files[idx];
-                        let vdf_root_desc = f.root_description.clone();
+            for cdp_file in cdp_files {
+                if let Some(&idx) = file_map.get(&cdp_file.name) {
+                    let f = &mut files[idx];
+                    let vdf_root_desc = f.root_description.clone();
 
-                        f.size = cdp_file.size;
-                        // 只有当 CDP 时间戳不是接近当前时间时才更新（避免解析失败时的 Local::now()）
-                        let now = Local::now();
-                        let time_diff = (now - cdp_file.timestamp).num_seconds().abs();
-                        if time_diff > 60 {
-                            f.timestamp = cdp_file.timestamp;
-                        }
-                        f.is_persisted = true;
+                    f.size = cdp_file.size;
+                    // 只有当 CDP 时间戳不是接近当前时间时才更新（避免解析失败时的 Local::now()）
+                    let now = Local::now();
+                    let time_diff = (now - cdp_file.timestamp).num_seconds().abs();
+                    if time_diff > 60 {
+                        f.timestamp = cdp_file.timestamp;
+                    }
+                    f.is_persisted = true;
 
-                        if cdp_file.root_description.starts_with("CDP:") {
-                            // 提取 URL 和 CDP 文件夹名
-                            let content = &cdp_file.root_description[4..];
-                            let parts: Vec<&str> = content.split('|').collect();
-                            let url = parts.first().unwrap_or(&"");
-                            let cdp_folder = parts.get(1).unwrap_or(&"");
+                    if cdp_file.root_description.starts_with("CDP:") {
+                        // 提取 URL 和 CDP 文件夹名
+                        let content = &cdp_file.root_description[4..];
+                        let parts: Vec<&str> = content.split('|').collect();
+                        let url = parts.first().unwrap_or(&"");
+                        let cdp_folder = parts.get(1).unwrap_or(&"");
 
-                            // 保留 URL 以便 Hash 检测下载云端文件
-                            // 如果 CDP folder 为空或不匹配，使用 VDF 的 folder 信息拼接
-                            if !url.is_empty() {
-                                if !cdp_folder.is_empty() {
-                                    f.root_description = cdp_file.root_description.clone();
-                                } else {
-                                    // CDP folder 为空，使用 VDF 的 root_description 拼接 URL
-                                    f.root_description = format!("CDP:{}|{}", url, vdf_root_desc);
-                                }
+                        // 保留 URL 以便 Hash 检测下载云端文件
+                        // 如果 CDP folder 为空或不匹配，使用 VDF 的 folder 信息拼接
+                        if !url.is_empty() {
+                            if !cdp_folder.is_empty() {
+                                f.root_description = cdp_file.root_description.clone();
+                            } else {
+                                // CDP folder 为空，使用 VDF 的 root_description 拼接 URL
+                                f.root_description = format!("CDP:{}|{}", url, vdf_root_desc);
                             }
-
-                            tracing::debug!(
-                                "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",
-                                f.name,
-                                f.root,
-                                f.exists,
-                                vdf_root_desc,
-                                cdp_folder,
-                                url
-                            );
-                        } else {
-                            tracing::debug!(
-                                "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | 保留原 root_description",
-                                f.name,
-                                f.root,
-                                f.exists,
-                                f.root_description
-                            );
-                        }
-                    } else {
-                        // CDP 返回了本地列表中没有的文件（云端独有）
-                        // 验证文件是否真实存在于本地
-                        let mut cdp_file = cdp_file;
-
-                        // 获取 Steam 路径信息以验证文件真实存在
-                        let parser = VdfParser::new().ok();
-                        if let Some(p) = parser.as_ref() {
-                            let steam_path = p.get_steam_path();
-                            let user_id = p.get_user_id().to_string();
-                            cdp_file.exists = resolve_cloud_file_path(
-                                cdp_file.root,
-                                &cdp_file.name,
-                                steam_path,
-                                &user_id,
-                                app_id,
-                            )
-                            .map(|p| p.exists())
-                            .unwrap_or(false);
-                        } else {
-                            // 无法获取路径信息，保守地设为 false（CDP 只能确认云端存在）
-                            cdp_file.exists = false;
                         }
 
                         tracing::debug!(
-                            "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
-                            cdp_file.name,
-                            cdp_file.root,
-                            cdp_file.exists,
-                            cdp_file.root_description
+                            "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | CDP: {} | URL: {}",
+                            f.name,
+                            f.root,
+                            f.exists,
+                            vdf_root_desc,
+                            cdp_folder,
+                            url
                         );
-                        files.push(cdp_file);
+                    } else {
+                        tracing::debug!(
+                            "合并 CDP 文件: {} | Root={} | 本地存在={} | VDF: {} | 保留原 root_description",
+                            f.name,
+                            f.root,
+                            f.exists,
+                            f.root_description
+                        );
                     }
+                } else {
+                    // CDP 返回了本地列表中没有的文件（云端独有）
+                    // 验证文件是否真实存在于本地
+                    let mut cdp_file = cdp_file;
+
+                    // 获取 Steam 路径信息以验证文件真实存在
+                    let parser = VdfParser::new().ok();
+                    if let Some(p) = parser.as_ref() {
+                        let steam_path = p.get_steam_path();
+                        let user_id = p.get_user_id().to_string();
+                        cdp_file.exists = resolve_cloud_file_path(
+                            cdp_file.root,
+                            &cdp_file.name,
+                            steam_path,
+                            &user_id,
+                            app_id,
+                        )
+                        .map(|p| p.exists())
+                        .unwrap_or(false);
+                    } else {
+                        // 无法获取路径信息，保守地设为 false（CDP 只能确认云端存在）
+                        cdp_file.exists = false;
+                    }
+
+                    tracing::debug!(
+                        "新增 CDP 文件: {} | Root={} | 本地存在={} | {}",
+                        cdp_file.name,
+                        cdp_file.root,
+                        cdp_file.exists,
+                        cdp_file.root_description
+                    );
+                    files.push(cdp_file);
                 }
             }
         }
@@ -451,10 +457,10 @@ impl FileOperations {
 
         if success_count > 0 {
             tracing::info!("移出云端完成，触发云同步...");
-            if let Ok(mut manager) = self.steam_manager.lock() {
-                if let Err(e) = manager.sync_cloud_files() {
-                    tracing::warn!("触发云同步失败: {}", e);
-                }
+            if let Ok(mut manager) = self.steam_manager.lock()
+                && let Err(e) = manager.sync_cloud_files()
+            {
+                tracing::warn!("触发云同步失败: {}", e);
             }
         }
 
@@ -468,10 +474,10 @@ impl FileOperations {
 
         if success_count > 0 {
             tracing::info!("删除完成，触发云同步...");
-            if let Ok(mut manager) = self.steam_manager.lock() {
-                if let Err(e) = manager.sync_cloud_files() {
-                    tracing::warn!("触发云同步失败: {}", e);
-                }
+            if let Ok(mut manager) = self.steam_manager.lock()
+                && let Err(e) = manager.sync_cloud_files()
+            {
+                tracing::warn!("触发云同步失败: {}", e);
             }
         }
 
@@ -758,10 +764,10 @@ impl FileOperations {
                 failed_files.len()
             );
             tracing::info!("触发云同步...");
-            if let Ok(mut manager) = self.steam_manager.lock() {
-                if let Err(e) = manager.sync_cloud_files() {
-                    tracing::warn!("触发云同步失败: {}", e);
-                }
+            if let Ok(mut manager) = self.steam_manager.lock()
+                && let Err(e) = manager.sync_cloud_files()
+            {
+                tracing::warn!("触发云同步失败: {}", e);
             }
             FileOperationResult::SuccessWithRefresh(format!("已同步 {} 个文件到云端", synced_count))
         } else if skipped_count > 0 {

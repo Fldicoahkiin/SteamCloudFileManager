@@ -1845,8 +1845,12 @@ impl I18n {
 
     pub fn symlink_experimental_desc(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "创建软链接后会自动同步目录下的文件到云端。点击云端上传按钮可手动同步新增文件。",
-            Language::English => "Files in the directory are auto-synced after symlink creation. Use the cloud upload button to manually sync new files.",
+            Language::Chinese => {
+                "创建软链接后会自动同步目录下的文件到云端。点击云端上传按钮可手动同步新增文件。"
+            }
+            Language::English => {
+                "Files in the directory are auto-synced after symlink creation. Use the cloud upload button to manually sync new files."
+            }
         }
     }
 

@@ -207,12 +207,12 @@ pub fn find_system_fonts() -> Vec<PathBuf> {
                 .filter_map(|e| e.ok())
             {
                 let path = entry.path();
-                if path.is_file() {
-                    if let Some(ext) = path.extension() {
-                        let ext_str = ext.to_str().unwrap_or("").to_lowercase();
-                        if ext_str == "ttf" || ext_str == "ttc" || ext_str == "otf" {
-                            font_paths.push(path.to_path_buf());
-                        }
+                if path.is_file()
+                    && let Some(ext) = path.extension()
+                {
+                    let ext_str = ext.to_str().unwrap_or("").to_lowercase();
+                    if ext_str == "ttf" || ext_str == "ttc" || ext_str == "otf" {
+                        font_paths.push(path.to_path_buf());
                     }
                 }
             }

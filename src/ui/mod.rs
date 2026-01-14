@@ -17,7 +17,7 @@ pub use appinfo_dialog::*;
 pub use backup_dialog::*;
 pub use conflict_dialog::*;
 pub use controls::*;
-pub use file_list::{render_file_tree, FileTreeRenderParams, TreeViewState};
+pub use file_list::{FileTreeRenderParams, TreeViewState, render_file_tree};
 pub use font_loader::setup_fonts;
 pub use guide_dialog::*;
 pub use settings::*;

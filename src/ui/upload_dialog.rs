@@ -1,4 +1,4 @@
-use crate::file_manager::{format_size, UploadQueue};
+use crate::file_manager::{UploadQueue, format_size};
 use crate::i18n::I18n;
 use crate::icons;
 use egui::RichText;
@@ -57,22 +57,21 @@ impl UploadPreviewDialog {
 
                 // 操作按钮 - 添加文件/文件夹
                 ui.horizontal(|ui| {
-                    if ui.button(i18n.add_files()).clicked() {
-                        if let Some(paths) = rfd::FileDialog::new().pick_files() {
-                            for path in paths {
-                                if let Err(e) = self.queue.add_file(path.clone()) {
-                                    tracing::warn!("添加文件失败 {}: {}", path.display(), e);
-                                }
+                    if ui.button(i18n.add_files()).clicked()
+                        && let Some(paths) = rfd::FileDialog::new().pick_files()
+                    {
+                        for path in paths {
+                            if let Err(e) = self.queue.add_file(path.clone()) {
+                                tracing::warn!("添加文件失败 {}: {}", path.display(), e);
                             }
                         }
                     }
 
-                    if ui.button(i18n.add_folder()).clicked() {
-                        if let Some(folder) = rfd::FileDialog::new().pick_folder() {
-                            if let Err(e) = self.queue.add_folder(&folder) {
-                                tracing::warn!("添加文件夹失败 {}: {}", folder.display(), e);
-                            }
-                        }
+                    if ui.button(i18n.add_folder()).clicked()
+                        && let Some(folder) = rfd::FileDialog::new().pick_folder()
+                        && let Err(e) = self.queue.add_folder(&folder)
+                    {
+                        tracing::warn!("添加文件夹失败 {}: {}", folder.display(), e);
                     }
 
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -275,18 +274,18 @@ impl UploadPreviewDialog {
             // 如果删除的是正在编辑的项，取消编辑状态
             if self.editing_index == Some(index) {
                 self.editing_index = None;
-            } else if let Some(editing) = self.editing_index {
-                if editing > index {
-                    self.editing_index = Some(editing - 1);
-                }
+            } else if let Some(editing) = self.editing_index
+                && editing > index
+            {
+                self.editing_index = Some(editing - 1);
             }
         }
 
         // 处理路径更新
-        if let Some((index, new_path)) = path_to_update {
-            if let Some(task) = self.queue.tasks.get_mut(index) {
-                task.cloud_path = new_path;
-            }
+        if let Some((index, new_path)) = path_to_update
+            && let Some(task) = self.queue.tasks.get_mut(index)
+        {
+            task.cloud_path = new_path;
         }
     }
 

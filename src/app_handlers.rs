@@ -2,7 +2,7 @@ use crate::app_state::{ConnectionState, DialogState, FileListState, GameLibraryS
 use crate::async_handlers::AsyncHandlers;
 use crate::steam_worker::SteamWorkerManager;
 use crate::vdf_parser::VdfParser;
-use anyhow::{anyhow, Result as AnyhowResult};
+use anyhow::{Result as AnyhowResult, anyhow};
 use chrono::TimeZone;
 use eframe::egui;
 use std::sync::{Arc, Mutex};
@@ -459,12 +459,16 @@ impl AppHandlers {
                                 app_id,
                             );
 
-                        // 如果没有 savefiles 配置，默认扫描 root=0 (SteamRemote)
+                        // 如果没有 savefiles 配置，默认扫描 root=0 (SteamCloudDocuments)
                         let scan_savefiles = if savefiles.is_empty() {
-                            tracing::debug!("appinfo.vdf 无 savefiles 配置，默认扫描 SteamRemote");
+                            tracing::debug!(
+                                "appinfo.vdf 无 savefiles 配置，默认扫描 SteamCloudDocuments"
+                            );
                             vec![crate::path_resolver::SaveFileConfig {
                                 root: "0".to_string(),
-                                root_type: Some(crate::path_resolver::RootType::SteamRemote),
+                                root_type: Some(
+                                    crate::path_resolver::RootType::SteamCloudDocuments,
+                                ),
                                 path: String::new(),
                                 pattern: "*".to_string(),
                                 platforms: vec![],
