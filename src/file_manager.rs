@@ -8,12 +8,14 @@ use std::sync::{Arc, Mutex};
 
 pub struct FileService {
     steam_manager: Option<Arc<Mutex<crate::steam_worker::SteamWorkerManager>>>,
+    vdf_parser: Option<VdfParser>,
 }
 
 impl FileService {
     pub fn new() -> Self {
         Self {
             steam_manager: None,
+            vdf_parser: VdfParser::new().ok(),
         }
     }
 
@@ -22,6 +24,7 @@ impl FileService {
     ) -> Self {
         Self {
             steam_manager: Some(steam_manager),
+            vdf_parser: VdfParser::new().ok(),
         }
     }
 
@@ -59,7 +62,10 @@ impl FileService {
     fn get_files_from_vdf(&self, app_id: u32) -> Result<Vec<CloudFile>> {
         tracing::debug!(app_id = app_id, "尝试从 VDF 解析文件列表");
 
-        let parser = VdfParser::new()?;
+        let parser = self
+            .vdf_parser
+            .as_ref()
+            .ok_or_else(|| anyhow!("VdfParser 未初始化"))?;
         let vdf_entries = parser.parse_remotecache(app_id)?;
 
         // 获取并缓存 rootoverrides 配置
@@ -90,9 +96,9 @@ impl FileService {
         let mut mgr = manager.lock().map_err(|e| anyhow!("锁错误: {}", e))?;
         let worker_files = mgr.get_files()?;
 
-        // 获取 Steam 路径信息以验证文件真实存在
-        let parser = VdfParser::new().ok();
-        let path_info = parser
+        // 使用缓存的 VdfParser 获取 Steam 路径信息
+        let path_info = self
+            .vdf_parser
             .as_ref()
             .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
         let app_id = mgr.get_app_id();
@@ -204,9 +210,8 @@ impl FileService {
                     // 验证文件是否真实存在于本地
                     let mut cdp_file = cdp_file;
 
-                    // 获取 Steam 路径信息以验证文件真实存在
-                    let parser = VdfParser::new().ok();
-                    if let Some(p) = parser.as_ref() {
+                    // 使用缓存的 VdfParser 获取 Steam 路径信息
+                    if let Some(p) = self.vdf_parser.as_ref() {
                         let steam_path = p.get_steam_path();
                         let user_id = p.get_user_id().to_string();
                         cdp_file.exists = resolve_cloud_file_path(
@@ -236,7 +241,7 @@ impl FileService {
         }
 
         // 输出每个文件的详细信息
-        log_file_details(&files, app_id);
+        log_file_details(&files, app_id, self.vdf_parser.as_ref());
 
         Ok(files)
     }
@@ -264,12 +269,11 @@ impl FileService {
 
         tracing::info!(count = cdp_files.len(), "CDP 返回文件");
 
-        // 验证本地文件存在性
-        let parser = VdfParser::new().ok();
+        // 使用缓存的 VdfParser 验证本地文件存在性
         let files: Vec<CloudFile> = cdp_files
             .into_iter()
             .map(|mut cdp_file| {
-                if let Some(p) = parser.as_ref() {
+                if let Some(p) = self.vdf_parser.as_ref() {
                     let steam_path = p.get_steam_path();
                     let user_id = p.get_user_id().to_string();
                     cdp_file.exists = resolve_cloud_file_path(
@@ -286,22 +290,20 @@ impl FileService {
             })
             .collect();
 
-        log_file_details(&files, app_id);
+        log_file_details(&files, app_id, self.vdf_parser.as_ref());
 
         Ok(files)
     }
 }
 
 // 输出每个文件的详细信息日志
-fn log_file_details(files: &[CloudFile], app_id: u32) {
+fn log_file_details(files: &[CloudFile], app_id: u32, parser: Option<&VdfParser>) {
     if files.is_empty() {
         return;
     }
 
-    // 获取 VDF 解析器以解析本地路径
-    let parser = crate::vdf_parser::VdfParser::new().ok();
+    // 使用传入的 VdfParser 解析本地路径
     let (steam_path, user_id) = parser
-        .as_ref()
         .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()))
         .unwrap_or_else(|| (std::path::PathBuf::new(), String::new()));
 
