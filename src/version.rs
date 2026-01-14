@@ -64,18 +64,3 @@ pub fn build_profile() -> &'static str {
         "release"
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_version_info() {
-        println!("Full version: {}", full_version());
-        println!("Version: {}", version());
-        println!("Git hash: {}", git_hash());
-        println!("Git branch: {}", git_branch());
-        println!("Is dirty: {}", is_dirty());
-        println!("\n{}", version_info());
-    }
-}
