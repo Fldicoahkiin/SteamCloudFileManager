@@ -1,54 +1,103 @@
 // 路径解析模块
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+// 游戏安装目录缓存，避免重复解析
+static GAME_INSTALL_DIR_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, PathBuf>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// Root Overrides 缓存，存储每个 app 的 rootoverrides 配置
+static ROOT_OVERRIDES_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, Vec<RootOverrideConfig>>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// 设置某个 app 的 rootoverrides 缓存
+pub fn set_root_overrides_cache(app_id: u32, overrides: Vec<RootOverrideConfig>) {
+    if let Ok(mut cache) = ROOT_OVERRIDES_CACHE.lock() {
+        cache.insert(app_id, overrides);
+    }
+}
+
+// 获取某个 app 的 rootoverrides 缓存
+fn get_root_overrides_cache(app_id: u32) -> Option<Vec<RootOverrideConfig>> {
+    if let Ok(cache) = ROOT_OVERRIDES_CACHE.lock() {
+        cache.get(&app_id).cloned()
+    } else {
+        None
+    }
+}
+
 // Steam Cloud 存储位置类型
+// 根据官方文档: https://partner.steamgames.com/doc/features/cloud
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
 pub enum RootType {
-    // 0: Steam 云文件夹 (userdata/{ID}/{AppID}/remote/)
-    SteamRemote = 0,
-    // 1: 游戏安装目录
-    GameInstallDir = 1,
-    // 2: 文档文件夹
-    Documents = 2,
-    // 3: AppData Roaming (Win) / Application Support (Mac) / .config (Linux)
-    AppDataRoaming = 3,
-    // 4: Local AppData (Win) / Caches (Mac) / .local/share (Linux)
-    AppDataLocal = 4,
-    // 5: 图片文件夹
-    Pictures = 5,
-    // 6: 音乐文件夹
-    Music = 6,
-    // 7: 视频文件夹 (Win/Linux: Videos, Mac: Application Support)
-    Videos = 7,
-    // 8: 桌面文件夹
-    Desktop = 8,
-    // 9: Windows Saved Games
-    SavedGames = 9,
-    // 10: 下载文件夹
-    Downloads = 10,
-    // 11: 公共共享目录
-    PublicShared = 11,
-    // 12: Windows LocalLow / Caches (Mac/Linux)
-    AppDataLocalLow = 12,
+    // Root 0: SteamCloudDocuments - Steam 云文件夹
+    // 路径: {Steam}/userdata/{UID}/{AppID}/remote/
+    SteamCloudDocuments = 0,
+
+    // Root 1: GameInstall - 游戏安装目录
+    // 可通过 rootoverrides 重定向到其他位置
+    GameInstall = 1,
+
+    // Root 2: WinMyDocuments / MacDocuments / LinuxHome
+    // Win: %USERPROFILE%\Documents, Mac/Linux: ~/Documents
+    WinMyDocuments = 2,
+
+    // Root 3: WinAppDataRoaming
+    // Win: %APPDATA%, Mac: ~/Library/Application Support, Linux: ~/.config
+    WinAppDataRoaming = 3,
+
+    // Root 4: WinAppDataLocal / MacHome / LinuxXdgDataHome
+    // Win: %LOCALAPPDATA%, Mac: ~/, Linux: ~/.local/share
+    WinAppDataLocal = 4,
+
+    // Root 5: 未知（官方文档未列出）
+    Root5 = 5,
+
+    // Root 6: 未知（官方文档未列出）
+    Root6 = 6,
+
+    // Root 7: MacAppSupport / LinuxXdgConfigHome
+    // Win: 未知, Mac: ~/Library/Application Support, Linux: ~/.config
+    MacAppSupport = 7,
+
+    // Root 8: LinuxXdgDataHome（官方文档）/ 或 Desktop
+    Root8 = 8,
+
+    // Root 9: WinSavedGames
+    // Win: %USERPROFILE%\Saved Games
+    WinSavedGames = 9,
+
+    // Root 10: 未知（官方文档未列出）
+    Root10 = 10,
+
+    // Root 11: 未知（官方文档未列出）
+    Root11 = 11,
+
+    // Root 12: WinAppDataLocalLow
+    // Win: %USERPROFILE%\AppData\LocalLow
+    WinAppDataLocalLow = 12,
 }
 
 impl RootType {
     // 从 u32 转换为 RootType
     pub fn from_u32(value: u32) -> Option<Self> {
         match value {
-            0 => Some(Self::SteamRemote),
-            1 => Some(Self::GameInstallDir),
-            2 => Some(Self::Documents),
-            3 => Some(Self::AppDataRoaming),
-            4 => Some(Self::AppDataLocal),
-            5 => Some(Self::Pictures),
-            6 => Some(Self::Music),
-            7 => Some(Self::Videos),
-            8 => Some(Self::Desktop),
-            9 => Some(Self::SavedGames),
-            10 => Some(Self::Downloads),
-            11 => Some(Self::PublicShared),
-            12 => Some(Self::AppDataLocalLow),
+            0 => Some(Self::SteamCloudDocuments),
+            1 => Some(Self::GameInstall),
+            2 => Some(Self::WinMyDocuments),
+            3 => Some(Self::WinAppDataRoaming),
+            4 => Some(Self::WinAppDataLocal),
+            5 => Some(Self::Root5),
+            6 => Some(Self::Root6),
+            7 => Some(Self::MacAppSupport),
+            8 => Some(Self::Root8),
+            9 => Some(Self::WinSavedGames),
+            10 => Some(Self::Root10),
+            11 => Some(Self::Root11),
+            12 => Some(Self::WinAppDataLocalLow),
             _ => None,
         }
     }
@@ -57,10 +106,55 @@ impl RootType {
     pub fn to_u32(self) -> u32 {
         self as u32
     }
+
+    // 转换为名称字符串（用于日志和调试）
+    pub fn to_name(self) -> &'static str {
+        match self {
+            Self::SteamCloudDocuments => "SteamCloudDocuments",
+            Self::GameInstall => "GameInstall",
+            Self::WinMyDocuments => "WinMyDocuments",
+            Self::WinAppDataRoaming => "WinAppDataRoaming",
+            Self::WinAppDataLocal => "WinAppDataLocal",
+            Self::Root5 => "Root5",
+            Self::Root6 => "Root6",
+            Self::MacAppSupport => "MacAppSupport",
+            Self::Root8 => "Root8",
+            Self::WinSavedGames => "WinSavedGames",
+            Self::Root10 => "Root10",
+            Self::Root11 => "Root11",
+            Self::WinAppDataLocalLow => "WinAppDataLocalLow",
+        }
+    }
+
+    // 从名称字符串解析（用于 rootoverrides）
+    pub fn from_name(name: &str) -> Option<Self> {
+        let name_lower = name.to_lowercase();
+        match name_lower.as_str() {
+            // Root 0
+            "steamclouddocuments" => Some(Self::SteamCloudDocuments),
+            // Root 1
+            "gameinstall" | "appinstalldirectory" | "app install directory" => {
+                Some(Self::GameInstall)
+            }
+            // Root 2
+            "winmydocuments" | "macdocuments" | "linuxhome" => Some(Self::WinMyDocuments),
+            // Root 3
+            "winappdataroaming" => Some(Self::WinAppDataRoaming),
+            // Root 4
+            "winappdatalocal" | "machome" | "linuxxdgdatahome" => Some(Self::WinAppDataLocal),
+            // Root 7: macOS Application Support / Linux XDG Config
+            "macappsupport" | "linuxxdgconfighome" => Some(Self::MacAppSupport),
+            // Root 9
+            "winsavedgames" => Some(Self::WinSavedGames),
+            // Root 12
+            "winappdatalocallow" => Some(Self::WinAppDataLocalLow),
+            _ => None,
+        }
+    }
 }
 
-use anyhow::{anyhow, Result};
-use std::path::{Path, PathBuf};
+use anyhow::{Result, anyhow};
+use std::path::Path;
 
 // 解析 Root 类型的基础路径
 pub fn resolve_root_base_path(
@@ -70,15 +164,18 @@ pub fn resolve_root_base_path(
     app_id: u32,
 ) -> Result<PathBuf> {
     match root_type {
-        RootType::SteamRemote => Ok(steam_path
+        // Root 0: SteamCloudDocuments
+        RootType::SteamCloudDocuments => Ok(steam_path
             .join("userdata")
             .join(user_id)
             .join(app_id.to_string())
             .join("remote")),
 
-        RootType::GameInstallDir => Err(anyhow!("GameInstallDir 需要特殊处理")),
+        // Root 1: GameInstall - 需要特殊处理
+        RootType::GameInstall => Err(anyhow!("GameInstall 需要特殊处理")),
 
-        RootType::Documents => {
+        // Root 2: WinMyDocuments
+        RootType::WinMyDocuments => {
             #[cfg(target_os = "windows")]
             {
                 let home = std::env::var("USERPROFILE")?;
@@ -96,7 +193,8 @@ pub fn resolve_root_base_path(
             }
         }
 
-        RootType::AppDataRoaming => {
+        // Root 3: WinAppDataRoaming
+        RootType::WinAppDataRoaming => {
             #[cfg(target_os = "windows")]
             {
                 let appdata = std::env::var("APPDATA")?;
@@ -116,7 +214,8 @@ pub fn resolve_root_base_path(
             }
         }
 
-        RootType::AppDataLocal => {
+        // Root 4: WinAppDataLocal / MacHome
+        RootType::WinAppDataLocal => {
             #[cfg(target_os = "windows")]
             {
                 let localappdata = std::env::var("LOCALAPPDATA")?;
@@ -124,62 +223,33 @@ pub fn resolve_root_base_path(
             }
             #[cfg(target_os = "macos")]
             {
+                // Root 4 在 macOS 上映射到 ~/ (MacHome)
                 let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Library").join("Caches"))
+                Ok(PathBuf::from(home))
             }
             #[cfg(target_os = "linux")]
             {
+                // Linux: XDG_DATA_HOME 或 ~/.local/share
                 let home = std::env::var("HOME")?;
                 Ok(PathBuf::from(home).join(".local").join("share"))
             }
         }
 
-        RootType::Pictures => {
-            #[cfg(target_os = "windows")]
-            {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Pictures"))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Pictures"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Pictures"))
-            }
+        // Root 5, 6: 未知，返回错误
+        RootType::Root5 | RootType::Root6 => {
+            Err(anyhow!("Root {} 未知，无法解析路径", root_type.to_u32()))
         }
 
-        RootType::Music => {
+        // Root 7: MacAppSupport / LinuxXdgConfigHome
+        RootType::MacAppSupport => {
             #[cfg(target_os = "windows")]
             {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Music"))
+                // Windows 上 Root 7 行为未知，回退到 AppData
+                let appdata = std::env::var("APPDATA")?;
+                Ok(PathBuf::from(appdata))
             }
             #[cfg(target_os = "macos")]
             {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Music"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Music"))
-            }
-        }
-
-        RootType::Videos => {
-            #[cfg(target_os = "windows")]
-            {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Videos"))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                // Root=7 在 macOS 上实际映射到 Application Support，而不是 Movies
-                // 参考: Finding Paradise 游戏实际使用情况
                 let home = std::env::var("HOME")?;
                 Ok(PathBuf::from(home)
                     .join("Library")
@@ -187,30 +257,20 @@ pub fn resolve_root_base_path(
             }
             #[cfg(target_os = "linux")]
             {
+                // Linux: XDG_CONFIG_HOME 或 ~/.config
                 let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Videos"))
+                Ok(PathBuf::from(home).join(".config"))
             }
         }
 
-        RootType::Desktop => {
-            #[cfg(target_os = "windows")]
-            {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Desktop"))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Desktop"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Desktop"))
-            }
+        // Root 8: 未知，暂时映射到 Desktop
+        RootType::Root8 => {
+            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
+            Ok(PathBuf::from(home).join("Desktop"))
         }
 
-        RootType::SavedGames => {
+        // Root 9: WinSavedGames
+        RootType::WinSavedGames => {
             #[cfg(target_os = "windows")]
             {
                 let home = std::env::var("USERPROFILE")?;
@@ -223,57 +283,27 @@ pub fn resolve_root_base_path(
             }
         }
 
-        RootType::Downloads => {
-            #[cfg(target_os = "windows")]
-            {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Downloads"))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Downloads"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Downloads"))
-            }
+        // Root 10, 11: 未知，返回错误
+        RootType::Root10 | RootType::Root11 => {
+            Err(anyhow!("Root {} 未知，无法解析路径", root_type.to_u32()))
         }
 
-        RootType::PublicShared => {
-            #[cfg(target_os = "windows")]
-            {
-                Ok(PathBuf::from("C:/Users/Public"))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                Ok(PathBuf::from("/Users/Shared"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                Ok(PathBuf::from("/tmp"))
-            }
-        }
-
-        RootType::AppDataLocalLow => {
+        // Root 12: WinAppDataLocalLow
+        RootType::WinAppDataLocalLow => {
             #[cfg(target_os = "windows")]
             {
                 let home = std::env::var("USERPROFILE")?;
                 Ok(PathBuf::from(home).join("AppData").join("LocalLow"))
             }
-            #[cfg(not(target_os = "windows"))]
+            #[cfg(target_os = "macos")]
             {
-                #[cfg(target_os = "macos")]
-                {
-                    let home = std::env::var("HOME")?;
-                    Ok(PathBuf::from(home).join("Library").join("Caches"))
-                }
-                #[cfg(target_os = "linux")]
-                {
-                    let home = std::env::var("HOME")?;
-                    Ok(PathBuf::from(home).join(".local").join("share"))
-                }
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join("Library").join("Caches"))
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join(".local").join("share"))
             }
         }
     }
@@ -288,12 +318,34 @@ pub fn resolve_cloud_file_path(
     app_id: u32,
 ) -> Result<PathBuf> {
     let root_type = RootType::from_u32(root).unwrap_or_else(|| {
-        tracing::warn!("未知的 root 值: {}，使用 SteamRemote", root);
-        RootType::SteamRemote
+        tracing::warn!("未知的 root 值: {}，使用 SteamCloudDocuments", root);
+        RootType::SteamCloudDocuments
     });
 
-    // GameInstallDir 需要查找游戏安装目录
-    if root_type == RootType::GameInstallDir {
+    // 获取 root 名称
+    let root_name = root_type.to_name();
+
+    // 检查是否有 rootoverrides 配置
+    if let Some(overrides) = get_root_overrides_cache(app_id)
+        && let Some((new_root, add_path, use_instead)) = apply_root_override(root_name, &overrides)
+    {
+        // 解析新的 root 类型
+        if let Some(new_root_type) = RootType::from_name(&new_root) {
+            let base_path = resolve_root_base_path(new_root_type, steam_path, user_id, app_id)?;
+            let final_path = if use_instead {
+                // 完全替换：base_path / add_path / filename
+                base_path.join(&add_path).join(filename)
+            } else {
+                // 追加：base_path / add_path / original_subpath / filename
+                base_path.join(&add_path).join(filename)
+            };
+            return Ok(final_path);
+        }
+    }
+
+    // 无 override，使用默认逻辑
+    // GameInstall 需要查找游戏安装目录
+    if root_type == RootType::GameInstall {
         let install_dir = get_game_install_dir(steam_path, app_id)?;
         return Ok(install_dir.join(filename));
     }
@@ -306,6 +358,13 @@ pub fn resolve_cloud_file_path(
 // - Windows/Linux: 游戏安装目录
 // - macOS: ~/Library/Application Support/{GameName}/
 fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
+    // 检查缓存
+    if let Ok(cache) = GAME_INSTALL_DIR_CACHE.lock()
+        && let Some(path) = cache.get(&app_id)
+    {
+        return Ok(path.clone());
+    }
+
     let libraries = crate::game_scanner::discover_library_steamapps(steam_path);
 
     for steamapps in libraries.iter() {
@@ -319,16 +378,16 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
                     let mut name: Option<String> = None;
 
                     for line in content.lines() {
-                        if line.contains("\"installdir\"") {
-                            if let Some(dir) = line.split('"').nth(3) {
-                                install_dir = Some(dir.to_string());
-                            }
+                        if line.contains("\"installdir\"")
+                            && let Some(dir) = line.split('"').nth(3)
+                        {
+                            install_dir = Some(dir.to_string());
                         }
                         #[cfg(target_os = "macos")]
-                        if line.contains("\"name\"") {
-                            if let Some(n) = line.split('"').nth(3) {
-                                name = Some(n.to_string());
-                            }
+                        if line.contains("\"name\"")
+                            && let Some(n) = line.split('"').nth(3)
+                        {
+                            name = Some(n.to_string());
                         }
                     }
 
@@ -347,6 +406,10 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
                                         "找到 macOS 存档目录: {}",
                                         app_support_path.display()
                                     );
+                                    // 写入缓存
+                                    if let Ok(mut cache) = GAME_INSTALL_DIR_CACHE.lock() {
+                                        cache.insert(app_id, app_support_path.clone());
+                                    }
                                     return Ok(app_support_path);
                                 }
                             }
@@ -354,13 +417,12 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
 
                         // 尝试游戏安装目录
                         let install_path = steamapps.join("common").join(&dir);
-                        if install_path.exists() {
-                            tracing::info!("找到游戏安装目录: {}", install_path.display());
-                            return Ok(install_path);
-                        } else {
-                            // 继续返回路径，即使目录不存在
-                            return Ok(install_path);
+                        tracing::info!("找到游戏安装目录: {}", install_path.display());
+                        // 写入缓存
+                        if let Ok(mut cache) = GAME_INSTALL_DIR_CACHE.lock() {
+                            cache.insert(app_id, install_path.clone());
                         }
+                        return Ok(install_path);
                     }
                 }
                 Err(_) => {
@@ -399,18 +461,16 @@ pub fn collect_local_save_paths_from_ufs(
 
     let mut path_map: HashMap<u32, (String, PathBuf)> = HashMap::new();
 
-    // 默认添加 root=0 (SteamRemote) 目录
+    // 默认添加 root=0 (SteamCloudDocuments) 目录，即使不存在也显示方便跳转
     let remote_path = steam_path
         .join("userdata")
         .join(user_id)
         .join(app_id.to_string())
         .join("remote");
 
-    if remote_path.exists() {
-        let desc = get_root_description(0);
-        tracing::debug!("✓ 默认路径: {}", remote_path.display());
-        path_map.insert(0, (desc, remote_path));
-    }
+    let desc = get_root_description(0);
+    tracing::debug!("默认路径 root=0: {}", remote_path.display());
+    path_map.insert(0, (desc, remote_path));
 
     // 根据 savefiles 配置添加其他 root 类型目录
     // 预先缓存 game_install_dir，避免重复查找
@@ -451,12 +511,12 @@ pub fn collect_local_save_paths_from_ufs(
             resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
         };
 
-        if let Some(base_path) = base_path {
-            if base_path.exists() {
-                let desc = get_root_description(root_num);
-                tracing::debug!("✓ {}: {}", desc, base_path.display());
-                path_map.insert(root_num, (desc, base_path));
-            }
+        if let Some(base_path) = base_path
+            && base_path.exists()
+        {
+            let desc = get_root_description(root_num);
+            tracing::debug!("✓ {}: {}", desc, base_path.display());
+            path_map.insert(root_num, (desc, base_path));
         }
     }
 
@@ -492,21 +552,22 @@ pub fn parse_cdp_root_description(root_description: &str) -> (Option<&str>, &str
 }
 
 // 获取 Root 类型名称
+// 数字 ID 来源于 remotecache.vdf，名称来源于 Steamworks 文档和 appinfo.vdf
 pub fn get_root_type_name(root: u32) -> &'static str {
     match root {
-        0 => "SteamRemote",
+        0 => "SteamCloudDocuments",
         1 => "GameInstall",
-        2 => "Documents",
-        3 => "AppDataRoaming",
-        4 => "AppDataLocal",
-        5 => "Pictures",
-        6 => "Music",
-        7 => "Videos",
-        8 => "Desktop",
-        9 => "SavedGames",
-        10 => "Downloads",
-        11 => "Public",
-        12 => "AppDataLocalLow",
+        2 => "WinMyDocuments",
+        3 => "WinAppDataRoaming",
+        4 => "WinAppDataLocal",
+        5 => "Root5", // 未在官方文档中
+        6 => "Root6", // 未在官方文档中
+        7 => "MacAppSupport",
+        8 => "LinuxXdgDataHome",
+        9 => "WinSavedGames",
+        10 => "Root10", // 未在官方文档中
+        11 => "Root11", // 未在官方文档中
+        12 => "WinAppDataLocalLow",
         _ => "Unknown",
     }
 }
@@ -514,19 +575,28 @@ pub fn get_root_type_name(root: u32) -> &'static str {
 // 从 appinfo.vdf 的 root 字符串名称转换为 RootType
 pub fn root_name_to_type(name: &str) -> Option<RootType> {
     match name.to_lowercase().as_str() {
-        "steamclouddocuments" | "0" => Some(RootType::SteamRemote),
-        "gameinstall" | "1" => Some(RootType::GameInstallDir),
-        "winmydocuments" | "2" => Some(RootType::Documents),
-        "winappdataroaming" | "3" => Some(RootType::AppDataRoaming),
-        "winappdatalocal" | "4" => Some(RootType::AppDataLocal),
-        "winpictures" | "5" => Some(RootType::Pictures),
-        "winmusic" | "6" => Some(RootType::Music),
-        "winvideos" | "macappsupport" | "7" => Some(RootType::Videos),
-        "linuxxdgdatahome" | "8" => Some(RootType::Desktop),
-        "winsavedgames" | "9" => Some(RootType::SavedGames),
-        "windownloads" | "10" => Some(RootType::Downloads),
-        "winpublic" | "11" => Some(RootType::PublicShared),
-        "winappdatalocallow" | "12" => Some(RootType::AppDataLocalLow),
+        // All platforms
+        "app install directory" | "gameinstall" | "1" => Some(RootType::GameInstall),
+        "steamclouddocuments" | "0" => Some(RootType::SteamCloudDocuments),
+        // Windows only
+        "winmydocuments" | "2" => Some(RootType::WinMyDocuments),
+        "winappdatalocal" | "4" => Some(RootType::WinAppDataLocal),
+        "winappdatalocallow" | "12" => Some(RootType::WinAppDataLocalLow),
+        "winappdataroaming" | "3" => Some(RootType::WinAppDataRoaming),
+        "winsavedgames" | "9" => Some(RootType::WinSavedGames),
+        // macOS only
+        "machome" => Some(RootType::WinAppDataLocal),
+        "macappsupport" | "7" => Some(RootType::MacAppSupport),
+        "macdocuments" => Some(RootType::WinMyDocuments),
+        // Linux only
+        "linuxhome" => Some(RootType::WinMyDocuments),
+        "linuxxdgdatahome" | "8" => Some(RootType::Root8),
+        "linuxxdgconfighome" => Some(RootType::MacAppSupport),
+        // 未知 Root
+        "5" => Some(RootType::Root5),
+        "6" => Some(RootType::Root6),
+        "10" => Some(RootType::Root10),
+        "11" => Some(RootType::Root11),
         _ => None,
     }
 }
@@ -567,6 +637,56 @@ pub fn get_current_platform() -> &'static str {
     }
 }
 
+// 应用 Root Override
+// 检查给定的 root 名称是否在当前平台上有覆盖配置
+// 返回: (新的 root 名称, 附加路径, 是否完全替换)
+pub fn apply_root_override(
+    root_name: &str,
+    overrides: &[RootOverrideConfig],
+) -> Option<(String, String, bool)> {
+    let current_platform = get_current_platform();
+
+    for override_config in overrides {
+        // 检查原始 root 是否匹配
+        if override_config.original_root.to_lowercase() != root_name.to_lowercase() {
+            continue;
+        }
+
+        // 检查 oslist 是否包含当前平台
+        let platform_match = override_config.oslist.iter().any(|os| {
+            let os_lower = os.to_lowercase();
+            match current_platform {
+                "windows" => os_lower.contains("windows") || os_lower.contains("win"),
+                "macos" => {
+                    os_lower.contains("macos")
+                        || os_lower.contains("mac")
+                        || os_lower.contains("osx")
+                }
+                "linux" => os_lower.contains("linux"),
+                _ => false,
+            }
+        });
+
+        if platform_match {
+            tracing::debug!(
+                "应用 Root Override: {} -> {} (platform: {}, addpath: {}, useinstead: {})",
+                override_config.original_root,
+                override_config.new_root,
+                current_platform,
+                override_config.add_path,
+                override_config.use_instead
+            );
+            return Some((
+                override_config.new_root.clone(),
+                override_config.add_path.clone(),
+                override_config.use_instead,
+            ));
+        }
+    }
+
+    None
+}
+
 // 从 ufs savefiles 配置中的路径配置
 #[derive(Debug, Clone, Default)]
 pub struct SaveFileConfig {
@@ -576,6 +696,17 @@ pub struct SaveFileConfig {
     pub pattern: String,             // 文件匹配模式 (glob)
     pub platforms: Vec<String>,      // 支持的平台
     pub recursive: bool,             // 是否递归 (默认 true)
+}
+
+// Root Override 配置
+// 用于在特定操作系统上将一个根目录重定向到另一个
+#[derive(Debug, Clone, Default)]
+pub struct RootOverrideConfig {
+    pub original_root: String, // 原始根名称 (如 "WinMyDocuments")
+    pub oslist: Vec<String>,   // 适用的操作系统列表
+    pub new_root: String,      // 新的根名称 (如 "MacDocuments")
+    pub add_path: String,      // 附加路径 (可选)
+    pub use_instead: bool,     // 是否完全替换 (useinstead=1)
 }
 
 // 扫描到的本地文件信息
@@ -702,13 +833,13 @@ fn scan_directory_with_pattern(
                 scan_dir(&path, base, pattern, recursive, results);
             } else if path.is_file() {
                 // 检查文件名是否匹配 pattern
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
-                    if pattern_matches(filename, pattern) {
-                        // 计算相对路径
-                        if let Ok(rel) = path.strip_prefix(base) {
-                            let rel_str = rel.to_string_lossy().replace('\\', "/");
-                            results.push((path.clone(), rel_str));
-                        }
+                if let Some(filename) = path.file_name().and_then(|n| n.to_str())
+                    && pattern_matches(filename, pattern)
+                {
+                    // 计算相对路径
+                    if let Ok(rel) = path.strip_prefix(base) {
+                        let rel_str = rel.to_string_lossy().replace('\\', "/");
+                        results.push((path.clone(), rel_str));
                     }
                 }
             }

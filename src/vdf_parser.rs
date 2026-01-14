@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use byteorder::{LittleEndian, ReadBytesExt};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -37,6 +37,7 @@ pub struct UfsConfig {
     pub maxnumfiles: u32,
     pub raw_text: String,
     pub savefiles: Vec<crate::path_resolver::SaveFileConfig>, // 解析后的 savefiles 配置
+    pub rootoverrides: Vec<crate::path_resolver::RootOverrideConfig>, // 根目录覆盖配置
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +146,7 @@ impl VdfParser {
         use std::ptr::null_mut;
         use winapi::um::winnt::{KEY_READ, REG_SZ};
         use winapi::um::winreg::{
-            RegCloseKey, RegOpenKeyExA, RegQueryValueExA, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE,
+            HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RegCloseKey, RegOpenKeyExA, RegQueryValueExA,
         };
 
         // 尝试的注册表路径
@@ -241,18 +242,18 @@ impl VdfParser {
                     } else {
                         pending_key = Some(key.to_string());
                     }
-                } else if line == "{" {
-                    if let Some(name) = pending_key.take() {
-                        in_entry = true;
-                        current = Some(VdfFileEntry {
-                            filename: name,
-                            root: 0,
-                            size: 0,
-                            timestamp: 0,
-                            sha: String::new(),
-                            sync_state: 0,
-                        });
-                    }
+                } else if line == "{"
+                    && let Some(name) = pending_key.take()
+                {
+                    in_entry = true;
+                    current = Some(VdfFileEntry {
+                        filename: name,
+                        root: 0,
+                        size: 0,
+                        timestamp: 0,
+                        sha: String::new(),
+                        sync_state: 0,
+                    });
                 }
                 continue;
             }
@@ -265,31 +266,31 @@ impl VdfParser {
                 continue;
             }
 
-            if let Some(e) = current.as_mut() {
-                if let Some((key, val)) = Self::extract_key_value(line) {
-                    match key {
-                        "root" => {
-                            e.root = val.parse().unwrap_or(0);
-                        }
-                        "size" => {
-                            e.size = val.parse::<u64>().unwrap_or(0);
-                        }
-                        "localtime" => {
+            if let Some(e) = current.as_mut()
+                && let Some((key, val)) = Self::extract_key_value(line)
+            {
+                match key {
+                    "root" => {
+                        e.root = val.parse().unwrap_or(0);
+                    }
+                    "size" => {
+                        e.size = val.parse::<u64>().unwrap_or(0);
+                    }
+                    "localtime" => {
+                        e.timestamp = val.parse::<i64>().unwrap_or(0);
+                    }
+                    "remotetime" | "time" => {
+                        if e.timestamp == 0 {
                             e.timestamp = val.parse::<i64>().unwrap_or(0);
                         }
-                        "remotetime" | "time" => {
-                            if e.timestamp == 0 {
-                                e.timestamp = val.parse::<i64>().unwrap_or(0);
-                            }
-                        }
-                        "sha" => {
-                            e.sha = val.to_string();
-                        }
-                        "syncstate" => {
-                            e.sync_state = val.parse().unwrap_or(0);
-                        }
-                        _ => {}
                     }
+                    "sha" => {
+                        e.sha = val.to_string();
+                    }
+                    "syncstate" => {
+                        e.sync_state = val.parse().unwrap_or(0);
+                    }
+                    _ => {}
                 }
             }
         }
@@ -435,18 +436,18 @@ impl VdfParser {
                         version,
                         name_idx,
                         common_idx,
-                    ) {
-                        if !name.is_empty() && name.len() < 200 {
-                            apps.insert(
+                    ) && !name.is_empty()
+                        && name.len() < 200
+                    {
+                        apps.insert(
+                            app_id,
+                            AppInfo {
                                 app_id,
-                                AppInfo {
-                                    app_id,
-                                    name: Some(name),
-                                    developer: None,
-                                    publisher: None,
-                                },
-                            );
-                        }
+                                name: Some(name),
+                                developer: None,
+                                publisher: None,
+                            },
+                        );
                     }
                 }
             }
@@ -489,20 +490,15 @@ impl VdfParser {
 
                 if let Some(pos) = Self::find_pattern(data, &inline_pattern) {
                     let start = pos + 5;
-                    if start < data.len() {
-                        if let Some(end) = data[start..].iter().position(|&b| b == 0) {
-                            if end > 0 && end < 200 {
-                                if let Ok(name) =
-                                    String::from_utf8(data[start..start + end].to_vec())
-                                {
-                                    if !name.is_empty()
-                                        && name.chars().all(|c| c.is_ascii_graphic() || c == ' ')
-                                    {
-                                        return Some(name);
-                                    }
-                                }
-                            }
-                        }
+                    if start < data.len()
+                        && let Some(end) = data[start..].iter().position(|&b| b == 0)
+                        && end > 0
+                        && end < 200
+                        && let Ok(name) = String::from_utf8(data[start..start + end].to_vec())
+                        && !name.is_empty()
+                        && name.chars().all(|c| c.is_ascii_graphic() || c == ' ')
+                    {
+                        return Some(name);
                     }
                 }
 
@@ -516,20 +512,20 @@ impl VdfParser {
                     ((name_i >> 24) & 0xFF) as u8,
                 ];
 
-                if let Some(pos) = Self::find_pattern(data, &idx_pattern) {
-                    if pos + 9 <= data.len() {
-                        let value_idx = u32::from_le_bytes([
-                            data[pos + 5],
-                            data[pos + 6],
-                            data[pos + 7],
-                            data[pos + 8],
-                        ]) as usize;
+                if let Some(pos) = Self::find_pattern(data, &idx_pattern)
+                    && pos + 9 <= data.len()
+                {
+                    let value_idx = u32::from_le_bytes([
+                        data[pos + 5],
+                        data[pos + 6],
+                        data[pos + 7],
+                        data[pos + 8],
+                    ]) as usize;
 
-                        if value_idx < string_table.len() {
-                            let name = &string_table[value_idx];
-                            if !name.is_empty() && name.chars().all(|c| !c.is_control()) {
-                                return Some(name.clone());
-                            }
+                    if value_idx < string_table.len() {
+                        let name = &string_table[value_idx];
+                        if !name.is_empty() && name.chars().all(|c| !c.is_control()) {
+                            return Some(name.clone());
                         }
                     }
                 }
@@ -539,16 +535,15 @@ impl VdfParser {
             let name_pattern = b"name\0";
             if let Some(pos) = Self::find_pattern(data, name_pattern) {
                 let start = pos + 5;
-                if start < data.len() {
-                    if let Some(end) = data[start..].iter().position(|&b| b == 0) {
-                        if end > 0 && end < 200 {
-                            if let Ok(name) = String::from_utf8(data[start..start + end].to_vec()) {
-                                if !name.is_empty() && name.is_ascii() {
-                                    return Some(name);
-                                }
-                            }
-                        }
-                    }
+                if start < data.len()
+                    && let Some(end) = data[start..].iter().position(|&b| b == 0)
+                    && end > 0
+                    && end < 200
+                    && let Ok(name) = String::from_utf8(data[start..start + end].to_vec())
+                    && !name.is_empty()
+                    && name.is_ascii()
+                {
+                    return Some(name);
                 }
             }
         }
@@ -564,9 +559,9 @@ impl VdfParser {
         }
 
         // 检查文件修改时间，确保不是过期缓存
-        if let Ok(metadata) = fs::metadata(&appinfo_path) {
-            if let Ok(_modified) = metadata.modified() {}
-        }
+        if let Ok(metadata) = fs::metadata(&appinfo_path)
+            && let Ok(_modified) = metadata.modified()
+        {}
 
         let data = fs::read(&appinfo_path)?;
 
@@ -785,6 +780,13 @@ impl VdfParser {
                         let savefile =
                             Self::parse_savefile_entry(cursor, string_table, lines, indent + 1);
                         config.savefiles.push(savefile);
+                    } else if parent_key == "rootoverrides"
+                        && key.chars().all(|c| c.is_ascii_digit())
+                    {
+                        // 解析 rootoverrides 的子条目
+                        let override_config =
+                            Self::parse_rootoverride_entry(cursor, string_table, lines, indent + 1);
+                        config.rootoverrides.push(override_config);
                     } else {
                         Self::parse_vdf_section_inner(
                             cursor,
@@ -889,6 +891,113 @@ impl VdfParser {
 
         savefile.root_type = crate::path_resolver::root_name_to_type(&savefile.root);
         savefile
+    }
+
+    // 解析单个 rootoverride 条目
+    fn parse_rootoverride_entry(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+    ) -> crate::path_resolver::RootOverrideConfig {
+        let mut override_config = crate::path_resolver::RootOverrideConfig::default();
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            match type_byte {
+                0x00 => {
+                    // 子节 (如 oslist 可能是子节)
+                    lines.push(format!("{}\"{}\"", indent_str, key));
+                    lines.push(format!("{}{{", indent_str));
+                    if key == "oslist" {
+                        Self::parse_oslist(
+                            cursor,
+                            string_table,
+                            lines,
+                            indent + 1,
+                            &mut override_config.oslist,
+                        );
+                    } else {
+                        Self::skip_section(cursor);
+                    }
+                    lines.push(format!("{}}}", indent_str));
+                }
+                0x01 => {
+                    let value = Self::read_null_string(cursor);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    match key.as_str() {
+                        "root" | "originalroot" => override_config.original_root = value,
+                        "newroot" => override_config.new_root = value,
+                        "addpath" | "path" => override_config.add_path = value,
+                        "oslist" => {
+                            // oslist 可能是字符串形式 "windows,macos"
+                            override_config.oslist =
+                                value.split(',').map(|s| s.trim().to_string()).collect();
+                        }
+                        _ => {}
+                    }
+                }
+                0x02 => {
+                    let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
+                    lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    if key == "useinstead" {
+                        override_config.use_instead = value != 0;
+                    }
+                }
+                _ => {
+                    tracing::debug!("rootoverride 未知类型: 0x{:02x}", type_byte);
+                }
+            }
+        }
+
+        override_config
+    }
+
+    // 解析 oslist 子节
+    fn parse_oslist(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+        oslist: &mut Vec<String>,
+    ) {
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            if type_byte == 0x01 {
+                let value = Self::read_null_string(cursor);
+                lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                oslist.push(value);
+            }
+        }
     }
 
     // 解析 platforms 子节
@@ -1002,6 +1111,20 @@ mod tests {
                             "  [{}] root={}, path={}, pattern={}, platforms={:?}",
                             i, sf.root, sf.path, sf.pattern, sf.platforms
                         );
+                    }
+                    if !config.rootoverrides.is_empty() {
+                        println!("rootoverrides count: {}", config.rootoverrides.len());
+                        for (i, ro) in config.rootoverrides.iter().enumerate() {
+                            println!(
+                                "  [{}] original={}, newroot={}, oslist={:?}, addpath={}, useinstead={}",
+                                i,
+                                ro.original_root,
+                                ro.new_root,
+                                ro.oslist,
+                                ro.add_path,
+                                ro.use_instead
+                            );
+                        }
                     }
                     println!("{}", config.raw_text);
                 }
