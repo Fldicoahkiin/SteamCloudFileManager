@@ -256,58 +256,163 @@ App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
 ```mermaid
 graph TB
-    subgraph dev["Developer"]
+    subgraph dev["🔧 Developer"]
         Steamworks["Steamworks Backend<br/>Configure ufs"]
+        GameCode["Game Code"]
     end
     
-    subgraph client["Steam Client"]
-        AppInfo[(appinfo.vdf)]
-        RemoteCache[(remotecache.vdf)]
+    Cloud(("☁️ Steam Server"))
+    
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["📁 VDF Files"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
         
-        subgraph sync["Steam Cloud Sync Mechanism"]
+        subgraph sync["🔄 Steam Cloud"]
             Auto["Auto-Cloud<br/>Auto Scan & Match"]
             API["Steam Cloud API<br/>ISteamRemoteStorage"]
         end
         
-        SteamBrowser["Steam Built-in Browser<br/>127.0.0.1:8080"]
+        SteamBrowser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
     end
     
-    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
+    ThirdParty["🛠️ Third-Party Tools<br/>(e.g., This Tool)"]
     
-    Cloud(("☁️ Steam Server<br/>store.steampowered.com"))
+    %% Steamworks Config → Auto-Cloud
+    Steamworks --> Cloud
+    Cloud -->|Deliver Config| AppInfo
+    AppInfo -->|ufs Config Rules| Auto
+    Auto --> RemoteCache
     
-    subgraph tool["This Tool"]
+    %% Game Code/Third-Party → API
+    GameCode -->|Call| API
+    ThirdParty -->|Call| API
+    API -->|Write File| RemoteCache
+    
+    %% Bidirectional Sync
+    RemoteCache <===>|Bidirectional Sync| Cloud
+
+```
+
+**This Tool's Interaction Flow:**
+
+```mermaid
+graph TB
+    subgraph tool["🛠️ This Tool"]
         App["Steam Cloud File Manager"]
         Parser["VDF Parser"]
         Resolver["Root ID Path Mapping"]
         UI["File Management UI"]
     end
     
-    %% Config Flow (Steamworks → Server → Client)
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["📁 VDF Files"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
+        API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        Browser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
+    Cloud(("☁️ Steam Server"))
+    
+    %% Read VDF
+    App --> Parser
+    Parser -.Read File List.-> RemoteCache
+    Parser -.Read ufs Config.-> AppInfo
+    
+    %% Root ID Mapping
+    RemoteCache -.Extract Root ID.-> Resolver
+    AppInfo -.Path Mapping Rules.-> Resolver
+    Resolver --> UI
+    
+    %% API Operations
+    UI -->|Upload/Delete/Sync/Remove| API
+    API -->|Write File| RemoteCache
+    
+    %% Download Link
+    UI -->|Get Download Link| CDP
+    CDP --> Browser
+    Browser -->|Access Cloud Storage| Cloud
+    Cloud -.-> Browser
+    Browser -.Return Download Link.-> UI
+```
+
+<details>
+<summary><b>Full Architecture Diagram (Click to Expand)</b></summary>
+
+```mermaid
+graph TB
+    subgraph dev["🔧 Developer"]
+        Steamworks["Steamworks Backend<br/>Configure ufs"]
+        GameCode["Game Code"]
+    end
+    
+    Cloud(("☁️ Steam Server"))
+    
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["📁 VDF Files"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
+        
+        subgraph sync["🔄 Steam Cloud"]
+            Auto["Auto-Cloud<br/>Auto Scan & Match"]
+            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        end
+        
+        SteamBrowser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
+    
+    ThirdParty["🛠️ Third-Party Tools<br/>(e.g., This Tool)"]
+    
+    subgraph tool["🛠️ This Tool"]
+        App["Steam Cloud File Manager"]
+        Parser["VDF Parser"]
+        Resolver["Root ID Path Mapping"]
+        UI["File Management UI"]
+    end
+    
+    %% Steamworks Config → Auto-Cloud
     Steamworks --> Cloud
     Cloud -->|Deliver Config| AppInfo
-    AppInfo --> Auto
-    
-    %% Sync Mechanism
+    AppInfo -->|ufs Config Rules| Auto
     Auto --> RemoteCache
+    
+    %% Game Code/Third-Party → API
+    GameCode -->|Call| API
+    ThirdParty -->|Call| API
+    
+    %% Bidirectional Sync
     API -->|Write File| RemoteCache
     RemoteCache <===>|Bidirectional Sync| Cloud
     
-    %% Browser
-    CDP --> SteamBrowser
-    SteamBrowser --> Cloud
-    
-    %% This Tool
+    %% This Tool Reads
     App --> Parser
-    Parser -.-> RemoteCache
-    Parser -.-> AppInfo
-    Parser --> Resolver
+    Parser -.Read File List.-> RemoteCache
+    Parser -.Read ufs Config.-> AppInfo
+    
+    %% Root ID Mapping
+    RemoteCache -.Extract Root ID.-> Resolver
+    AppInfo -.Path Mapping Rules.-> Resolver
     Resolver --> UI
+    
+    %% This Tool Calls API (Same as Game Code)
     UI -->|Upload/Delete/Sync/Remove| API
+    
+    %% Download Link
     UI -->|Get Download Link| CDP
+    CDP --> SteamBrowser
+    SteamBrowser -->|Access Cloud Storage| Cloud
     Cloud -.-> SteamBrowser
     SteamBrowser -.Return Download Link.-> UI
 ```
+
+</details>
 
 
 

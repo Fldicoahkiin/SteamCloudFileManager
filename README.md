@@ -258,59 +258,163 @@ App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找
 
 ```mermaid
 graph TB
-    subgraph dev["开发者"]
+    subgraph dev["🔧 开发者"]
         Steamworks["Steamworks 后台<br/>配置 ufs"]
+        GameCode["游戏代码"]
     end
     
-    subgraph client["Steam 客户端"]
-        AppInfo[(appinfo.vdf)]
-        RemoteCache[(remotecache.vdf)]
+    Cloud(("☁️ Steam 服务器"))
+    
+    subgraph client["🖥️ Steam 客户端"]
+        subgraph vdf["📁 VDF 文件"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
         
-        subgraph sync["Steam Cloud 同步机制"]
+        subgraph sync["🔄 Steam Cloud"]
             Auto["Auto-Cloud<br/>自动扫描匹配"]
             API["Steam Cloud API<br/>ISteamRemoteStorage"]
         end
         
-        SteamBrowser["Steam 内置浏览器<br/>127.0.0.1:8080"]
+        SteamBrowser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
     end
     
-    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
+    ThirdParty["🛠️ 第三方工具<br/>（如本工具）"]
     
-    Cloud(("☁️ Steam 服务器<br/>store.steampowered.com"))
+    %% Steamworks 配置 → Auto-Cloud
+    Steamworks --> Cloud
+    Cloud -->|下发配置| AppInfo
+    AppInfo -->|ufs 配置规则| Auto
+    Auto --> RemoteCache
     
-    subgraph tool["本工具"]
+    %% 游戏代码/第三方工具 → API
+    GameCode -->|调用| API
+    ThirdParty -->|调用| API
+    API -->|写入文件| RemoteCache
+    
+    %% 双向同步
+    RemoteCache <===>|双向同步| Cloud
+
+```
+
+**本工具交互流程：**
+
+```mermaid
+graph TB
+    subgraph tool["🛠️ 本工具"]
         App["Steam 云文件管理器"]
         Parser["VDF 解析器"]
         Resolver["Root ID 路径映射"]
         UI["文件管理界面"]
     end
     
-    %% 配置流程（Steamworks → 服务器 → 客户端）
+    subgraph client["🖥️ Steam 客户端"]
+        subgraph vdf["📁 VDF 文件"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
+        API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        Browser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
+    Cloud(("☁️ Steam 服务器"))
+    
+    %% 读取 VDF
+    App --> Parser
+    Parser -.读取文件列表.-> RemoteCache
+    Parser -.读取ufs配置.-> AppInfo
+    
+    %% Root ID 映射
+    RemoteCache -.提取 Root ID.-> Resolver
+    AppInfo -.路径映射规则.-> Resolver
+    Resolver --> UI
+    
+    %% API 操作
+    UI -->|上传/删除/同步/移除| API
+    API -->|写入文件| RemoteCache
+    
+    %% 下载链接
+    UI -->|获取下载链接| CDP
+    CDP --> Browser
+    Browser -->|访问云存储| Cloud
+    Cloud -.-> Browser
+    Browser -.返回下载链接.-> UI
+```
+
+<details>
+<summary><b>完整架构图（点击展开）</b></summary>
+
+```mermaid
+graph TB
+    subgraph dev["🔧 开发者"]
+        Steamworks["Steamworks 后台<br/>配置 ufs"]
+        GameCode["游戏代码"]
+    end
+    
+    Cloud(("☁️ Steam 服务器"))
+    
+    subgraph client["🖥️ Steam 客户端"]
+        subgraph vdf["📁 VDF 文件"]
+            AppInfo[(appinfo.vdf)]
+            RemoteCache[(remotecache.vdf)]
+        end
+        
+        subgraph sync["🔄 Steam Cloud"]
+            Auto["Auto-Cloud<br/>自动扫描匹配"]
+            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        end
+        
+        SteamBrowser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
+    end
+    
+    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
+    
+    ThirdParty["🛠️ 第三方工具<br/>（如本工具）"]
+    
+    subgraph tool["🛠️ 本工具"]
+        App["Steam 云文件管理器"]
+        Parser["VDF 解析器"]
+        Resolver["Root ID 路径映射"]
+        UI["文件管理界面"]
+    end
+    
+    %% Steamworks 配置 → Auto-Cloud
     Steamworks --> Cloud
     Cloud -->|下发配置| AppInfo
-    AppInfo --> Auto
-    
-    %% 同步机制
+    AppInfo -->|ufs 配置规则| Auto
     Auto --> RemoteCache
+    
+    %% 游戏代码/第三方工具 → API
+    GameCode -->|调用| API
+    ThirdParty -->|调用| API
+    
+    %% 双向同步
     API -->|写入文件| RemoteCache
     RemoteCache <===>|双向同步| Cloud
     
-    %% 浏览器
-    CDP --> SteamBrowser
-    SteamBrowser --> Cloud
-    
-    %% 本工具
+    %% 本工具读取
     App --> Parser
-    Parser -.-> RemoteCache
-    Parser -.-> AppInfo
-    Parser --> Resolver
+    Parser -.读取文件列表.-> RemoteCache
+    Parser -.读取ufs配置.-> AppInfo
+    
+    %% Root ID 映射
+    RemoteCache -.提取 Root ID.-> Resolver
+    AppInfo -.路径映射规则.-> Resolver
     Resolver --> UI
+    
+    %% 本工具调用 API（与游戏代码相同）
     UI -->|上传/删除/同步/移除| API
+    
+    %% 下载链接
     UI -->|获取下载链接| CDP
+    CDP --> SteamBrowser
+    SteamBrowser -->|访问云存储| Cloud
     Cloud -.-> SteamBrowser
     SteamBrowser -.返回下载链接.-> UI
 ```
 
+</details>
 
 
 #### Steam 云同步的两种方式
