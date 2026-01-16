@@ -24,6 +24,10 @@ pub struct AppConfig {
     // 软链接配置
     #[serde(default)]
     pub symlinks: Vec<SymlinkConfigEntry>,
+
+    // UFS 注入配置（用于持久化自定义云同步路径）
+    #[serde(default)]
+    pub ufs_injections: Vec<UfsInjectionConfig>,
 }
 
 // 软链接配置项
@@ -36,6 +40,22 @@ pub struct SymlinkConfigEntry {
     pub remote_subfolder: String,
     #[serde(default)]
     pub platform: String, // "windows", "macos", "linux"
+    #[serde(default)]
+    pub created_at: i64,
+    #[serde(default)]
+    pub note: String,
+}
+
+// UFS 注入配置项（持久化用户自定义的 appinfo.vdf 修改）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UfsInjectionConfig {
+    pub id: String,
+    pub app_id: u32,
+    pub root: String,    // Root 类型名称
+    pub path: String,    // 相对路径
+    pub pattern: String, // 文件匹配模式
+    #[serde(default)]
+    pub platforms: Vec<String>, // 支持的平台列表
     #[serde(default)]
     pub created_at: i64,
     #[serde(default)]
@@ -320,6 +340,61 @@ pub fn remove_symlink_config(id: &str) -> Result<()> {
         .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
     let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
     config.symlinks.retain(|c| c.id != id);
+
+    // 保存到文件
+    let config_path = get_config_path()?;
+    let content = toml::to_string_pretty(&*config)?;
+    std::fs::write(&config_path, content)?;
+    Ok(())
+}
+
+// 获取 UFS 注入配置
+pub fn get_ufs_injection_configs() -> Vec<UfsInjectionConfig> {
+    get_config().ufs_injections
+}
+
+// 获取指定游戏的 UFS 注入配置
+pub fn get_ufs_injection_configs_for_app(app_id: u32) -> Vec<UfsInjectionConfig> {
+    get_ufs_injection_configs()
+        .into_iter()
+        .filter(|c| c.app_id == app_id)
+        .collect()
+}
+
+// 添加 UFS 注入配置
+pub fn add_ufs_injection_config(entry: UfsInjectionConfig) -> Result<()> {
+    let config = CONFIG
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
+    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
+
+    // 检查是否已存在相同配置（同一 app + root + path）
+    let exists = config
+        .ufs_injections
+        .iter()
+        .any(|c| c.app_id == entry.app_id && c.root == entry.root && c.path == entry.path);
+
+    if exists {
+        return Err(anyhow::anyhow!("相同的 UFS 配置已存在"));
+    }
+
+    config.ufs_injections.push(entry);
+
+    // 保存到文件
+    let config_path = get_config_path()?;
+    let content = toml::to_string_pretty(&*config)?;
+    std::fs::write(&config_path, content)?;
+    tracing::info!("已保存 UFS 注入配置");
+    Ok(())
+}
+
+// 删除 UFS 注入配置
+pub fn remove_ufs_injection_config(id: &str) -> Result<()> {
+    let config = CONFIG
+        .get()
+        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
+    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
+    config.ufs_injections.retain(|c| c.id != id);
 
     // 保存到文件
     let config_path = get_config_path()?;

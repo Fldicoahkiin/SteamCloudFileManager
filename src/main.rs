@@ -3,6 +3,7 @@
 mod app;
 mod app_handlers;
 mod app_state;
+mod appinfo_writer;
 mod async_handlers;
 mod backup;
 mod cdp_client;

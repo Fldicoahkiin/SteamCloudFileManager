@@ -92,12 +92,19 @@ impl CdpClient {
                 })
             })
             .or_else(|| {
-                // 最后回退：任意 page
-                targets
-                    .iter()
-                    .find(|t| t.websocket_debugger_url.is_some() && t.target_type == "page")
+                // 最后回退：任意非 about:blank 的 page
+                targets.iter().find(|t| {
+                    t.websocket_debugger_url.is_some()
+                        && t.target_type == "page"
+                        && t.url.as_ref().is_some_and(|url| !url.starts_with("about:"))
+                })
             })
-            .ok_or_else(|| anyhow!("未找到{}的调试目标", target_desc))?;
+            .ok_or_else(|| {
+                anyhow!(
+                    "未找到{}的调试目标，请先在 Steam 客户端打开云存储页面",
+                    target_desc
+                )
+            })?;
 
         tracing::debug!(
             "CDP 连接到目标 (期望: {}): type={}, url={:?}",

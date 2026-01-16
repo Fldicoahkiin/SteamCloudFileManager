@@ -47,6 +47,7 @@
 - **搜索与过滤**：支持文件名、路径及同步状态的正则表达式检索。
 - **游戏库扫描**：通过解析 `libraryfolders.vdf` 自动发现本地游戏。
 - **软链接同步**：支持将非原生支持的本地文件通过软链接挂载至 Steam Cloud（实验性）。
+- **UFS 配置注入**：直接修改 `appinfo.vdf`，为任意游戏添加自定义云同步路径（实验性）。
 - **多平台支持**：Windows / macOS / Linux。
 
 ## 平台兼容性
@@ -565,6 +566,7 @@ Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位
 - [x] 文件冲突检测与处理
 - [x] 云存档备份
 - [x] 软链接同步支持（实验性）
+- [x] UFS 配置注入（实验性）- 直接修改 appinfo.vdf 添加自定义云同步路径
 - [ ] 自动备份计划
 
 ### 包管理器支持
@@ -622,6 +624,7 @@ src/
 ├── symlink_manager.rs      # 软链接管理
 │
 ├── vdf_parser.rs           # VDF 文件解析（appinfo.vdf, loginusers.vdf）
+├── appinfo_writer.rs       # appinfo.vdf 写入（UFS 配置注入）
 ├── path_resolver.rs        # 路径解析（savefiles 配置 → 实际路径）
 ├── cdp_client.rs           # CDP 网页解析（获取远程文件列表）
 ├── game_scanner.rs         # 游戏扫描（合并 VDF + CDP）

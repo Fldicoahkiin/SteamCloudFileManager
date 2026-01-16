@@ -24,6 +24,7 @@ pub const DOWNLOAD: &str = ph::DOWNLOAD_SIMPLE;
 pub const UPLOAD: &str = ph::UPLOAD_SIMPLE;
 pub const ADD_FILE: &str = ph::FILE_PLUS;
 pub const ADD_FOLDER: &str = ph::FOLDER_PLUS;
+pub const SAVE: &str = ph::FLOPPY_DISK;
 
 // 云同步图标
 pub const CLOUD: &str = ph::CLOUD;

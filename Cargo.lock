@@ -757,6 +757,7 @@ dependencies = [
  "iana-time-zone",
  "js-sys",
  "num-traits",
+ "serde",
  "wasm-bindgen",
  "windows-link 0.2.1",
 ]
@@ -4419,7 +4420,7 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "steam-cloud-file-manager"
-version = "1.2.2"
+version = "1.3.0"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -4439,6 +4440,7 @@ dependencies = [
  "sha1",
  "steamworks",
  "steamworks-sys",
+ "tempfile",
  "toml 0.9.10+spec-1.1.0",
  "tracing",
  "tracing-subscriber",

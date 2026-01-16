@@ -1909,4 +1909,172 @@ impl I18n {
             Language::English => "files",
         }
     }
+
+    // ========== AppInfo 对话框和 UFS 配置管理 ==========
+
+    pub fn appinfo_debug_title(&self, app_id: u32) -> String {
+        match self.lang {
+            Language::Chinese => format!("appinfo.vdf 调试 - App {}", app_id),
+            Language::English => format!("appinfo.vdf Debug - App {}", app_id),
+        }
+    }
+
+    pub fn appinfo_quota(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "配额:",
+            Language::English => "Quota:",
+        }
+    }
+
+    pub fn appinfo_max_files(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "最大文件数:",
+            Language::English => "Max Files:",
+        }
+    }
+
+    pub fn appinfo_current_ufs(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "当前 UFS 云存储配置:",
+            Language::English => "Current UFS Cloud Config:",
+        }
+    }
+
+    pub fn appinfo_custom_ufs(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 自定义 UFS 配置 (实验性)", icons::GEAR),
+            Language::English => format!("{} Custom UFS Config (Experimental)", icons::GEAR),
+        }
+    }
+
+    pub fn appinfo_root_type(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Root 类型:",
+            Language::English => "Root Type:",
+        }
+    }
+
+    pub fn appinfo_relative_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "相对路径:",
+            Language::English => "Relative Path:",
+        }
+    }
+
+    pub fn appinfo_pattern(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "文件匹配:",
+            Language::English => "Pattern:",
+        }
+    }
+
+    pub fn appinfo_inject(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 注入到 appinfo.vdf", icons::EXPORT),
+            Language::English => format!("{} Inject to appinfo.vdf", icons::EXPORT),
+        }
+    }
+
+    pub fn appinfo_save_config(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 保存配置", icons::SAVE),
+            Language::English => format!("{} Save Config", icons::SAVE),
+        }
+    }
+
+    pub fn appinfo_restart_steam(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 重启 Steam", icons::REFRESH),
+            Language::English => format!("{} Restart Steam", icons::REFRESH),
+        }
+    }
+
+    pub fn appinfo_saved_configs(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "已保存的配置:",
+            Language::English => "Saved Configs:",
+        }
+    }
+
+    pub fn appinfo_inject_success(&self, root: &str, path: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("成功注入 root={} path={}", root, path),
+            Language::English => format!("Success: root={} path={}", root, path),
+        }
+    }
+
+    pub fn appinfo_save_success(&self, root: &str, path: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("已保存配置 root={} path={}", root, path),
+            Language::English => format!("Saved config: root={} path={}", root, path),
+        }
+    }
+
+    pub fn appinfo_warning(&self) -> String {
+        match self.lang {
+            Language::Chinese => {
+                format!(
+                    "{} 此功能为实验性质。修改 appinfo.vdf 可能被 Steam 覆盖。\n\
+                     需要在 Steam 启动前注入，或在注入后立即重启 Steam。",
+                    icons::WARNING
+                )
+            }
+            Language::English => {
+                format!(
+                    "{} This is experimental. appinfo.vdf may be overwritten by Steam.\n\
+                     Inject before Steam starts, or restart Steam after injection.",
+                    icons::WARNING
+                )
+            }
+        }
+    }
+
+    pub fn appinfo_path_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "例如: MyGame/Saves",
+            Language::English => "e.g. MyGame/Saves",
+        }
+    }
+
+    pub fn appinfo_pattern_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "* 或 *.sav",
+            Language::English => "* or *.sav",
+        }
+    }
+
+    pub fn appinfo_delete_config(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 删除", icons::TRASH),
+            Language::English => format!("{} Delete", icons::TRASH),
+        }
+    }
+
+    pub fn appinfo_load_config(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 加载", icons::DOWNLOAD),
+            Language::English => format!("{} Load", icons::DOWNLOAD),
+        }
+    }
+
+    pub fn appinfo_delete_success(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "配置已删除",
+            Language::English => "Config deleted",
+        }
+    }
+
+    pub fn appinfo_apply_success(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "配置已应用到注入器",
+            Language::English => "Config applied to injector",
+        }
+    }
+
+    pub fn appinfo_no_saved_configs(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "暂无已保存的配置",
+            Language::English => "No saved configs",
+        }
+    }
 }

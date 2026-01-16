@@ -1,5 +1,6 @@
 // 路径解析模块
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -30,7 +31,7 @@ fn get_root_overrides_cache(app_id: u32) -> Option<Vec<RootOverrideConfig>> {
 
 // Steam Cloud 存储位置类型
 // 根据官方文档: https://partner.steamgames.com/doc/features/cloud
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum RootType {
     // Root 0: SteamCloudDocuments - Steam 云文件夹
@@ -688,7 +689,7 @@ pub fn apply_root_override(
 }
 
 // 从 ufs savefiles 配置中的路径配置
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SaveFileConfig {
     pub root: String,                // root 字符串名称 (如 "WinMyDocuments")
     pub root_type: Option<RootType>, // 解析后的 RootType
@@ -700,7 +701,7 @@ pub struct SaveFileConfig {
 
 // Root Override 配置
 // 用于在特定操作系统上将一个根目录重定向到另一个
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RootOverrideConfig {
     pub original_root: String, // 原始根名称 (如 "WinMyDocuments")
     pub oslist: Vec<String>,   // 适用的操作系统列表
