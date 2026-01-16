@@ -47,6 +47,7 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 - **Search & Filter**: Supports regex search for filenames, paths, and sync status.
 - **Game Library Scanning**: Automatically discovers local games by parsing `libraryfolders.vdf`.
 - **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
+- **UFS Config Injection**: Directly modify `appinfo.vdf` to add custom cloud sync paths for any game (Experimental).
 - **Multi-Platform Support**: Windows / macOS / Linux.
 
 ## Platform Compatibility
@@ -564,6 +565,7 @@ Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage
 - [x] File conflict detection and handling
 - [x] Cloud save backup
 - [x] Symlink sync support (experimental)
+- [x] UFS config injection (experimental) - Directly modify appinfo.vdf to add custom cloud sync paths
 - [ ] Automatic backup schedule
 
 ### Package Manager Support
@@ -621,6 +623,7 @@ src/
 ├── symlink_manager.rs      # Symlink management
 │
 ├── vdf_parser.rs           # VDF file parsing (appinfo.vdf, loginusers.vdf)
+├── appinfo_writer.rs       # appinfo.vdf writing (UFS config injection)
 ├── path_resolver.rs        # Path resolution (savefiles config → actual paths)
 ├── cdp_client.rs           # CDP web parsing (fetch remote file list)
 ├── game_scanner.rs         # Game scanning (merge VDF + CDP)
