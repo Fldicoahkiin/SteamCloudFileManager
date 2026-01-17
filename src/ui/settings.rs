@@ -3,6 +3,64 @@ use crate::icons;
 use egui;
 use std::path::PathBuf;
 
+// 窗口尺寸常量
+const CONTENT_WIDTH: f32 = 380.0;
+const WINDOW_HEIGHT: f32 = 380.0;
+
+// 绘制侧边栏 Tab 按钮
+fn draw_sidebar_tab(
+    ui: &mut egui::Ui,
+    label: &str,
+    is_selected: bool,
+    accent_color: egui::Color32,
+) -> egui::Response {
+    let text_color = if is_selected {
+        accent_color
+    } else {
+        ui.style().visuals.text_color()
+    };
+    let fill_color = if is_selected {
+        ui.style().visuals.selection.bg_fill
+    } else {
+        crate::ui::theme::transparent_color()
+    };
+
+    ui.add_sized(
+        [ui.available_width(), 28.0],
+        egui::Button::new(egui::RichText::new(label).color(text_color)).fill(fill_color),
+    )
+}
+
+// 绘制只读路径字段（带打开按钮）
+fn draw_readonly_path_field<F>(
+    ui: &mut egui::Ui,
+    display_value: &mut String,
+    original_value: &str,
+    button_tooltip: &str,
+    on_open: F,
+) where
+    F: FnOnce(),
+{
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            if ui
+                .button(icons::FOLDER_OPEN)
+                .on_hover_text(button_tooltip)
+                .clicked()
+            {
+                on_open();
+            }
+
+            let w = ui.available_width();
+            let response = ui.add_sized([w, 24.0], egui::TextEdit::singleline(display_value));
+
+            if response.lost_focus() && display_value != original_value {
+                *display_value = original_value.to_string();
+            }
+        });
+    });
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum SettingsTab {
     #[default]
@@ -69,172 +127,94 @@ pub fn draw_settings_window(
     let mut download_release = None;
 
     let accent_color = crate::ui::theme::accent_color(ctx);
+    let sidebar_width = calculate_sidebar_width(i18n);
+    let window_width = sidebar_width + CONTENT_WIDTH + 40.0;
 
     egui::Window::new(i18n.settings_title())
         .open(show)
         .resizable(true)
         .collapsible(false)
-        .default_size([520.0, 460.0])
-        .min_size([450.0, 380.0])
+        .default_size([window_width, WINDOW_HEIGHT])
+        .min_size([window_width, WINDOW_HEIGHT])
         .show(ctx, |ui| {
-            let content_height = ui.available_height().max(400.0);
+            let content_height = ui.available_height().max(WINDOW_HEIGHT);
 
             ui.horizontal(|ui| {
-                // 左侧边栏
-                ui.vertical(|ui| {
-                    ui.set_width(80.0);
-                    ui.set_min_height(content_height);
-                    ui.add_space(8.0);
-
-                    // 日志
-                    let log_selected = state.tab == SettingsTab::Log;
-                    let log_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.settings_log()).color(
-                            if log_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if log_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if log_response.clicked() {
-                        state.tab = SettingsTab::Log;
-                    }
-
-                    ui.add_space(4.0);
-
-                    // 备份
-                    let backup_selected = state.tab == SettingsTab::Backup;
-                    let backup_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.backup()).color(
-                            if backup_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if backup_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if backup_response.clicked() {
-                        state.tab = SettingsTab::Backup;
-                    }
-
-                    ui.add_space(4.0);
-
-                    // 外观
-                    let appearance_selected = state.tab == SettingsTab::Appearance;
-                    let appearance_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.settings_appearance()).color(
-                            if appearance_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if appearance_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if appearance_response.clicked() {
-                        state.tab = SettingsTab::Appearance;
-                    }
-
-                    ui.add_space(4.0);
-
-                    // 高级
-                    let advanced_selected = state.tab == SettingsTab::Advanced;
-                    let advanced_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.settings_advanced()).color(
-                            if advanced_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if advanced_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if advanced_response.clicked() {
-                        state.tab = SettingsTab::Advanced;
-                    }
-
-                    ui.add_space(4.0);
-
-                    // 关于
-                    let about_selected = state.tab == SettingsTab::About;
-                    let about_response = ui.add_sized(
-                        [ui.available_width(), 28.0],
-                        egui::Button::new(egui::RichText::new(i18n.settings_about()).color(
-                            if about_selected {
-                                accent_color
-                            } else {
-                                ui.style().visuals.text_color()
-                            },
-                        ))
-                        .fill(if about_selected {
-                            ui.style().visuals.selection.bg_fill
-                        } else {
-                            crate::ui::theme::transparent_color()
-                        }),
-                    );
-                    if about_response.clicked() {
-                        state.tab = SettingsTab::About;
-                    }
-                });
-
+                draw_sidebar(ui, state, sidebar_width, content_height, accent_color, i18n);
                 ui.separator();
-
-                // 右侧内容
-                ui.vertical(|ui| {
-                    ui.set_min_width(ui.available_width());
-                    egui::ScrollArea::vertical()
-                        .id_salt("settings_content")
-                        .show(ui, |ui| {
-                            ui.add_space(8.0);
-                            match state.tab {
-                                SettingsTab::Log => {
-                                    draw_log_settings(ui, state, i18n);
-                                }
-                                SettingsTab::Appearance => {
-                                    draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
-                                }
-                                SettingsTab::Advanced => {
-                                    draw_advanced_settings(ui, state, i18n);
-                                }
-                                SettingsTab::Backup => {
-                                    draw_backup_settings(ui, state, i18n);
-                                }
-                                SettingsTab::About => {
-                                    download_release = draw_about_content(
-                                        ui,
-                                        &mut state.about_icon_texture,
-                                        update_manager,
-                                        i18n,
-                                    );
-                                }
-                            }
-                        });
-                });
+                download_release = draw_content_area(ctx, ui, state, update_manager, i18n);
             });
         });
+
+    download_release
+}
+
+// 绘制侧边栏
+fn draw_sidebar(
+    ui: &mut egui::Ui,
+    state: &mut SettingsWindowState,
+    width: f32,
+    min_height: f32,
+    accent_color: egui::Color32,
+    i18n: &I18n,
+) {
+    ui.vertical(|ui| {
+        ui.set_width(width);
+        ui.set_min_height(min_height);
+        ui.add_space(8.0);
+
+        let tabs = [
+            (i18n.settings_log(), SettingsTab::Log),
+            (i18n.backup(), SettingsTab::Backup),
+            (i18n.settings_appearance(), SettingsTab::Appearance),
+            (i18n.settings_advanced(), SettingsTab::Advanced),
+            (i18n.settings_about(), SettingsTab::About),
+        ];
+
+        for (idx, (label, tab)) in tabs.iter().enumerate() {
+            if idx > 0 {
+                ui.add_space(4.0);
+            }
+            if draw_sidebar_tab(ui, label, state.tab == *tab, accent_color).clicked() {
+                state.tab = *tab;
+            }
+        }
+    });
+}
+
+// 绘制内容区域
+fn draw_content_area(
+    ctx: &egui::Context,
+    ui: &mut egui::Ui,
+    state: &mut SettingsWindowState,
+    update_manager: &mut crate::update::UpdateManager,
+    i18n: &I18n,
+) -> Option<crate::update::ReleaseInfo> {
+    let mut download_release = None;
+
+    ui.vertical(|ui| {
+        egui::ScrollArea::vertical()
+            .id_salt("settings_content")
+            .show(ui, |ui| {
+                ui.add_space(8.0);
+                match state.tab {
+                    SettingsTab::Log => draw_log_settings(ui, state, i18n),
+                    SettingsTab::Appearance => {
+                        draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
+                    }
+                    SettingsTab::Advanced => draw_advanced_settings(ui, state, i18n),
+                    SettingsTab::Backup => draw_backup_settings(ui, state, i18n),
+                    SettingsTab::About => {
+                        download_release = draw_about_content(
+                            ui,
+                            &mut state.about_icon_texture,
+                            update_manager,
+                            i18n,
+                        );
+                    }
+                }
+            });
+    });
 
     download_release
 }
@@ -281,31 +261,20 @@ fn draw_log_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &
     );
     ui.add_space(4.0);
 
-    // 获取原始路径用于重置
     let original_path = crate::logger::get_log_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-
-    ui.horizontal(|ui| {
-        let response = ui.add_sized(
-            [ui.available_width() - 32.0, 20.0],
-            egui::TextEdit::singleline(&mut state.log_dir_display),
-        );
-
-        // 编辑后自动重置（失去焦点时）
-        if response.lost_focus() && state.log_dir_display != original_path {
-            state.log_dir_display = original_path.clone();
-        }
-
-        if ui
-            .button(icons::FOLDER_OPEN)
-            .on_hover_text(i18n.open_log_dir())
-            .clicked()
-            && let Err(e) = crate::logger::open_log_directory()
-        {
-            tracing::error!("打开日志目录失败: {}", e);
-        }
-    });
+    draw_readonly_path_field(
+        ui,
+        &mut state.log_dir_display,
+        &original_path,
+        i18n.open_log_dir(),
+        || {
+            if let Err(e) = crate::logger::open_log_directory() {
+                tracing::error!("打开日志目录失败: {}", e);
+            }
+        },
+    );
 }
 
 // 外观设置内容
@@ -349,21 +318,24 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
     ui.heading(i18n.steam_path_label());
     ui.add_space(8.0);
 
-    // 路径输入框和浏览按钮
+    // 路径输入框和浏览按钮 - 使用 horizontal + right_to_left 布局
     ui.horizontal(|ui| {
-        ui.add_sized(
-            [ui.available_width() - 60.0, 24.0],
-            egui::TextEdit::singleline(&mut state.steam_path_input)
-                .hint_text("Steam 安装路径")
-                .interactive(false), // 只读，通过浏览按钮修改
-        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+            if ui.button(i18n.steam_path_browse()).clicked()
+                && let Some(path) = rfd::FileDialog::new().pick_folder()
+            {
+                state.steam_path_input = path.display().to_string();
+                state.steam_path_changed = true;
+            }
 
-        if ui.button(i18n.steam_path_browse()).clicked()
-            && let Some(path) = rfd::FileDialog::new().pick_folder()
-        {
-            state.steam_path_input = path.display().to_string();
-            state.steam_path_changed = true;
-        }
+            let w = ui.available_width();
+            ui.add_sized(
+                [w, 24.0],
+                egui::TextEdit::singleline(&mut state.steam_path_input)
+                    .hint_text("Steam 安装路径")
+                    .interactive(false),
+            );
+        });
     });
 
     // 验证路径并显示状态
@@ -489,7 +461,7 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
 
     ui.add_space(24.0);
 
-    // 显示配置文件位置
+    // 配置文件位置
     let original_config_path = crate::config::get_config_path()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
@@ -501,33 +473,25 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
             .color(text_subtle),
     );
     ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        let response = ui.add_sized(
-            [ui.available_width() - 32.0, 20.0],
-            egui::TextEdit::singleline(&mut state.config_path_display),
-        );
-
-        if response.lost_focus() && state.config_path_display != original_config_path {
-            state.config_path_display = original_config_path.clone();
-        }
-
-        if ui
-            .button(icons::FOLDER_OPEN)
-            .on_hover_text(i18n.open_config_dir())
-            .clicked()
-            && let Some(ref config_path) = config_path_for_open
-            && let Some(parent) = config_path.parent()
-        {
-            let _ = open::that(parent);
-        }
-    });
+    draw_readonly_path_field(
+        ui,
+        &mut state.config_path_display,
+        &original_config_path,
+        i18n.open_config_dir(),
+        || {
+            if let Some(ref config_path) = config_path_for_open
+                && let Some(parent) = config_path.parent()
+            {
+                let _ = open::that(parent);
+            }
+        },
+    );
 }
 
 // 备份设置内容
 fn draw_backup_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &I18n) {
     let text_subtle = ui.style().visuals.text_color().gamma_multiply(0.6);
 
-    // 备份目录路径
     let original_backup_path = crate::backup::get_backup_root_dir()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
@@ -538,26 +502,19 @@ fn draw_backup_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n
             .color(text_subtle),
     );
     ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        let response = ui.add_sized(
-            [ui.available_width() - 32.0, 20.0],
-            egui::TextEdit::singleline(&mut state.backup_dir_display),
-        );
-
-        if response.lost_focus() && state.backup_dir_display != original_backup_path {
-            state.backup_dir_display = original_backup_path.clone();
-        }
-
-        if ui
-            .button(icons::FOLDER_OPEN)
-            .on_hover_text(i18n.backup_open_dir())
-            .clicked()
-            && let Ok(manager) = crate::backup::BackupManager::new()
-            && let Err(e) = manager.open_backup_dir()
-        {
-            tracing::error!("打开备份目录失败: {}", e);
-        }
-    });
+    draw_readonly_path_field(
+        ui,
+        &mut state.backup_dir_display,
+        &original_backup_path,
+        i18n.backup_open_dir(),
+        || {
+            if let Ok(manager) = crate::backup::BackupManager::new()
+                && let Err(e) = manager.open_backup_dir()
+            {
+                tracing::error!("打开备份目录失败: {}", e);
+            }
+        },
+    );
 }
 
 // 关于内容
@@ -816,4 +773,29 @@ fn draw_about_content(
     });
 
     download_release
+}
+
+// 根据当前语言动态计算侧边栏宽度
+fn calculate_sidebar_width(i18n: &I18n) -> f32 {
+    let sidebar_labels = [
+        i18n.settings_log(),
+        i18n.backup(),
+        i18n.settings_appearance(),
+        i18n.settings_advanced(),
+        i18n.settings_about(),
+    ];
+
+    // 估算每个字符的宽度（中文约14px，英文约8px）
+    let max_label_width = sidebar_labels
+        .iter()
+        .map(|label| {
+            label
+                .chars()
+                .map(|c| if c.is_ascii() { 8.0 } else { 14.0 })
+                .sum::<f32>()
+        })
+        .fold(0.0_f32, |a, b| a.max(b));
+
+    // 添加按钮内边距和两侧边距
+    (max_label_width + 32.0).max(80.0)
 }
