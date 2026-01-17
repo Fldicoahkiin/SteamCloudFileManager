@@ -157,7 +157,10 @@ pub struct MiscState {
 
 impl Default for MiscState {
     fn default() -> Self {
-        let i18n = I18n::new(Language::Chinese);
+        // 从配置加载语言设置
+        let config = crate::config::get_config();
+        let lang = Language::from_config(&config.appearance.language);
+        let i18n = I18n::new(lang);
         Self {
             status_message: i18n.status_enter_app_id().to_string(),
             quota_info: None,

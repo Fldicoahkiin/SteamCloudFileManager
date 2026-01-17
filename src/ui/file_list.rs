@@ -25,6 +25,7 @@ struct TreeRenderContext<'a> {
     show_only_local: bool,
     show_only_cloud: bool,
     sync_status_map: &'a HashMap<String, SyncStatus>,
+    i18n: &'a I18n,
 }
 
 // 树节点渲染的可变上下文
@@ -34,6 +35,7 @@ struct TreeBodyContext<'a> {
     show_only_cloud: bool,
     last_selected_index: &'a mut Option<usize>,
     sync_status_map: &'a HashMap<String, SyncStatus>,
+    i18n: &'a I18n,
 }
 
 // 绘制树状线条
@@ -372,6 +374,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
                     show_only_cloud: *state.show_only_cloud,
                     last_selected_index: state.last_selected_index,
                     sync_status_map,
+                    i18n,
                 };
                 render_tree_body(&mut body, children, selected_files, &mut ctx);
             }
@@ -394,6 +397,7 @@ fn render_tree_body(
         show_only_local: ctx.show_only_local,
         show_only_cloud: ctx.show_only_cloud,
         sync_status_map: ctx.sync_status_map,
+        i18n: ctx.i18n,
     };
     render_tree_body_recursive(
         body,
@@ -557,6 +561,7 @@ fn render_tree_body_recursive(
 
                 // 获取同步状态
                 let sync_status = ctx.sync_status_map.get(&file.name).copied();
+                let i18n = ctx.i18n;
 
                 // 渲染文件行
                 body.row(18.0, |mut row| {
@@ -664,30 +669,33 @@ fn render_tree_body_recursive(
                     // 状态列（最右边）
                     row.col(|ui| {
                         if let Some(status) = sync_status {
-                            let ctx = ui.ctx();
-                            let i18n = crate::i18n::I18n::new(crate::i18n::Language::default());
+                            let ui_ctx = ui.ctx();
                             let (text, color) = match status {
-                                SyncStatus::Synced => {
-                                    (i18n.filter_synced(), crate::ui::theme::success_color(ctx))
-                                }
-                                SyncStatus::LocalNewer => {
-                                    (i18n.status_local_newer(), crate::ui::theme::info_color(ctx))
-                                }
+                                SyncStatus::Synced => (
+                                    i18n.filter_synced(),
+                                    crate::ui::theme::success_color(ui_ctx),
+                                ),
+                                SyncStatus::LocalNewer => (
+                                    i18n.status_local_newer(),
+                                    crate::ui::theme::info_color(ui_ctx),
+                                ),
                                 SyncStatus::CloudNewer => (
                                     i18n.status_cloud_newer(),
-                                    crate::ui::theme::warning_color(ctx),
+                                    crate::ui::theme::warning_color(ui_ctx),
                                 ),
-                                SyncStatus::Conflict => {
-                                    (i18n.status_conflict(), crate::ui::theme::error_color(ctx))
-                                }
-                                SyncStatus::LocalOnly => {
-                                    (i18n.status_local_only(), crate::ui::theme::muted_color(ctx))
-                                }
+                                SyncStatus::Conflict => (
+                                    i18n.status_conflict(),
+                                    crate::ui::theme::error_color(ui_ctx),
+                                ),
+                                SyncStatus::LocalOnly => (
+                                    i18n.status_local_only(),
+                                    crate::ui::theme::muted_color(ui_ctx),
+                                ),
                                 SyncStatus::CloudOnly => (
                                     i18n.status_cloud_only(),
-                                    crate::ui::theme::cloud_only_color(ctx),
+                                    crate::ui::theme::cloud_only_color(ui_ctx),
                                 ),
-                                SyncStatus::Unknown => ("?", crate::ui::theme::muted_color(ctx)),
+                                SyncStatus::Unknown => ("?", crate::ui::theme::muted_color(ui_ctx)),
                             };
                             ui.colored_label(color, text);
                         }

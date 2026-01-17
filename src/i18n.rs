@@ -4,21 +4,89 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Language {
     #[default]
-    Chinese,
     English,
+    Chinese,
 }
 
 impl Language {
     // 返回所有支持的语言列表
     pub const fn all() -> &'static [Language] {
-        &[Language::Chinese, Language::English]
+        &[Language::English, Language::Chinese]
     }
 
     pub fn display_name(&self) -> &'static str {
         match self {
-            Language::Chinese => "简体中文",
             Language::English => "English",
+            Language::Chinese => "简体中文",
         }
+    }
+
+    // 从配置字符串解析语言设置
+    pub fn from_config(value: &str) -> Self {
+        let result = match value {
+            "en" => Language::English,
+            "zh" => Language::Chinese,
+            "auto" => Self::detect_system_language(),
+            _ => Language::English,
+        };
+        tracing::info!("语言配置: {} -> {:?}", value, result);
+        result
+    }
+
+    // 转换为配置字符串
+    pub fn to_config(self) -> &'static str {
+        match self {
+            Language::Chinese => "zh",
+            Language::English => "en",
+        }
+    }
+
+    // 检测系统语言
+    pub fn detect_system_language() -> Self {
+        // 尝试读取环境变量
+        let lang_env = std::env::var("LANG")
+            .or_else(|_| std::env::var("LC_ALL"))
+            .or_else(|_| std::env::var("LC_MESSAGES"))
+            .or_else(|_| std::env::var("LANGUAGE"))
+            .unwrap_or_default();
+
+        // 检查环境变量是否为中文
+        if lang_env.starts_with("zh")
+            || lang_env.contains("CN")
+            || lang_env.contains("TW")
+            || lang_env.contains("HK")
+        {
+            tracing::info!("系统语言检测: 中文 (环境变量: {})", lang_env);
+            return Language::Chinese;
+        }
+
+        // macOS: 使用 defaults 命令检测
+        #[cfg(target_os = "macos")]
+        if let Ok(output) = std::process::Command::new("defaults")
+            .args(["read", "-g", "AppleLanguages"])
+            .output()
+            && let Ok(stdout) = String::from_utf8(output.stdout)
+            && stdout.contains("zh")
+        {
+            tracing::info!("系统语言检测: 中文 (macOS AppleLanguages)");
+            return Language::Chinese;
+        }
+
+        // Windows: 使用 PowerShell 检测系统区域设置
+        #[cfg(target_os = "windows")]
+        if let Ok(output) = std::process::Command::new("powershell")
+            .args(["-Command", "(Get-Culture).Name"])
+            .output()
+            && let Ok(stdout) = String::from_utf8(output.stdout)
+            && stdout.starts_with("zh")
+        {
+            tracing::info!("系统语言检测: 中文 (Windows Culture)");
+            return Language::Chinese;
+        }
+
+        // 默认使用英文
+        tracing::info!("系统语言检测: 英文 (默认)");
+        Language::English
     }
 }
 
@@ -40,6 +108,13 @@ impl I18n {
     }
 
     // ========== UI 通用文本 ==========
+
+    pub fn language_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "语言:",
+            Language::English => "Language:",
+        }
+    }
 
     pub fn app_title(&self) -> &'static str {
         match self.lang {

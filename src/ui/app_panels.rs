@@ -97,9 +97,17 @@ pub fn render_top_panel(
                             .clicked()
                         {
                             misc.i18n.set_language(*lang);
+                            // 持久化语言设置
+                            if let Err(e) = crate::config::update_config(|config| {
+                                config.appearance.language = lang.to_config().to_string();
+                            }) {
+                                tracing::error!("保存语言设置失败: {}", e);
+                            }
                         }
                     }
                 });
+            // 在语言选择器左边显示标签
+            ui.label(misc.i18n.language_label());
         });
     });
 

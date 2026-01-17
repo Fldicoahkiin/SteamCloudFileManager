@@ -73,16 +73,25 @@ pub struct AppearanceConfig {
     // 主题模式: "system", "light", "dark"
     #[serde(default = "default_theme")]
     pub theme_mode: String,
+
+    // 语言设置: "auto", "zh", "en"
+    #[serde(default = "default_language")]
+    pub language: String,
 }
 
 fn default_theme() -> String {
     "system".to_string()
 }
 
+fn default_language() -> String {
+    "auto".to_string()
+}
+
 impl Default for AppearanceConfig {
     fn default() -> Self {
         Self {
             theme_mode: default_theme(),
+            language: default_language(),
         }
     }
 }
@@ -184,6 +193,7 @@ pub fn save_config(config: &AppConfig) -> Result<()> {
     // 如果是默认配置，写入带注释的版本
     let content = if config.paths.steam_path.is_none()
         && config.appearance.theme_mode == "system"
+        && config.appearance.language == "auto"
         && config.logging.enabled
     {
         AppConfig::default_toml_with_comments()
