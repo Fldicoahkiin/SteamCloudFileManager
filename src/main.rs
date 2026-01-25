@@ -21,6 +21,7 @@ mod steam_api;
 mod steam_process;
 mod steam_worker;
 mod symlink_manager;
+mod ufs_dump;
 mod ui;
 mod update;
 mod user_manager;
@@ -37,6 +38,17 @@ fn main() -> Result<(), eframe::Error> {
         // Worker 模式：不初始化 GUI，只运行 Steam API 服务
         steam_worker::run_worker();
         return Ok(());
+    }
+
+    // 检查是否请求 UFS 配置转储
+    if let Some(pos) = args.iter().position(|a| a == "--ufs") {
+        if let Some(app_id_str) = args.get(pos + 1) {
+            dump_ufs_config(app_id_str);
+            std::process::exit(0);
+        } else {
+            eprintln!("用法: {} --ufs <app_id>", args[0]);
+            std::process::exit(1);
+        }
     }
 
     // 初始化配置系统
@@ -100,4 +112,10 @@ fn load_icon() -> egui::IconData {
             height: 32,
         },
     }
+}
+
+// UFS 配置转储功能
+// 用法: ./SteamCloudFileManager --ufs <app_id>
+fn dump_ufs_config(app_id_str: &str) {
+    ufs_dump::dump(app_id_str);
 }

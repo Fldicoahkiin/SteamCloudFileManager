@@ -941,8 +941,12 @@ impl VdfParser {
                     lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
                     match key.as_str() {
                         "root" | "originalroot" => override_config.original_root = value,
-                        "newroot" => override_config.new_root = value,
+                        "useinstead" | "newroot" => override_config.new_root = value,
                         "addpath" | "path" => override_config.add_path = value,
+                        "os" => {
+                            // os 字段是单个平台名称，如 "Linux", "MacOS", "Windows"
+                            override_config.oslist = vec![value];
+                        }
                         "oslist" => {
                             // oslist 可能是字符串形式 "windows,macos"
                             override_config.oslist =
@@ -954,9 +958,8 @@ impl VdfParser {
                 0x02 => {
                     let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
                     lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
-                    if key == "useinstead" {
-                        override_config.use_instead = value != 0;
-                    }
+                    // useinstead 可以是整数也可以是字符串，这里处理整数情况
+                    // 但通常 useinstead 是字符串（新根名称），所以这里不需要处理
                 }
                 _ => {
                     tracing::debug!("rootoverride 未知类型: 0x{:02x}", type_byte);

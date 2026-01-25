@@ -321,21 +321,53 @@
         }
     }
 
-    "rootoverrides"                     // 可选
+
+    "rootoverrides"                     // 可选，根先决替代
+    //
+    // 官方文档说明：
+    // 如果应用程序是跨平台的，且每个操作系统需要不同的目录，可使用根先决替代。
+    // 若使用此功能，原始根路径的"操作系统"下拉菜单中应指明 [所有操作系统]。
+    //
+    // 由 5 个部分组成：
+    // 1. 原始根 (root)        - 对应上面设置的根之一
+    // 2. 操作系统 (os)        - 使用此先决替代的操作系统
+    // 3. 新根 (useinstead)    - 原始根映射到指定操作系统的新位置
+    // 4. 添加/替代路径 (addpath) - 插入到新根和原始子目录之间的子目录路径
+    // 5. 替代路径             - 启用后，addpath 完全替代原始子目录
     {
-        "0"
+        "0"                              // 索引：独立于 savefiles，从 0 开始（可能不连续）
         {
-            "oslist"        "目标平台"
-            "newroot"       "新根目录"
-            "addpath"       "附加路径"
-            "useinstead"    "1"
+            "root"          "原始根目录"    // 如 gameinstall, WinSavedGames
+            "os"            "目标平台"      // MacOS, Linux, Windows
+            "oscompare"     "="             // 比较符，已知值："="（可能还有其他如"!="，待验证）
+            "useinstead"    "新根目录"      // 新的根目录名称，如 MacAppSupport, LinuxXdgDataHome
+            "addpath"       "附加路径"      // 可选，附加到路径末尾，如 "Celeste"
+            "pathtransforms" { }            // 可选，路径转换（用途待验证）
         }
     }
 }
 ```
 
+### Steamworks 后台界面与 VDF 字段对应
+
+![Steamworks Auto-Cloud 配置界面](docs/steamworks_autocloud_ui.png)
+
+| Steamworks 后台 | VDF 字段 | 说明 |
+|----------------|----------|------|
+| Original Root | `root` | 要覆盖的原始根目录 |
+| OS | `os` | 目标操作系统 (Mac OS X, Linux + SteamOS 等) |
+| New Root | `useinstead` | 新的根目录位置 |
+| Add/Replace Path | `addpath` | 附加/替代路径 |
+| Replace Path [✓] | (待确认) | 勾选后 addpath 完全替代原始子目录 |
+
+> **待验证事项**：
+> - `oscompare` 其他可能值待验证
+> - `pathtransforms` 用途不明
+> - "Replace Path" 勾选框对应的 VDF 字段待确认
+> - 索引可能不连续
+
 ---
 
-**最后更新**：2026-01-14  
+**最后更新**：2026-01-21  
 **维护者**：[@Fldicoahkiin](https://github.com/Fldicoahkiin)
 

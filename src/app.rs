@@ -200,33 +200,6 @@ impl SteamCloudApp {
         }
     }
 
-    fn inject_ufs_config(&mut self) {
-        if let Some(ref mut dialog) = self.dialogs.appinfo_dialog
-            && let Some(savefile) = dialog.get_custom_savefile()
-        {
-            let app_id = dialog.app_id;
-            match crate::appinfo_writer::AppInfoWriter::new() {
-                Ok(writer) => match writer.inject_ufs(app_id, std::slice::from_ref(&savefile)) {
-                    Ok(_) => {
-                        dialog.inject_status = Some(
-                            self.misc
-                                .i18n
-                                .appinfo_inject_success(&savefile.root, &savefile.path),
-                        );
-                        // 刷新配置显示
-                        self.refresh_appinfo_config();
-                    }
-                    Err(e) => {
-                        dialog.inject_status = Some(format!("Error: {}", e));
-                    }
-                },
-                Err(e) => {
-                    dialog.inject_status = Some(format!("Writer init error: {}", e));
-                }
-            }
-        }
-    }
-
     fn refresh_appinfo_config(&mut self) {
         if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
             let app_id = dialog.app_id;
@@ -246,36 +219,53 @@ impl SteamCloudApp {
         }
     }
 
-    fn save_ufs_config(&mut self) {
-        if let Some(ref mut dialog) = self.dialogs.appinfo_dialog
-            && let Some(savefile) = dialog.get_custom_savefile()
-        {
+    // 注入完整 UFS 配置（新版）
+    fn inject_full_ufs_config(&mut self) {
+        if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
+            let game_config = dialog.build_game_config();
             let app_id = dialog.app_id;
 
-            // 创建配置项
-            let config = crate::config::UfsInjectionConfig {
-                id: uuid::Uuid::new_v4().to_string(),
-                app_id,
-                root: savefile.root.clone(),
-                path: savefile.path.clone(),
-                pattern: savefile.pattern.clone(),
-                platforms: savefile.platforms.clone(),
-                created_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_secs() as i64,
-                note: String::new(),
-            };
+            if game_config.savefiles.is_empty() && game_config.root_overrides.is_empty() {
+                dialog.inject_status = Some(self.misc.i18n.ufs_inject_empty().to_string());
+                return;
+            }
 
-            // 保存到配置文件
-            match crate::config::add_ufs_injection_config(config) {
+            match crate::appinfo_writer::AppInfoWriter::new() {
+                Ok(writer) => match writer.inject_full_ufs_config(app_id, &game_config) {
+                    Ok(_) => {
+                        dialog.inject_status = Some(self.misc.i18n.ufs_inject_success(
+                            game_config.savefiles.len(),
+                            game_config.root_overrides.len(),
+                        ));
+                        // 刷新配置显示
+                        self.refresh_appinfo_config();
+                    }
+                    Err(e) => {
+                        dialog.inject_status =
+                            Some(self.misc.i18n.ufs_inject_error(&e.to_string()));
+                    }
+                },
+                Err(e) => {
+                    dialog.inject_status =
+                        Some(self.misc.i18n.ufs_writer_init_error(&e.to_string()));
+                }
+            }
+        }
+    }
+
+    // 保存完整 UFS 配置（新版）
+    fn save_game_config(&mut self) {
+        if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
+            let game_config = dialog.build_game_config();
+
+            match crate::config::save_ufs_game_config(game_config.clone()) {
                 Ok(_) => {
-                    dialog.inject_status = Some(
-                        self.misc
-                            .i18n
-                            .appinfo_save_success(&savefile.root, &savefile.path),
-                    );
-                    // 刷新已保存配置列表
+                    dialog.inject_status = Some(format!(
+                        "Saved {} savefiles, {} overrides",
+                        game_config.savefiles.len(),
+                        game_config.root_overrides.len()
+                    ));
+                    dialog.game_config = Some(game_config);
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
@@ -285,30 +275,20 @@ impl SteamCloudApp {
         }
     }
 
-    fn delete_ufs_config(&mut self, config_id: &str) {
+    fn clear_game_config(&mut self) {
         if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
-            match crate::config::remove_ufs_injection_config(config_id) {
+            let app_id = dialog.app_id;
+
+            match crate::config::remove_ufs_game_config(app_id) {
                 Ok(_) => {
-                    dialog.inject_status =
-                        Some(self.misc.i18n.appinfo_delete_success().to_string());
-                    // 刷新已保存配置列表
+                    dialog.inject_status = Some("Cleared all custom configurations".to_string());
+                    dialog.game_config = None;
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
-                    dialog.inject_status = Some(format!("Delete error: {}", e));
+                    dialog.inject_status = Some(format!("Clear error: {}", e));
                 }
             }
-        }
-    }
-
-    fn load_ufs_config(&mut self, config: crate::config::UfsInjectionConfig) {
-        if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
-            // 将配置加载到输入框
-            dialog.custom_root = config.root;
-            dialog.custom_path = config.path;
-            dialog.custom_pattern = config.pattern;
-            dialog.custom_platforms = config.platforms;
-            dialog.inject_status = Some(self.misc.i18n.appinfo_apply_success().to_string());
         }
     }
 
@@ -627,25 +607,26 @@ impl eframe::App for SteamCloudApp {
                 crate::ui::AppInfoDialogAction::Close => {
                     self.dialogs.appinfo_dialog = None;
                 }
-                crate::ui::AppInfoDialogAction::InjectUfs => {
-                    self.inject_ufs_config();
+                crate::ui::AppInfoDialogAction::InjectFullConfig => {
+                    self.inject_full_ufs_config();
                 }
-                crate::ui::AppInfoDialogAction::SaveConfig => {
-                    self.save_ufs_config();
+                crate::ui::AppInfoDialogAction::SaveGameConfig => {
+                    self.save_game_config();
                 }
-                crate::ui::AppInfoDialogAction::DeleteConfig(config_id) => {
-                    self.delete_ufs_config(&config_id);
-                }
-                crate::ui::AppInfoDialogAction::LoadConfig(config) => {
-                    self.load_ufs_config(config);
+                crate::ui::AppInfoDialogAction::ClearGameConfig => {
+                    self.clear_game_config();
                 }
                 crate::ui::AppInfoDialogAction::RestartSteam => {
-                    // 先断开连接，再重启 Steam
                     if self.connection.is_connected {
                         self.disconnect_from_steam();
                     }
                     self.handlers
                         .start_restart_steam(ctx, &mut self.async_handlers);
+                }
+                crate::ui::AppInfoDialogAction::LoadFromVdf => {
+                    if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
+                        dialog.load_from_vdf();
+                    }
                 }
                 crate::ui::AppInfoDialogAction::RefreshConfig => {
                     self.refresh_appinfo_config();

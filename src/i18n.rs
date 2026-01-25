@@ -2015,73 +2015,10 @@ impl I18n {
         }
     }
 
-    pub fn appinfo_custom_ufs(&self) -> String {
-        match self.lang {
-            Language::Chinese => format!("{} 自定义 UFS 配置 (实验性)", icons::GEAR),
-            Language::English => format!("{} Custom UFS Config (Experimental)", icons::GEAR),
-        }
-    }
-
-    pub fn appinfo_root_type(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "Root 类型:",
-            Language::English => "Root Type:",
-        }
-    }
-
-    pub fn appinfo_relative_path(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "相对路径:",
-            Language::English => "Relative Path:",
-        }
-    }
-
-    pub fn appinfo_pattern(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "文件匹配:",
-            Language::English => "Pattern:",
-        }
-    }
-
-    pub fn appinfo_inject(&self) -> String {
-        match self.lang {
-            Language::Chinese => format!("{} 注入到 appinfo.vdf", icons::EXPORT),
-            Language::English => format!("{} Inject to appinfo.vdf", icons::EXPORT),
-        }
-    }
-
-    pub fn appinfo_save_config(&self) -> String {
-        match self.lang {
-            Language::Chinese => format!("{} 保存配置", icons::SAVE),
-            Language::English => format!("{} Save Config", icons::SAVE),
-        }
-    }
-
     pub fn appinfo_restart_steam(&self) -> String {
         match self.lang {
             Language::Chinese => format!("{} 重启 Steam", icons::REFRESH),
             Language::English => format!("{} Restart Steam", icons::REFRESH),
-        }
-    }
-
-    pub fn appinfo_saved_configs(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "已保存的配置:",
-            Language::English => "Saved Configs:",
-        }
-    }
-
-    pub fn appinfo_inject_success(&self, root: &str, path: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!("成功注入 root={} path={}", root, path),
-            Language::English => format!("Success: root={} path={}", root, path),
-        }
-    }
-
-    pub fn appinfo_save_success(&self, root: &str, path: &str) -> String {
-        match self.lang {
-            Language::Chinese => format!("已保存配置 root={} path={}", root, path),
-            Language::English => format!("Saved config: root={} path={}", root, path),
         }
     }
 
@@ -2118,38 +2055,200 @@ impl I18n {
         }
     }
 
-    pub fn appinfo_delete_config(&self) -> String {
+    // ========== UFS 配置表格标签 ==========
+
+    pub fn ufs_savefiles_header(&self, count: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("{} 删除", icons::TRASH),
-            Language::English => format!("{} Delete", icons::TRASH),
+            Language::Chinese => format!("存档文件配置 ({})", count),
+            Language::English => format!("Savefiles Configuration ({})", count),
         }
     }
 
-    pub fn appinfo_load_config(&self) -> String {
+    pub fn ufs_overrides_header(&self, count: usize) -> String {
         match self.lang {
-            Language::Chinese => format!("{} 加载", icons::DOWNLOAD),
-            Language::English => format!("{} Load", icons::DOWNLOAD),
+            Language::Chinese => format!("跨平台路径映射 ({})", count),
+            Language::English => format!("Root Overrides ({})", count),
         }
     }
 
-    pub fn appinfo_delete_success(&self) -> &'static str {
+    pub fn ufs_add_savefile(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "配置已删除",
-            Language::English => "Config deleted",
+            Language::Chinese => "添加存档路径",
+            Language::English => "Add Savefile",
         }
     }
 
-    pub fn appinfo_apply_success(&self) -> &'static str {
+    pub fn ufs_add_override(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "配置已应用到注入器",
-            Language::English => "Config applied to injector",
+            Language::Chinese => "添加路径映射",
+            Language::English => "Add Override",
         }
     }
 
-    pub fn appinfo_no_saved_configs(&self) -> &'static str {
+    pub fn ufs_no_savefiles(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "暂无已保存的配置",
-            Language::English => "No saved configs",
+            Language::Chinese => "暂无存档配置 — 点击添加创建",
+            Language::English => "No savefiles configured — click Add to create",
+        }
+    }
+
+    pub fn ufs_no_overrides(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "暂无路径映射 — 添加以支持跨平台",
+            Language::English => "No overrides — add for cross-platform support",
+        }
+    }
+
+    pub fn ufs_label_root(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "根目录",
+            Language::English => "Root",
+        }
+    }
+
+    pub fn ufs_label_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "路径",
+            Language::English => "Path",
+        }
+    }
+
+    pub fn ufs_label_pattern(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "匹配",
+            Language::English => "Pattern",
+        }
+    }
+
+    pub fn ufs_label_platforms(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "平台",
+            Language::English => "Platforms",
+        }
+    }
+
+    pub fn ufs_label_actions(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "操作",
+            Language::English => "Actions",
+        }
+    }
+
+    pub fn ufs_label_original_root(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "原始根目录",
+            Language::English => "Original Root",
+        }
+    }
+
+    pub fn ufs_label_target_os(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "目标系统",
+            Language::English => "Target OS",
+        }
+    }
+
+    pub fn ufs_label_new_root(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "新根目录",
+            Language::English => "New Root",
+        }
+    }
+
+    pub fn ufs_label_add_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "追加路径",
+            Language::English => "Add Path",
+        }
+    }
+
+    pub fn ufs_label_use_instead(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "替换",
+            Language::English => "Replace",
+        }
+    }
+
+    pub fn ufs_refresh(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "刷新",
+            Language::English => "Refresh",
+        }
+    }
+
+    pub fn ufs_clear_all(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "清空全部",
+            Language::English => "Clear All",
+        }
+    }
+
+    pub fn ufs_clear_all_tooltip(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "清空所有自定义存档路径和路径映射",
+            Language::English => "Clear all custom savefiles and root overrides",
+        }
+    }
+
+    pub fn ufs_save_config(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 保存配置", icons::SAVE),
+            Language::English => format!("{} Save Config", icons::SAVE),
+        }
+    }
+
+    pub fn ufs_inject_to_vdf(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 注入到 VDF", icons::CLOUD_UPLOAD),
+            Language::English => format!("{} Inject to VDF", icons::CLOUD_UPLOAD),
+        }
+    }
+
+    pub fn ufs_inject_success(&self, savefiles: usize, overrides: usize) -> String {
+        match self.lang {
+            Language::Chinese => {
+                format!("已注入 {} 个存档路径, {} 个路径映射", savefiles, overrides)
+            }
+            Language::English => {
+                format!("Injected {} savefiles, {} overrides", savefiles, overrides)
+            }
+        }
+    }
+
+    pub fn ufs_inject_empty(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "无存档路径或路径映射可注入",
+            Language::English => "No savefiles or overrides to inject",
+        }
+    }
+
+    pub fn ufs_inject_error(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("注入失败: {}", error),
+            Language::English => format!("Inject error: {}", error),
+        }
+    }
+
+    pub fn ufs_writer_init_error(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("写入器初始化失败: {}", error),
+            Language::English => format!("Writer init error: {}", error),
+        }
+    }
+
+    pub fn ufs_load_from_vdf(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 从 VDF 加载", icons::DOWNLOAD),
+            Language::English => format!("{} Load from VDF", icons::DOWNLOAD),
+        }
+    }
+
+    pub fn ufs_load_from_vdf_tooltip(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "从游戏的 VDF 配置加载现有的存档路径和路径映射",
+            Language::English => {
+                "Load existing savefiles and root overrides from game's VDF config"
+            }
         }
     }
 }

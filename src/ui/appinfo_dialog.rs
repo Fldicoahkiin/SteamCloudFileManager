@@ -1,7 +1,7 @@
-use crate::config::{UfsInjectionConfig, get_ufs_injection_configs_for_app};
+use crate::config::{RootOverrideEntry, SaveFileEntry, UfsGameConfig, get_ufs_game_config};
 use crate::i18n::I18n;
 use crate::icons;
-use crate::path_resolver::{RootType, SaveFileConfig, get_current_platform};
+use crate::path_resolver::get_current_platform;
 use crate::vdf_parser::UfsConfig;
 
 // 官方文档支持的所有 Root 类型
@@ -38,25 +38,46 @@ pub const ALL_ROOT_TYPES: &[(&str, &str, &str)] = &[
     ("LinuxXdgDataHome", "linux", "$XDG_DATA_HOME/"),
 ];
 
+// 编辑模式
+#[derive(Clone, PartialEq)]
+pub enum EditMode {
+    None,
+    AddSavefile,
+    EditSavefile(usize),
+    AddOverride,
+    EditOverride(usize),
+}
+
 // AppInfo 对话框状态
 #[derive(Clone)]
 pub struct AppInfoDialog {
     pub app_id: u32,
     pub config: UfsConfig,
-    // UFS 调试功能
-    pub custom_root: String,
-    pub custom_path: String,
-    pub custom_pattern: String,
-    pub custom_platforms: Vec<String>, // 选中的平台
+
+    // 表格编辑状态
+    pub editing_savefiles: Vec<SaveFileEntry>,
+    pub editing_overrides: Vec<RootOverrideEntry>,
+    pub edit_mode: EditMode,
+
+    // 临时编辑字段
+    pub temp_savefile: SaveFileEntry,
+    pub temp_override: RootOverrideEntry,
+
+    // 状态
     pub inject_status: Option<String>,
-    pub show_inject_section: bool,
-    pub saved_configs: Vec<UfsInjectionConfig>, // 已保存的配置
+    pub game_config: Option<UfsGameConfig>,
 }
 
 impl AppInfoDialog {
     pub fn new(app_id: u32, config: UfsConfig) -> Self {
-        // 加载已保存的配置
-        let saved_configs = get_ufs_injection_configs_for_app(app_id);
+        let game_config = get_ufs_game_config(app_id);
+
+        // 初始化编辑表格
+        let (editing_savefiles, editing_overrides) = if let Some(ref gc) = game_config {
+            (gc.savefiles.clone(), gc.root_overrides.clone())
+        } else {
+            (Vec::new(), Vec::new())
+        };
 
         // 根据当前平台选择默认 Root
         let default_root = match get_current_platform() {
@@ -69,43 +90,97 @@ impl AppInfoDialog {
         Self {
             app_id,
             config,
-            custom_root: default_root.to_string(),
-            custom_path: "".to_string(),
-            custom_pattern: "*".to_string(),
-            custom_platforms: vec!["all".to_string()], // 默认所有平台
+            editing_savefiles,
+            editing_overrides,
+            edit_mode: EditMode::None,
+            temp_savefile: SaveFileEntry {
+                root: default_root.to_string(),
+                path: String::new(),
+                pattern: "*".to_string(),
+                platforms: vec!["all".to_string()],
+                recursive: true,
+            },
+            temp_override: RootOverrideEntry {
+                original_root: "WinAppDataLocal".to_string(),
+                os: "macos".to_string(),
+                new_root: "MacAppSupport".to_string(),
+                add_path: String::new(),
+                use_instead: false,
+            },
             inject_status: None,
-            show_inject_section: false,
-            saved_configs,
+            game_config,
         }
     }
 
     // 刷新已保存的配置
     pub fn refresh_saved_configs(&mut self) {
-        self.saved_configs = get_ufs_injection_configs_for_app(self.app_id);
-    }
-
-    // 获取自定义 savefile 配置
-    pub fn get_custom_savefile(&self) -> Option<SaveFileConfig> {
-        if self.custom_path.is_empty() {
-            return None;
+        self.game_config = get_ufs_game_config(self.app_id);
+        if let Some(ref gc) = self.game_config {
+            self.editing_savefiles = gc.savefiles.clone();
+            self.editing_overrides = gc.root_overrides.clone();
         }
-
-        Some(SaveFileConfig {
-            root: self.custom_root.clone(),
-            root_type: RootType::from_name(&self.custom_root),
-            path: self.custom_path.clone(),
-            pattern: self.custom_pattern.clone(),
-            platforms: self.custom_platforms.clone(),
-            recursive: true,
-        })
     }
 
-    // 获取当前平台可用的 Root 类型
-    pub fn get_available_roots(&self) -> Vec<(&'static str, &'static str)> {
-        let current = get_current_platform();
+    // 从 VDF 配置加载到编辑界面
+    // 将 VDF 中的 SaveFileConfig 和 RootOverrideConfig 转换为可编辑的 Entry 格式
+    pub fn load_from_vdf(&mut self) {
+        // 转换 savefiles
+        self.editing_savefiles = self
+            .config
+            .savefiles
+            .iter()
+            .map(|sf| SaveFileEntry {
+                root: sf.root.clone(),
+                path: sf.path.clone(),
+                pattern: sf.pattern.clone(),
+                platforms: if sf.platforms.is_empty() {
+                    vec!["all".to_string()]
+                } else {
+                    sf.platforms.clone()
+                },
+                recursive: sf.recursive,
+            })
+            .collect();
+
+        // 转换 rootoverrides
+        self.editing_overrides = self
+            .config
+            .rootoverrides
+            .iter()
+            .map(|ro| RootOverrideEntry {
+                original_root: ro.original_root.clone(),
+                os: ro.oslist.first().cloned().unwrap_or_default(),
+                new_root: ro.new_root.clone(),
+                add_path: ro.add_path.clone(),
+                use_instead: ro.use_instead,
+            })
+            .collect();
+    }
+
+    // 构建当前编辑的 UfsGameConfig
+    pub fn build_game_config(&self) -> UfsGameConfig {
+        UfsGameConfig {
+            id: self
+                .game_config
+                .as_ref()
+                .map(|c| c.id.clone())
+                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
+            app_id: self.app_id,
+            savefiles: self.editing_savefiles.clone(),
+            root_overrides: self.editing_overrides.clone(),
+            created_at: self
+                .game_config
+                .as_ref()
+                .map(|c| c.created_at)
+                .unwrap_or_else(|| chrono::Utc::now().timestamp()),
+            note: String::new(),
+        }
+    }
+
+    // 获取所有 Root 类型（用于 Root Overrides 配置）
+    pub fn get_all_roots() -> Vec<(&'static str, &'static str)> {
         ALL_ROOT_TYPES
             .iter()
-            .filter(|(_, platform, _)| *platform == "all" || *platform == current)
             .map(|(name, _, desc)| (*name, *desc))
             .collect()
     }
@@ -115,10 +190,10 @@ impl AppInfoDialog {
 pub enum AppInfoDialogAction {
     None,
     Close,
-    InjectUfs,
-    SaveConfig,                     // 保存配置到持久化存储
-    DeleteConfig(String),           // 删除指定 ID 的配置
-    LoadConfig(UfsInjectionConfig), // 加载配置到输入框
+    InjectFullConfig, // 注入完整配置到 VDF
+    SaveGameConfig,   // 保存配置到文件
+    ClearGameConfig,  // 清空所有自定义配置
+    LoadFromVdf,      // 从 VDF 加载现有配置
     RestartSteam,
     RefreshConfig,
 }
@@ -176,202 +251,462 @@ pub fn draw_appinfo_dialog(
 
             ui.separator();
 
-            // 自定义 UFS 注入区域（实验性）
-            let inject_header = i18n.appinfo_custom_ufs();
-
-            egui::CollapsingHeader::new(inject_header)
-                .default_open(dialog.show_inject_section)
-                .show(ui, |ui| {
-                    dialog.show_inject_section = true;
-
-                    ui.horizontal(|ui| {
-                        ui.label(i18n.appinfo_root_type());
-
-                        let available_roots = dialog.get_available_roots();
-                        egui::ComboBox::from_id_salt("root_type_combo")
-                            .selected_text(&dialog.custom_root)
-                            .width(350.0)
-                            .show_ui(ui, |ui| {
-                                for (name, desc) in available_roots {
-                                    let label = format!("{} - {}", name, desc);
-                                    ui.selectable_value(
-                                        &mut dialog.custom_root,
-                                        name.to_string(),
-                                        label,
-                                    );
-                                }
-                            });
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label(i18n.appinfo_relative_path());
-                        ui.add(
-                            egui::TextEdit::singleline(&mut dialog.custom_path)
-                                .hint_text(i18n.appinfo_path_hint())
-                                .desired_width(300.0),
-                        );
-                    });
-
-                    ui.horizontal(|ui| {
-                        ui.label(i18n.appinfo_pattern());
-                        ui.add(
-                            egui::TextEdit::singleline(&mut dialog.custom_pattern)
-                                .hint_text(i18n.appinfo_pattern_hint())
-                                .desired_width(100.0),
-                        );
-                    });
-
-                    ui.add_space(8.0);
-
-                    ui.horizontal(|ui| {
-                        let can_inject = !dialog.custom_path.is_empty();
-                        if ui
-                            .add_enabled(can_inject, egui::Button::new(i18n.appinfo_inject()))
-                            .clicked()
-                        {
-                            action = AppInfoDialogAction::InjectUfs;
-                        }
-
-                        if ui
-                            .add_enabled(can_inject, egui::Button::new(i18n.appinfo_save_config()))
-                            .clicked()
-                        {
-                            action = AppInfoDialogAction::SaveConfig;
-                        }
-
-                        if ui.button(i18n.appinfo_restart_steam()).clicked() {
-                            action = AppInfoDialogAction::RestartSteam;
-                        }
-                    });
-
-                    // 显示注入状态
-                    if let Some(status) = &dialog.inject_status {
-                        ui.add_space(4.0);
-                        ui.label(egui::RichText::new(status).color(
-                            if status.contains("成功")
-                                || status.contains("Success")
-                                || status.contains("保存")
-                            {
-                                egui::Color32::GREEN
-                            } else {
-                                egui::Color32::RED
-                            },
-                        ));
+            // 可编辑配置表格（类似 Steamworks）
+            egui::CollapsingHeader::new(format!(
+                "{} {}",
+                icons::FOLDER,
+                i18n.ufs_savefiles_header(dialog.editing_savefiles.len())
+            ))
+            .default_open(true)
+            .show(ui, |ui| {
+                // 添加按钮
+                ui.horizontal(|ui| {
+                    if ui
+                        .button(format!("{} {}", icons::ADD_FILE, i18n.ufs_add_savefile()))
+                        .clicked()
+                    {
+                        dialog.edit_mode = EditMode::AddSavefile;
+                        // 保持 temp_savefile 的默认值（在 new() 中已初始化）
+                        dialog.temp_savefile.path.clear();
+                        dialog.temp_savefile.pattern = "*".to_string();
+                        dialog.temp_savefile.platforms = vec!["all".to_string()];
+                        dialog.temp_savefile.recursive = true;
                     }
-
-                    ui.add_space(8.0);
-
-                    // 已保存的配置列表（类似 Steamworks 的可视化管理）
-                    ui.separator();
-                    ui.label(egui::RichText::new(i18n.appinfo_saved_configs()).strong());
-
-                    if dialog.saved_configs.is_empty() {
-                        ui.label(
-                            egui::RichText::new(i18n.appinfo_no_saved_configs())
-                                .italics()
-                                .color(egui::Color32::GRAY),
-                        );
-                    } else {
-                        egui::ScrollArea::vertical()
-                            .id_salt("saved_configs_scroll")
-                            .max_height(150.0)
-                            .show(ui, |ui| {
-                                let configs = dialog.saved_configs.clone();
-                                for config in configs {
-                                    egui::Frame::group(ui.style())
-                                        .inner_margin(egui::Margin::same(8))
-                                        .show(ui, |ui| {
-                                            ui.horizontal(|ui| {
-                                                // 配置信息
-                                                ui.vertical(|ui| {
-                                                    ui.horizontal(|ui| {
-                                                        ui.label(
-                                                            egui::RichText::new(&config.root)
-                                                                .strong()
-                                                                .color(egui::Color32::from_rgb(
-                                                                    100, 180, 255,
-                                                                )),
-                                                        );
-                                                        ui.label("/");
-                                                        ui.label(&config.path);
-                                                    });
-                                                    ui.horizontal(|ui| {
-                                                        ui.label(
-                                                            egui::RichText::new(format!(
-                                                                "Pattern: {}",
-                                                                &config.pattern
-                                                            ))
-                                                            .small()
-                                                            .color(egui::Color32::GRAY),
-                                                        );
-                                                        if !config.platforms.is_empty()
-                                                            && !config
-                                                                .platforms
-                                                                .iter()
-                                                                .any(|p| p == "all")
-                                                        {
-                                                            ui.label(
-                                                                egui::RichText::new(format!(
-                                                                    "| Platforms: {}",
-                                                                    config.platforms.join(", ")
-                                                                ))
-                                                                .small()
-                                                                .color(egui::Color32::GRAY),
-                                                            );
-                                                        }
-                                                    });
-                                                });
-
-                                                // 操作按钮（右侧）
-                                                ui.with_layout(
-                                                    egui::Layout::right_to_left(
-                                                        egui::Align::Center,
-                                                    ),
-                                                    |ui| {
-                                                        // 删除按钮
-                                                        if ui
-                                                            .small_button(
-                                                                i18n.appinfo_delete_config(),
-                                                            )
-                                                            .clicked()
-                                                        {
-                                                            action =
-                                                                AppInfoDialogAction::DeleteConfig(
-                                                                    config.id.clone(),
-                                                                );
-                                                        }
-
-                                                        // 加载到输入框按钮
-                                                        if ui
-                                                            .small_button(
-                                                                i18n.appinfo_load_config(),
-                                                            )
-                                                            .clicked()
-                                                        {
-                                                            action =
-                                                                AppInfoDialogAction::LoadConfig(
-                                                                    config.clone(),
-                                                                );
-                                                        }
-                                                    },
-                                                );
-                                            });
-                                        });
-                                    ui.add_space(4.0);
-                                }
-                            });
-                    }
-
-                    ui.add_space(4.0);
-
-                    // 实验性功能警告
-                    let warning = i18n.appinfo_warning();
-                    ui.label(
-                        egui::RichText::new(warning)
-                            .color(egui::Color32::YELLOW)
-                            .small(),
-                    );
                 });
+
+                // 添加/编辑表单
+                if matches!(
+                    dialog.edit_mode,
+                    EditMode::AddSavefile | EditMode::EditSavefile(_)
+                ) {
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(8))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_root()));
+                                egui::ComboBox::from_id_salt("edit_savefile_root")
+                                    .selected_text(&dialog.temp_savefile.root)
+                                    .width(200.0)
+                                    .show_ui(ui, |ui| {
+                                        // 显示所有平台的 Root，跨平台映射通过 overrides 处理
+                                        for (name, desc) in AppInfoDialog::get_all_roots() {
+                                            ui.selectable_value(
+                                                &mut dialog.temp_savefile.root,
+                                                name.to_string(),
+                                                format!("{} - {}", name, desc),
+                                            );
+                                        }
+                                    });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_path()));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut dialog.temp_savefile.path)
+                                        .hint_text(i18n.appinfo_path_hint())
+                                        .desired_width(200.0),
+                                );
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_pattern()));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut dialog.temp_savefile.pattern)
+                                        .hint_text(i18n.appinfo_pattern_hint())
+                                        .desired_width(80.0),
+                                );
+                            });
+
+                            ui.horizontal(|ui| {
+                                if ui.button(icons::CHECK).clicked() {
+                                    match dialog.edit_mode {
+                                        EditMode::AddSavefile => {
+                                            dialog
+                                                .editing_savefiles
+                                                .push(dialog.temp_savefile.clone());
+                                        }
+                                        EditMode::EditSavefile(idx) => {
+                                            if idx < dialog.editing_savefiles.len() {
+                                                dialog.editing_savefiles[idx] =
+                                                    dialog.temp_savefile.clone();
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                    dialog.edit_mode = EditMode::None;
+                                }
+                                if ui.button(icons::CLOSE).clicked() {
+                                    dialog.edit_mode = EditMode::None;
+                                }
+                            });
+                        });
+                }
+
+                // 表格显示
+                if dialog.editing_savefiles.is_empty() {
+                    ui.label(
+                        egui::RichText::new(i18n.ufs_no_savefiles())
+                            .italics()
+                            .color(egui::Color32::GRAY),
+                    );
+                } else {
+                    egui::ScrollArea::vertical()
+                        .id_salt("editing_savefiles_table")
+                        .max_height(120.0)
+                        .show(ui, |ui| {
+                            let mut to_delete: Option<usize> = None;
+                            let mut to_edit: Option<usize> = None;
+
+                            egui::Grid::new("editing_savefiles_grid")
+                                .num_columns(5)
+                                .striped(true)
+                                .min_col_width(50.0)
+                                .show(ui, |ui| {
+                                    // 表头
+                                    ui.label(egui::RichText::new(i18n.ufs_label_root()).strong());
+                                    ui.label(egui::RichText::new(i18n.ufs_label_path()).strong());
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_pattern()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_platforms()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_actions()).strong(),
+                                    );
+                                    ui.end_row();
+
+                                    // 数据行
+                                    for (idx, sf) in dialog.editing_savefiles.iter().enumerate() {
+                                        ui.label(
+                                            egui::RichText::new(&sf.root)
+                                                .color(egui::Color32::from_rgb(100, 180, 255)),
+                                        );
+                                        ui.label(&sf.path);
+                                        ui.label(&sf.pattern);
+                                        ui.label(sf.platforms.join(", "));
+                                        ui.horizontal(|ui| {
+                                            if ui.small_button(icons::GEAR).clicked() {
+                                                to_edit = Some(idx);
+                                            }
+                                            if ui.small_button(icons::TRASH).clicked() {
+                                                to_delete = Some(idx);
+                                            }
+                                        });
+                                        ui.end_row();
+                                    }
+                                });
+
+                            // 处理删除
+                            if let Some(idx) = to_delete {
+                                dialog.editing_savefiles.remove(idx);
+                            }
+                            // 处理编辑
+                            if let Some(idx) = to_edit {
+                                dialog.temp_savefile = dialog.editing_savefiles[idx].clone();
+                                dialog.edit_mode = EditMode::EditSavefile(idx);
+                            }
+                        });
+                }
+            });
+
+            // Root Overrides 可编辑表格
+            egui::CollapsingHeader::new(format!(
+                "{} {}",
+                icons::ARROW_SYNC,
+                i18n.ufs_overrides_header(dialog.editing_overrides.len())
+            ))
+            .default_open(true)
+            .show(ui, |ui| {
+                // 添加按钮
+                ui.horizontal(|ui| {
+                    if ui
+                        .button(format!("{} {}", icons::ADD_FILE, i18n.ufs_add_override()))
+                        .clicked()
+                    {
+                        dialog.edit_mode = EditMode::AddOverride;
+                        dialog.temp_override = RootOverrideEntry {
+                            original_root: "WinAppDataLocal".to_string(),
+                            os: "macos".to_string(),
+                            new_root: "MacAppSupport".to_string(),
+                            add_path: String::new(),
+                            use_instead: false,
+                        };
+                    }
+                });
+
+                // 添加/编辑表单
+                if matches!(
+                    dialog.edit_mode,
+                    EditMode::AddOverride | EditMode::EditOverride(_)
+                ) {
+                    egui::Frame::group(ui.style())
+                        .inner_margin(egui::Margin::same(8))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_original_root()));
+                                egui::ComboBox::from_id_salt("edit_override_original")
+                                    .selected_text(&dialog.temp_override.original_root)
+                                    .width(130.0)
+                                    .show_ui(ui, |ui| {
+                                        for (name, _) in AppInfoDialog::get_all_roots() {
+                                            ui.selectable_value(
+                                                &mut dialog.temp_override.original_root,
+                                                name.to_string(),
+                                                name,
+                                            );
+                                        }
+                                    });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_target_os()));
+                                egui::ComboBox::from_id_salt("edit_override_os")
+                                    .selected_text(&dialog.temp_override.os)
+                                    .width(80.0)
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut dialog.temp_override.os,
+                                            "windows".to_string(),
+                                            "Windows",
+                                        );
+                                        ui.selectable_value(
+                                            &mut dialog.temp_override.os,
+                                            "macos".to_string(),
+                                            "macOS",
+                                        );
+                                        ui.selectable_value(
+                                            &mut dialog.temp_override.os,
+                                            "linux".to_string(),
+                                            "Linux",
+                                        );
+                                    });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_new_root()));
+                                egui::ComboBox::from_id_salt("edit_override_new")
+                                    .selected_text(&dialog.temp_override.new_root)
+                                    .width(130.0)
+                                    .show_ui(ui, |ui| {
+                                        for (name, _) in AppInfoDialog::get_all_roots() {
+                                            ui.selectable_value(
+                                                &mut dialog.temp_override.new_root,
+                                                name.to_string(),
+                                                name,
+                                            );
+                                        }
+                                    });
+                            });
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{}:", i18n.ufs_label_add_path()));
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut dialog.temp_override.add_path)
+                                        .hint_text("optional")
+                                        .desired_width(120.0),
+                                );
+                                ui.checkbox(
+                                    &mut dialog.temp_override.use_instead,
+                                    i18n.ufs_label_use_instead(),
+                                );
+                            });
+
+                            ui.horizontal(|ui| {
+                                if ui.button(icons::CHECK).clicked() {
+                                    match dialog.edit_mode {
+                                        EditMode::AddOverride => {
+                                            dialog
+                                                .editing_overrides
+                                                .push(dialog.temp_override.clone());
+                                        }
+                                        EditMode::EditOverride(idx) => {
+                                            if idx < dialog.editing_overrides.len() {
+                                                dialog.editing_overrides[idx] =
+                                                    dialog.temp_override.clone();
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                    dialog.edit_mode = EditMode::None;
+                                }
+                                if ui.button(icons::CLOSE).clicked() {
+                                    dialog.edit_mode = EditMode::None;
+                                }
+                            });
+                        });
+                }
+
+                // 表格显示
+                if dialog.editing_overrides.is_empty() {
+                    ui.label(
+                        egui::RichText::new(i18n.ufs_no_overrides())
+                            .italics()
+                            .color(egui::Color32::GRAY),
+                    );
+                } else {
+                    egui::ScrollArea::vertical()
+                        .id_salt("editing_overrides_table")
+                        .max_height(100.0)
+                        .show(ui, |ui| {
+                            let mut to_delete: Option<usize> = None;
+                            let mut to_edit: Option<usize> = None;
+
+                            egui::Grid::new("editing_overrides_grid")
+                                .num_columns(6)
+                                .striped(true)
+                                .min_col_width(40.0)
+                                .show(ui, |ui| {
+                                    // 表头
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_original_root())
+                                            .strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_target_os()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_new_root()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_add_path()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_use_instead()).strong(),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(i18n.ufs_label_actions()).strong(),
+                                    );
+                                    ui.end_row();
+
+                                    // 数据行
+                                    for (idx, ro) in dialog.editing_overrides.iter().enumerate() {
+                                        ui.label(
+                                            egui::RichText::new(&ro.original_root)
+                                                .color(egui::Color32::from_rgb(255, 180, 100)),
+                                        );
+                                        ui.label(&ro.os);
+                                        ui.label(&ro.new_root);
+                                        ui.label(if ro.add_path.is_empty() {
+                                            "-"
+                                        } else {
+                                            &ro.add_path
+                                        });
+                                        ui.label(if ro.use_instead { "✓" } else { "-" });
+                                        ui.horizontal(|ui| {
+                                            if ui.small_button(icons::GEAR).clicked() {
+                                                to_edit = Some(idx);
+                                            }
+                                            if ui.small_button(icons::TRASH).clicked() {
+                                                to_delete = Some(idx);
+                                            }
+                                        });
+                                        ui.end_row();
+                                    }
+                                });
+
+                            // 处理删除
+                            if let Some(idx) = to_delete {
+                                dialog.editing_overrides.remove(idx);
+                            }
+                            // 处理编辑
+                            if let Some(idx) = to_edit {
+                                dialog.temp_override = dialog.editing_overrides[idx].clone();
+                                dialog.edit_mode = EditMode::EditOverride(idx);
+                            }
+                        });
+                }
+            });
+
+            // 保存和注入按钮
+            ui.separator();
+            ui.horizontal(|ui| {
+                let has_changes =
+                    !dialog.editing_savefiles.is_empty() || !dialog.editing_overrides.is_empty();
+
+                if ui
+                    .add_enabled(has_changes, egui::Button::new(i18n.ufs_save_config()))
+                    .clicked()
+                {
+                    action = AppInfoDialogAction::SaveGameConfig;
+                }
+                if ui
+                    .add_enabled(has_changes, egui::Button::new(i18n.ufs_inject_to_vdf()))
+                    .clicked()
+                {
+                    action = AppInfoDialogAction::InjectFullConfig;
+                }
+
+                // Load from VDF 按钮：当 VDF 中有配置时可用
+                let has_vdf_config =
+                    !dialog.config.savefiles.is_empty() || !dialog.config.rootoverrides.is_empty();
+                if ui
+                    .add_enabled(has_vdf_config, egui::Button::new(i18n.ufs_load_from_vdf()))
+                    .on_hover_text(i18n.ufs_load_from_vdf_tooltip())
+                    .clicked()
+                {
+                    action = AppInfoDialogAction::LoadFromVdf;
+                }
+
+                // 清空按钮：当有内容时可以点击
+                let can_clear =
+                    !dialog.editing_savefiles.is_empty() || !dialog.editing_overrides.is_empty();
+                if ui
+                    .add_enabled(
+                        can_clear,
+                        egui::Button::new(format!("{} {}", icons::TRASH, i18n.ufs_clear_all()))
+                            .fill(egui::Color32::from_rgb(120, 40, 40)),
+                    )
+                    .on_hover_text(i18n.ufs_clear_all_tooltip())
+                    .clicked()
+                {
+                    // 清空本地编辑状态
+                    dialog.editing_savefiles.clear();
+                    dialog.editing_overrides.clear();
+                    action = AppInfoDialogAction::ClearGameConfig;
+                }
+            });
+
+            ui.separator();
+
+            // 操作提示区域
+            ui.separator();
+            ui.horizontal(|ui| {
+                // 重启 Steam 按钮
+                if ui.button(i18n.appinfo_restart_steam()).clicked() {
+                    action = AppInfoDialogAction::RestartSteam;
+                }
+
+                // 刷新配置按钮
+                if ui
+                    .button(format!("{} {}", icons::ARROW_SYNC, i18n.ufs_refresh()))
+                    .clicked()
+                {
+                    action = AppInfoDialogAction::RefreshConfig;
+                }
+            });
+
+            // 显示注入状态
+            if let Some(status) = &dialog.inject_status {
+                ui.add_space(4.0);
+                let color = if status.contains("成功")
+                    || status.contains("Success")
+                    || status.contains("Saved")
+                    || status.contains("Cleared")
+                {
+                    egui::Color32::GREEN
+                } else if status.contains("error") || status.contains("Error") {
+                    egui::Color32::RED
+                } else {
+                    egui::Color32::YELLOW
+                };
+                ui.label(egui::RichText::new(status).color(color));
+            }
+
+            ui.add_space(4.0);
+
+            // 实验性功能警告
+            let warning = i18n.appinfo_warning();
+            ui.label(
+                egui::RichText::new(warning)
+                    .color(egui::Color32::YELLOW)
+                    .small(),
+            );
         });
 
     if !open {

@@ -25,9 +25,9 @@ pub struct AppConfig {
     #[serde(default)]
     pub symlinks: Vec<SymlinkConfigEntry>,
 
-    // UFS 注入配置（用于持久化自定义云同步路径）
+    // UFS 游戏配置（新版合并存储）
     #[serde(default)]
-    pub ufs_injections: Vec<UfsInjectionConfig>,
+    pub ufs_configs: Vec<UfsGameConfig>,
 }
 
 // 软链接配置项
@@ -46,16 +46,42 @@ pub struct SymlinkConfigEntry {
     pub note: String,
 }
 
-// UFS 注入配置项（持久化用户自定义的 appinfo.vdf 修改）
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UfsInjectionConfig {
-    pub id: String,
-    pub app_id: u32,
+// 单个 savefile 条目
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct SaveFileEntry {
     pub root: String,    // Root 类型名称
     pub path: String,    // 相对路径
     pub pattern: String, // 文件匹配模式
     #[serde(default)]
-    pub platforms: Vec<String>, // 支持的平台列表
+    pub platforms: Vec<String>, // 支持的平台
+    #[serde(default = "default_recursive")]
+    pub recursive: bool, // 是否递归
+}
+
+fn default_recursive() -> bool {
+    true
+}
+
+// 单个 rootoverride 条目
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RootOverrideEntry {
+    pub original_root: String, // 原始根名称
+    pub os: String,            // 目标操作系统
+    pub new_root: String,      // 新的根名称
+    #[serde(default)]
+    pub add_path: String, // 附加路径
+    #[serde(default)]
+    pub use_instead: bool, // 是否完全替换
+}
+
+// 游戏 UFS 完整配置（合并存储）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UfsGameConfig {
+    pub id: String,
+    pub app_id: u32,
+    pub savefiles: Vec<SaveFileEntry>,
+    #[serde(default)]
+    pub root_overrides: Vec<RootOverrideEntry>,
     #[serde(default)]
     pub created_at: i64,
     #[serde(default)]
@@ -358,53 +384,55 @@ pub fn remove_symlink_config(id: &str) -> Result<()> {
     Ok(())
 }
 
-// 获取 UFS 注入配置
-pub fn get_ufs_injection_configs() -> Vec<UfsInjectionConfig> {
-    get_config().ufs_injections
+// ============== UFS 游戏配置管理函数 ==============
+
+// 获取所有 UFS 游戏配置
+pub fn get_ufs_game_configs() -> Vec<UfsGameConfig> {
+    get_config().ufs_configs
 }
 
-// 获取指定游戏的 UFS 注入配置
-pub fn get_ufs_injection_configs_for_app(app_id: u32) -> Vec<UfsInjectionConfig> {
-    get_ufs_injection_configs()
+// 获取指定游戏的 UFS 配置
+pub fn get_ufs_game_config(app_id: u32) -> Option<UfsGameConfig> {
+    get_ufs_game_configs()
         .into_iter()
-        .filter(|c| c.app_id == app_id)
-        .collect()
+        .find(|c| c.app_id == app_id)
 }
 
-// 添加 UFS 注入配置
-pub fn add_ufs_injection_config(entry: UfsInjectionConfig) -> Result<()> {
+// 保存或更新 UFS 游戏配置
+pub fn save_ufs_game_config(entry: UfsGameConfig) -> Result<()> {
     let config = CONFIG
         .get()
         .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
     let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
 
-    // 检查是否已存在相同配置（同一 app + root + path）
-    let exists = config
-        .ufs_injections
-        .iter()
-        .any(|c| c.app_id == entry.app_id && c.root == entry.root && c.path == entry.path);
-
-    if exists {
-        return Err(anyhow::anyhow!("相同的 UFS 配置已存在"));
+    // 查找是否已存在该游戏的配置
+    if let Some(existing) = config
+        .ufs_configs
+        .iter_mut()
+        .find(|c| c.app_id == entry.app_id)
+    {
+        // 更新现有配置
+        *existing = entry;
+    } else {
+        // 添加新配置
+        config.ufs_configs.push(entry);
     }
-
-    config.ufs_injections.push(entry);
 
     // 保存到文件
     let config_path = get_config_path()?;
     let content = toml::to_string_pretty(&*config)?;
     std::fs::write(&config_path, content)?;
-    tracing::info!("已保存 UFS 注入配置");
+    tracing::info!("已保存 UFS 游戏配置");
     Ok(())
 }
 
-// 删除 UFS 注入配置
-pub fn remove_ufs_injection_config(id: &str) -> Result<()> {
+// 删除 UFS 游戏配置
+pub fn remove_ufs_game_config(app_id: u32) -> Result<()> {
     let config = CONFIG
         .get()
         .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
     let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
-    config.ufs_injections.retain(|c| c.id != id);
+    config.ufs_configs.retain(|c| c.app_id != app_id);
 
     // 保存到文件
     let config_path = get_config_path()?;
