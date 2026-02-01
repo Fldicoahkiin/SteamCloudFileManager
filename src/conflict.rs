@@ -139,14 +139,16 @@ impl FileComparison {
                 let size_tolerance = (c.size as f64 * 0.01).max(1024.0) as i64;
                 flags.size_diff = size_diff.abs() > size_tolerance;
 
-                // 计算时间差异（精确到秒）
-                let time_diff = l.modified.timestamp() - c.timestamp.timestamp();
-                flags.time_diff = time_diff != 0;
+                // 计算时间差异
+                let local_minutes = l.modified.timestamp() / 60;
+                let cloud_minutes = c.timestamp.timestamp() / 60;
+                let time_diff_minutes = local_minutes - cloud_minutes;
+                flags.time_diff = time_diff_minutes != 0;
 
                 // 判断状态
-                let status = if time_diff > 2 {
+                let status = if time_diff_minutes > 0 {
                     SyncStatus::LocalNewer
-                } else if time_diff < -2 {
+                } else if time_diff_minutes < 0 {
                     SyncStatus::CloudNewer
                 } else if flags.size_diff {
                     // 时间相同但大小不同 → 需要 hash 确认
@@ -155,7 +157,9 @@ impl FileComparison {
                     SyncStatus::Synced
                 };
 
-                (status, time_diff, size_diff, flags)
+                // time_diff_secs 保留秒级差异用于显示
+                let time_diff_secs = l.modified.timestamp() - c.timestamp.timestamp();
+                (status, time_diff_secs, size_diff, flags)
             }
             (Some(l), None) if l.exists => {
                 flags.exists_diff = true;

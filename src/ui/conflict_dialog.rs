@@ -438,11 +438,12 @@ fn render_detail_panel(
             ui.label(i18n.status_label());
             ui.label(comparison.status_display());
 
-            if comparison.time_diff_secs != 0 {
-                let diff_text = if comparison.time_diff_secs > 0 {
-                    i18n.local_newer_by(comparison.time_diff_secs)
+            let time_diff_minutes = comparison.time_diff_secs / 60;
+            if time_diff_minutes != 0 {
+                let diff_text = if time_diff_minutes > 0 {
+                    i18n.local_newer_by_minutes(time_diff_minutes)
                 } else {
-                    i18n.cloud_newer_by(-comparison.time_diff_secs)
+                    i18n.cloud_newer_by_minutes(-time_diff_minutes)
                 };
                 ui.label(diff_text);
             }

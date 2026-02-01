@@ -1545,17 +1545,17 @@ impl I18n {
         }
     }
 
-    pub fn local_newer_by(&self, secs: i64) -> String {
+    pub fn local_newer_by_minutes(&self, mins: i64) -> String {
         match self.lang {
-            Language::Chinese => format!("(本地比云端新 {} 秒)", secs),
-            Language::English => format!("(local {} secs newer)", secs),
+            Language::Chinese => format!("(本地比云端新 {} 分钟)", mins),
+            Language::English => format!("(local {} mins newer)", mins),
         }
     }
 
-    pub fn cloud_newer_by(&self, secs: i64) -> String {
+    pub fn cloud_newer_by_minutes(&self, mins: i64) -> String {
         match self.lang {
-            Language::Chinese => format!("(云端比本地新 {} 秒)", secs),
-            Language::English => format!("(cloud {} secs newer)", secs),
+            Language::Chinese => format!("(云端比本地新 {} 分钟)", mins),
+            Language::English => format!("(cloud {} mins newer)", mins),
         }
     }
 
