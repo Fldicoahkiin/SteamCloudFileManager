@@ -869,7 +869,8 @@ impl AppInfoWriter {
     }
 
     // 编码 rootoverride 条目 (V28 格式 - 直接字符串)
-    // 正确格式参考: root, os, oscompare, useinstead, addpath
+    // VDF 格式: root, os, oscompare, useinstead, addpath 或 pathtransforms
+    // 注意：pathtransforms 和 addpath 互斥，有 pathtransforms 时不输出 addpath
     fn encode_rootoverride_v28(
         &self,
         override_entry: &crate::config::RootOverrideEntry,
@@ -906,8 +907,38 @@ impl AppInfoWriter {
         result.extend_from_slice(override_entry.new_root.as_bytes());
         result.push(0);
 
-        // addpath 字段
-        if !override_entry.add_path.is_empty() {
+        // pathtransforms 和 addpath 互斥
+        if !override_entry.path_transforms.is_empty() {
+            // 有 pathtransforms 时，编码 pathtransforms 结构
+            result.push(VDF_TYPE_SECTION);
+            result.extend_from_slice(b"pathtransforms\0");
+
+            for (i, transform) in override_entry.path_transforms.iter().enumerate() {
+                // 每个 transform 是一个子节
+                result.push(VDF_TYPE_SECTION);
+                result.extend_from_slice(i.to_string().as_bytes());
+                result.push(0);
+
+                // find 字段
+                result.push(VDF_TYPE_STRING);
+                result.extend_from_slice(b"find\0");
+                result.extend_from_slice(transform.find.as_bytes());
+                result.push(0);
+
+                // replace 字段
+                result.push(VDF_TYPE_STRING);
+                result.extend_from_slice(b"replace\0");
+                result.extend_from_slice(transform.replace.as_bytes());
+                result.push(0);
+
+                // transform 子节结束
+                result.push(VDF_TYPE_SECTION_END);
+            }
+
+            // pathtransforms 节结束
+            result.push(VDF_TYPE_SECTION_END);
+        } else if !override_entry.add_path.is_empty() {
+            // 无 pathtransforms 时，输出 addpath
             result.push(VDF_TYPE_STRING);
             result.extend_from_slice(b"addpath\0");
             result.extend_from_slice(override_entry.add_path.as_bytes());
@@ -921,7 +952,8 @@ impl AppInfoWriter {
     }
 
     // 编码 rootoverride 条目 (V29 格式 - 字符串表索引)
-    // 正确格式参考: root, os, oscompare, useinstead, addpath
+    // VDF 格式: root, os, oscompare, useinstead, addpath 或 pathtransforms
+    // 注意：pathtransforms 和 addpath 互斥，有 pathtransforms 时不输出 addpath
     fn encode_rootoverride_v29(
         &self,
         override_entry: &crate::config::RootOverrideEntry,
@@ -967,8 +999,48 @@ impl AppInfoWriter {
         result.extend_from_slice(override_entry.new_root.as_bytes());
         result.push(0);
 
-        // addpath 字段
-        if !override_entry.add_path.is_empty() {
+        // pathtransforms 和 addpath 互斥
+        if !override_entry.path_transforms.is_empty() {
+            // 有 pathtransforms 时，编码 pathtransforms 结构
+            let pathtransforms_idx =
+                self.get_or_create_string_index("pathtransforms", string_table, string_to_idx);
+            result.push(VDF_TYPE_SECTION);
+            result.extend_from_slice(&(pathtransforms_idx as u32).to_le_bytes());
+
+            for (i, transform) in override_entry.path_transforms.iter().enumerate() {
+                // 每个 transform 是一个子节
+                let transform_idx_str = i.to_string();
+                let transform_idx = self.get_or_create_string_index(
+                    &transform_idx_str,
+                    string_table,
+                    string_to_idx,
+                );
+                result.push(VDF_TYPE_SECTION);
+                result.extend_from_slice(&(transform_idx as u32).to_le_bytes());
+
+                // find 字段
+                let find_idx = self.get_or_create_string_index("find", string_table, string_to_idx);
+                result.push(VDF_TYPE_STRING);
+                result.extend_from_slice(&(find_idx as u32).to_le_bytes());
+                result.extend_from_slice(transform.find.as_bytes());
+                result.push(0);
+
+                // replace 字段
+                let replace_idx =
+                    self.get_or_create_string_index("replace", string_table, string_to_idx);
+                result.push(VDF_TYPE_STRING);
+                result.extend_from_slice(&(replace_idx as u32).to_le_bytes());
+                result.extend_from_slice(transform.replace.as_bytes());
+                result.push(0);
+
+                // transform 子节结束
+                result.push(VDF_TYPE_SECTION_END);
+            }
+
+            // pathtransforms 节结束
+            result.push(VDF_TYPE_SECTION_END);
+        } else if !override_entry.add_path.is_empty() {
+            // 无 pathtransforms 时，输出 addpath
             let addpath_idx =
                 self.get_or_create_string_index("addpath", string_table, string_to_idx);
             result.push(VDF_TYPE_STRING);

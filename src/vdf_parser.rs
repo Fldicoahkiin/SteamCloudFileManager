@@ -920,7 +920,7 @@ impl VdfParser {
 
             match type_byte {
                 0x00 => {
-                    // 子节 (如 oslist 可能是子节)
+                    // 子节 (oslist 或 pathtransforms)
                     lines.push(format!("{}\"{}\"", indent_str, key));
                     lines.push(format!("{}{{", indent_str));
                     if key == "oslist" {
@@ -930,6 +930,15 @@ impl VdfParser {
                             lines,
                             indent + 1,
                             &mut override_config.oslist,
+                        );
+                    } else if key == "pathtransforms" {
+                        // 解析 pathtransforms 节
+                        Self::parse_pathtransforms(
+                            cursor,
+                            string_table,
+                            lines,
+                            indent + 1,
+                            &mut override_config.path_transforms,
                         );
                     } else {
                         Self::skip_section(cursor);
@@ -958,8 +967,7 @@ impl VdfParser {
                 0x02 => {
                     let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
                     lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
-                    // useinstead 可以是整数也可以是字符串，这里处理整数情况
-                    // 但通常 useinstead 是字符串（新根名称），所以这里不需要处理
+                    // oscompare 等整数字段不需要特殊处理
                 }
                 _ => {
                     tracing::debug!("rootoverride 未知类型: 0x{:02x}", type_byte);
@@ -968,6 +976,84 @@ impl VdfParser {
         }
 
         override_config
+    }
+
+    // 解析 pathtransforms 节
+    fn parse_pathtransforms(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+        transforms: &mut Vec<crate::path_resolver::PathTransformConfig>,
+    ) {
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            if type_byte == 0x00 {
+                // 每个索引下有一个 transform 条目
+                lines.push(format!("{}\"{}\"", indent_str, key));
+                lines.push(format!("{}{{", indent_str));
+
+                let transform =
+                    Self::parse_single_pathtransform(cursor, string_table, lines, indent + 1);
+                transforms.push(transform);
+
+                lines.push(format!("{}}}", indent_str));
+            }
+        }
+    }
+
+    // 解析单个 pathtransform 条目 (find/replace 对)
+    fn parse_single_pathtransform(
+        cursor: &mut Cursor<&[u8]>,
+        string_table: &[String],
+        lines: &mut Vec<String>,
+        indent: usize,
+    ) -> crate::path_resolver::PathTransformConfig {
+        let mut transform = crate::path_resolver::PathTransformConfig::default();
+        let indent_str = "    ".repeat(indent);
+
+        while let Ok(type_byte) = cursor.read_u8() {
+            if type_byte == 0x08 {
+                break;
+            }
+
+            let key_idx = match cursor.read_u32::<LittleEndian>() {
+                Ok(idx) => idx as usize,
+                Err(_) => break,
+            };
+
+            let key = string_table
+                .get(key_idx)
+                .cloned()
+                .unwrap_or_else(|| format!("#{}", key_idx));
+
+            if type_byte == 0x01 {
+                let value = Self::read_null_string(cursor);
+                lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                match key.as_str() {
+                    "find" => transform.find = value,
+                    "replace" => transform.replace = value,
+                    _ => {}
+                }
+            }
+        }
+
+        transform
     }
 
     // 解析 oslist 子节

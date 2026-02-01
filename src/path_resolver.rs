@@ -328,17 +328,30 @@ pub fn resolve_cloud_file_path(
 
     // 检查是否有 rootoverrides 配置
     if let Some(overrides) = get_root_overrides_cache(app_id)
-        && let Some((new_root, add_path, use_instead)) = apply_root_override(root_name, &overrides)
+        && let Some((new_root, add_path, path_transforms)) =
+            apply_root_override(root_name, &overrides)
     {
         // 解析新的 root 类型
         if let Some(new_root_type) = RootType::from_name(&new_root) {
             let base_path = resolve_root_base_path(new_root_type, steam_path, user_id, app_id)?;
-            let final_path = if use_instead {
-                // 完全替换：base_path / add_path / filename
+
+            // 应用 path_transforms 规则
+            let mut final_filename = filename.to_string();
+            for transform in &path_transforms {
+                if !transform.find.is_empty() {
+                    final_filename = final_filename.replace(&transform.find, &transform.replace);
+                }
+            }
+
+            let final_path = if !path_transforms.is_empty() {
+                // 有 pathtransforms 时，应用转换后的路径
+                base_path.join(&final_filename)
+            } else if !add_path.is_empty() {
+                // 无 pathtransforms，有 addpath 时，追加路径
                 base_path.join(&add_path).join(filename)
             } else {
-                // 追加：base_path / add_path / original_subpath / filename
-                base_path.join(&add_path).join(filename)
+                // 都没有时，直接使用 base_path
+                base_path.join(filename)
             };
             return Ok(final_path);
         }
@@ -640,11 +653,11 @@ pub fn get_current_platform() -> &'static str {
 
 // 应用 Root Override
 // 检查给定的 root 名称是否在当前平台上有覆盖配置
-// 返回: (新的 root 名称, 附加路径, 是否完全替换)
+// 返回: (新的 root 名称, 附加路径, path_transforms)
 pub fn apply_root_override(
     root_name: &str,
     overrides: &[RootOverrideConfig],
-) -> Option<(String, String, bool)> {
+) -> Option<(String, String, Vec<PathTransformConfig>)> {
     let current_platform = get_current_platform();
 
     for override_config in overrides {
@@ -670,17 +683,17 @@ pub fn apply_root_override(
 
         if platform_match {
             tracing::debug!(
-                "应用 Root Override: {} -> {} (platform: {}, addpath: {}, useinstead: {})",
+                "应用 Root Override: {} -> {} (platform: {}, addpath: {}, transforms: {})",
                 override_config.original_root,
                 override_config.new_root,
                 current_platform,
                 override_config.add_path,
-                override_config.use_instead
+                override_config.path_transforms.len()
             );
             return Some((
                 override_config.new_root.clone(),
                 override_config.add_path.clone(),
-                override_config.use_instead,
+                override_config.path_transforms.clone(),
             ));
         }
     }
@@ -699,15 +712,22 @@ pub struct SaveFileConfig {
     pub recursive: bool,             // 是否递归 (默认 true)
 }
 
+// 路径转换配置 (对应 VDF 中的 pathtransforms)
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PathTransformConfig {
+    pub find: String,    // 要查找的路径片段
+    pub replace: String, // 替换为的路径片段
+}
+
 // Root Override 配置
 // 用于在特定操作系统上将一个根目录重定向到另一个
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct RootOverrideConfig {
     pub original_root: String, // 原始根名称 (如 "WinMyDocuments")
     pub oslist: Vec<String>,   // 适用的操作系统列表
-    pub new_root: String,      // 新的根名称 (如 "MacDocuments")
-    pub add_path: String,      // 附加路径 (可选)
-    pub use_instead: bool,     // 是否完全替换 (useinstead=1)
+    pub new_root: String,      // 新的根名称 (如 "MacDocuments") (VDF: useinstead)
+    pub add_path: String,      // 附加路径 (可选) (VDF: addpath)
+    pub path_transforms: Vec<PathTransformConfig>, // 路径转换规则 (VDF: pathtransforms)
 }
 
 // 扫描到的本地文件信息

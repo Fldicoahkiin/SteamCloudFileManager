@@ -303,9 +303,11 @@
 ```vdf
 "ufs"
 {
-    "quota"         "配额字节数"
-    "maxnumfiles"   "最大文件数"
-    "hidecloudui"   "0或1"          // 可选
+    "quota"                 "配额字节数"
+    "maxnumfiles"           "最大文件数"
+    "hidecloudui"           "0或1"      // 可选，Steamworks 后台可见
+    "sync_while_suspended"  "0或1"      // 可选，Steamworks 后台可见
+    "ignoreexternalfiles"   "0或1"      // 可选，Steamworks 后台可见
 
     "savefiles"
     {
@@ -333,16 +335,23 @@
     // 2. 操作系统 (os)        - 使用此先决替代的操作系统
     // 3. 新根 (useinstead)    - 原始根映射到指定操作系统的新位置
     // 4. 添加/替代路径 (addpath) - 插入到新根和原始子目录之间的子目录路径
-    // 5. 替代路径             - 启用后，addpath 完全替代原始子目录
+    // 5. 替代路径             - 启用后，addpath 完全替换为 pathtransforms
     {
         "0"                              // 索引：独立于 savefiles，从 0 开始（可能不连续）
         {
             "root"          "原始根目录"    // 如 gameinstall, WinSavedGames
-            "os"            "目标平台"      // MacOS, Linux, Windows
-            "oscompare"     "="             // 比较符，已知值："="（可能还有其他如"!="，待验证）
+            "os"            "目标平台"      // Windows, MacOS, Linux (大小写敏感)
+            "oscompare"     "="             // 比较符，目前观察到的值均为 "="
             "useinstead"    "新根目录"      // 新的根目录名称，如 MacAppSupport, LinuxXdgDataHome
-            "addpath"       "附加路径"      // 可选，附加到路径末尾，如 "Celeste"
-            "pathtransforms" { }            // 可选，路径转换（用途待验证）
+            "addpath"       "附加路径"      // 可选，附加到路径末尾 (与 pathtransforms 互斥)
+            "pathtransforms"                // 可选，路径转换 (与 addpath 互斥)
+            {
+                "0"
+                {
+                    "find"      ""          // 匹配模式，空字符串表示匹配所有
+                    "replace"   "SaveData"  // 替换内容
+                }
+            }
         }
     }
 }
@@ -355,19 +364,53 @@
 | Steamworks 后台 | VDF 字段 | 说明 |
 |----------------|----------|------|
 | Original Root | `root` | 要覆盖的原始根目录 |
-| OS | `os` | 目标操作系统 (Mac OS X, Linux + SteamOS 等) |
-| New Root | `useinstead` | 新的根目录位置 |
-| Add/Replace Path | `addpath` | 附加/替代路径 |
-| Replace Path [✓] | (待确认) | 勾选后 addpath 完全替代原始子目录 |
+| OS | `os` | 目标操作系统 (`Windows`, `MacOS`, `Linux`，大小写敏感) |
+| (隐藏) | `oscompare` | 比较符，UI 不可编辑，目前观察到的值均为 `"="` |
+| New Root | `useinstead` | 新的根目录名称 (字符串类型) |
+| Add/Replace Path | `addpath` | 附加路径，未勾选 "Replace Path" 时使用 |
+| Replace Path [✓] | `pathtransforms` | 勾选后使用 pathtransforms 结构替代 addpath |
 
-> **待验证事项**：
-> - `oscompare` 其他可能值待验证
-> - `pathtransforms` 用途不明
-> - "Replace Path" 勾选框对应的 VDF 字段待确认
-> - 索引可能不连续
+### pathtransforms 结构
 
----
+当 Steamworks UI 中勾选 "Replace Path" 时，后端使用 `pathtransforms` 结构而非 `addpath` 字段，二者互斥：
 
-**最后更新**：2026-01-21  
-**维护者**：[@Fldicoahkiin](https://github.com/Fldicoahkiin)
+- **未勾选**：只有 `addpath` 字段，无 `pathtransforms`
+- **已勾选**：只有 `pathtransforms` 结构，无 `addpath`
 
+`pathtransforms` 是一个包含索引子节 ("0", "1", ...) 的结构，每个子节包含：
+- `find`: 匹配模式，空字符串表示匹配所有路径
+- `replace`: 替换内容
+
+典型用法：`find=""` (匹配所有) + `replace="<path>"` (替换为指定路径)
+
+多个 transform 可以链式应用。
+
+### oscompare 字段分析
+
+**已验证**：
+- 目前观察到的所有 rootoverride 条目中，`oscompare` 值均为 `"="`
+- Steamworks UI 中该字段不可编辑
+
+**推测**：
+- 该字段以比较操作符的形式存在，暗示可能支持其他值（如 `"!="` 表示"不等于"）
+- 可能是 Valve 预留的扩展字段，用于未来支持更复杂的平台匹配逻辑
+- 可能存在通过直接编辑配置使用其他操作符的内部用法
+- 使用场景推测：`"!="` 可用于表示"除了某平台以外的所有平台"
+
+### UFS 顶层配置字段分析
+
+以下字段在 Steamworks 后台 UI 中可见，但在已分析的 appinfo.vdf 中均未观察到：
+
+| 字段 | 已验证 | 推测用途 |
+|------|--------|----------|
+| `hidecloudui` | Steamworks 后台可见，appinfo 中未观察到 | 控制 Steam 客户端是否显示云存储相关 UI（同步状态、冲突解决对话框等） |
+| `sync_while_suspended` | Steamworks 后台可见，appinfo 中未观察到 | 控制游戏挂起时是否继续同步云存档（可能用于 Steam Deck 休眠场景） |
+| `ignoreexternalfiles` | Steamworks 后台可见，appinfo 中未观察到 | 控制是否忽略外部文件（非 Steam 创建的文件），可能用于防止第三方工具干扰云存档 |
+
+**推测**：
+- 这些字段可能是服务端配置，不需要下发到客户端的 appinfo.vdf
+- 或者默认值均为 0/false，VDF 序列化时省略默认值
+- 需要进一步验证：在 Steamworks 后台启用这些选项后，观察 appinfo.vdf 是否会出现对应字段
+
+# 查看指定游戏的 UFS 配置
+cargo run -- --ufs <app_id>

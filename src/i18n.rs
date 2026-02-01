@@ -2162,10 +2162,10 @@ impl I18n {
         }
     }
 
-    pub fn ufs_label_use_instead(&self) -> &'static str {
+    pub fn ufs_label_replace_path(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "替换",
-            Language::English => "Replace",
+            Language::Chinese => "替换路径",
+            Language::English => "Replace Path",
         }
     }
 

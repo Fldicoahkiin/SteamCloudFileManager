@@ -62,16 +62,27 @@ fn default_recursive() -> bool {
     true
 }
 
+// 路径转换规则 (对应 VDF 中的 pathtransforms)
+// Steamworks UI 中勾选 "Replace Path" 时会生成此结构
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct PathTransform {
+    pub find: String,    // 要查找的路径片段
+    pub replace: String, // 替换为的路径片段
+}
+
 // 单个 rootoverride 条目
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct RootOverrideEntry {
-    pub original_root: String, // 原始根名称
-    pub os: String,            // 目标操作系统
-    pub new_root: String,      // 新的根名称
+    pub original_root: String, // 原始根名称 (VDF: root)
+    pub os: String,            // 目标操作系统 (VDF: os)
+    pub new_root: String,      // 新的根名称 (VDF: useinstead)
     #[serde(default)]
-    pub add_path: String, // 附加路径
+    pub add_path: String, // 附加路径 (VDF: addpath), 当无 pathtransforms 时使用
     #[serde(default)]
-    pub use_instead: bool, // 是否完全替换
+    pub path_transforms: Vec<PathTransform>, // 路径转换规则 (VDF: pathtransforms)
+                               // 注意：Steamworks 中 "Replace Path" 勾选框的实际行为是：
+                               // - 勾选: 生成 pathtransforms 结构，不生成 addpath
+                               // - 不勾选: 生成 addpath 字段，不生成 pathtransforms
 }
 
 // 游戏 UFS 完整配置（合并存储）

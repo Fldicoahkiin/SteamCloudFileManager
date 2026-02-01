@@ -1,4 +1,6 @@
-use crate::config::{RootOverrideEntry, SaveFileEntry, UfsGameConfig, get_ufs_game_config};
+use crate::config::{
+    PathTransform, RootOverrideEntry, SaveFileEntry, UfsGameConfig, get_ufs_game_config,
+};
 use crate::i18n::I18n;
 use crate::icons;
 use crate::path_resolver::get_current_platform;
@@ -62,6 +64,8 @@ pub struct AppInfoDialog {
     // 临时编辑字段
     pub temp_savefile: SaveFileEntry,
     pub temp_override: RootOverrideEntry,
+    // UI 临时状态：是否使用路径转换（对应 Steamworks 的 "Replace Path" 勾选框）
+    pub temp_use_path_transform: bool,
 
     // 状态
     pub inject_status: Option<String>,
@@ -105,8 +109,9 @@ impl AppInfoDialog {
                 os: "macos".to_string(),
                 new_root: "MacAppSupport".to_string(),
                 add_path: String::new(),
-                use_instead: false,
+                path_transforms: Vec::new(),
             },
+            temp_use_path_transform: false,
             inject_status: None,
             game_config,
         }
@@ -152,7 +157,14 @@ impl AppInfoDialog {
                 os: ro.oslist.first().cloned().unwrap_or_default(),
                 new_root: ro.new_root.clone(),
                 add_path: ro.add_path.clone(),
-                use_instead: ro.use_instead,
+                path_transforms: ro
+                    .path_transforms
+                    .iter()
+                    .map(|t| PathTransform {
+                        find: t.find.clone(),
+                        replace: t.replace.clone(),
+                    })
+                    .collect(),
             })
             .collect();
     }
@@ -428,8 +440,9 @@ pub fn draw_appinfo_dialog(
                             os: "macos".to_string(),
                             new_root: "MacAppSupport".to_string(),
                             add_path: String::new(),
-                            use_instead: false,
+                            path_transforms: Vec::new(),
                         };
+                        dialog.temp_use_path_transform = false;
                     }
                 });
 
@@ -502,23 +515,37 @@ pub fn draw_appinfo_dialog(
                                         .desired_width(120.0),
                                 );
                                 ui.checkbox(
-                                    &mut dialog.temp_override.use_instead,
-                                    i18n.ufs_label_use_instead(),
+                                    &mut dialog.temp_use_path_transform,
+                                    i18n.ufs_label_replace_path(),
                                 );
                             });
 
                             ui.horizontal(|ui| {
                                 if ui.button(icons::CHECK).clicked() {
+                                    // 根据 UI 状态准备 override 条目
+                                    let mut override_entry = dialog.temp_override.clone();
+
+                                    if dialog.temp_use_path_transform {
+                                        // 勾选了 "Replace Path"：使用 pathtransforms
+                                        // find="" 表示匹配所有，replace=add_path 表示替换为该路径
+                                        override_entry.path_transforms = vec![PathTransform {
+                                            find: String::new(),
+                                            replace: override_entry.add_path.clone(),
+                                        }];
+                                        // pathtransforms 和 addpath 互斥，清空 add_path
+                                        override_entry.add_path = String::new();
+                                    } else {
+                                        // 未勾选：使用 addpath，清空 path_transforms
+                                        override_entry.path_transforms = Vec::new();
+                                    }
+
                                     match dialog.edit_mode {
                                         EditMode::AddOverride => {
-                                            dialog
-                                                .editing_overrides
-                                                .push(dialog.temp_override.clone());
+                                            dialog.editing_overrides.push(override_entry);
                                         }
                                         EditMode::EditOverride(idx) => {
                                             if idx < dialog.editing_overrides.len() {
-                                                dialog.editing_overrides[idx] =
-                                                    dialog.temp_override.clone();
+                                                dialog.editing_overrides[idx] = override_entry;
                                             }
                                         }
                                         _ => {}
@@ -567,7 +594,7 @@ pub fn draw_appinfo_dialog(
                                         egui::RichText::new(i18n.ufs_label_add_path()).strong(),
                                     );
                                     ui.label(
-                                        egui::RichText::new(i18n.ufs_label_use_instead()).strong(),
+                                        egui::RichText::new(i18n.ufs_label_replace_path()).strong(),
                                     );
                                     ui.label(
                                         egui::RichText::new(i18n.ufs_label_actions()).strong(),
@@ -582,12 +609,24 @@ pub fn draw_appinfo_dialog(
                                         );
                                         ui.label(&ro.os);
                                         ui.label(&ro.new_root);
-                                        ui.label(if ro.add_path.is_empty() {
-                                            "-"
-                                        } else {
+                                        // 显示 add_path 或 pathtransforms 中的 replace 值
+                                        let display_path = if !ro.path_transforms.is_empty() {
+                                            ro.path_transforms
+                                                .first()
+                                                .map(|t| t.replace.as_str())
+                                                .unwrap_or("-")
+                                        } else if !ro.add_path.is_empty() {
                                             &ro.add_path
+                                        } else {
+                                            "-"
+                                        };
+                                        ui.label(display_path);
+                                        // 有 pathtransforms 表示勾选了 Replace Path
+                                        ui.label(if !ro.path_transforms.is_empty() {
+                                            "✓"
+                                        } else {
+                                            "-"
                                         });
-                                        ui.label(if ro.use_instead { "✓" } else { "-" });
                                         ui.horizontal(|ui| {
                                             if ui.small_button(icons::GEAR).clicked() {
                                                 to_edit = Some(idx);
@@ -606,7 +645,18 @@ pub fn draw_appinfo_dialog(
                             }
                             // 处理编辑
                             if let Some(idx) = to_edit {
-                                dialog.temp_override = dialog.editing_overrides[idx].clone();
+                                let entry = &dialog.editing_overrides[idx];
+                                dialog.temp_override = entry.clone();
+                                // 恢复 UI 状态
+                                dialog.temp_use_path_transform = !entry.path_transforms.is_empty();
+                                // 如果使用 pathtransforms，将 replace 值恢复到 add_path 以便 UI 编辑
+                                if dialog.temp_use_path_transform {
+                                    dialog.temp_override.add_path = entry
+                                        .path_transforms
+                                        .first()
+                                        .map(|t| t.replace.clone())
+                                        .unwrap_or_default();
+                                }
                                 dialog.edit_mode = EditMode::EditOverride(idx);
                             }
                         });
