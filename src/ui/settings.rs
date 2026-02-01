@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 // 窗口尺寸常量
 const CONTENT_WIDTH: f32 = 380.0;
-const WINDOW_HEIGHT: f32 = 380.0;
+const WINDOW_HEIGHT: f32 = 388.0;
 
 // 绘制侧边栏 Tab 按钮
 fn draw_sidebar_tab(
