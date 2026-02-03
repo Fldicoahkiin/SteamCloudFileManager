@@ -3,99 +3,99 @@ description: 报告软件问题 / Report a bug in the application
 title: "[Bug]: "
 labels: ["bug"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        感谢你提交 Bug 报告！请尽量填写以下信息以便我们快速定位问题。
-        Thanks for reporting a bug! Please fill in the following information to help us locate the issue.
+    - type: markdown
+      attributes:
+          value: |
+              感谢你提交 Bug 报告！请尽量填写以下信息以便我们快速定位问题。
+              Thanks for reporting a bug! Please fill in the following information to help us locate the issue.
 
-  - type: dropdown
-    id: os
-    attributes:
-      label: 操作系统 / Operating System
-      options:
-        - Windows 10
-        - Windows 11
-        - macOS (Intel)
-        - macOS (Apple Silicon)
-        - Linux (Debian/Ubuntu)
-        - Linux (Fedora/RHEL)
-        - Linux (Arch)
-        - Linux (Other)
-    validations:
-      required: true
+    - type: dropdown
+      id: os
+      attributes:
+          label: 操作系统 / Operating System
+          options:
+              - Windows 10
+              - Windows 11
+              - macOS (Intel)
+              - macOS (Apple Silicon)
+              - Linux (Debian/Ubuntu)
+              - Linux (Fedora/RHEL)
+              - Linux (Arch)
+              - Linux (Other)
+      validations:
+          required: true
 
-  - type: input
-    id: version
-    attributes:
-      label: 软件版本 / App Version
-      description: 可在设置页面查看 / Check in Settings
-      placeholder: "例如: 1.0.0"
-    validations:
-      required: true
+    - type: input
+      id: version
+      attributes:
+          label: 软件版本 / App Version
+          description: 可在设置页面查看 / Check in Settings
+          placeholder: "例如: 1.0.0"
+      validations:
+          required: true
 
-  - type: dropdown
-    id: install-method
-    attributes:
-      label: 安装方式 / Installation Method
-      options:
-        - GitHub Release (zip/dmg/deb/rpm)
-        - Homebrew
-        - AUR
-        - AppImage
-        - 从源码编译 / Built from source
+    - type: dropdown
+      id: install-method
+      attributes:
+          label: 安装方式 / Installation Method
+          options:
+              - GitHub Release (zip/dmg/deb/rpm)
+              - Homebrew
+              - AUR
+              - AppImage
+              - 从源码编译 / Built from source
 
-  - type: textarea
-    id: description
-    attributes:
-      label: 问题描述 / Bug Description
-      description: 请详细描述遇到的问题 / Please describe the issue in detail
-      placeholder: |
-        发生了什么？预期的行为是什么？
-        What happened? What was the expected behavior?
-    validations:
-      required: true
+    - type: textarea
+      id: description
+      attributes:
+          label: 问题描述 / Bug Description
+          description: 请详细描述遇到的问题 / Please describe the issue in detail
+          placeholder: |
+              发生了什么？预期的行为是什么？
+              What happened? What was the expected behavior?
+      validations:
+          required: true
 
-  - type: textarea
-    id: steps
-    attributes:
-      label: 复现步骤 / Steps to Reproduce
-      description: 如何复现这个问题？/ How to reproduce this issue?
-      placeholder: |
-        1. 启动软件
-        2. 点击...
-        3. 出现错误
-    validations:
-      required: true
+    - type: textarea
+      id: steps
+      attributes:
+          label: 复现步骤 / Steps to Reproduce
+          description: 如何复现这个问题？/ How to reproduce this issue?
+          placeholder: |
+              1. 启动软件
+              2. 点击...
+              3. 出现错误
+      validations:
+          required: true
 
-  - type: input
-    id: game
-    attributes:
-      label: 相关游戏 AppID / Related Game AppID
-      description: 如果和特定游戏相关 / If related to a specific game
-      placeholder: "例如: 570"
+    - type: input
+      id: game
+      attributes:
+          label: 相关游戏 AppID / Related Game AppID
+          description: 如果和特定游戏相关 / If related to a specific game
+          placeholder: "例如: 570"
 
-  - type: textarea
-    id: logs
-    attributes:
-      label: 日志信息 / Log Output
-      description: |
-        请附上相关日志 / Please attach relevant logs
-        - Windows: 应用目录/logs/
-        - macOS: ~/Library/Logs/SteamCloudFileManager/
-        - Linux: ~/.local/share/SteamCloudFileManager/logs/
-      render: shell
+    - type: textarea
+      id: logs
+      attributes:
+          label: 日志信息 / Log Output
+          description: |
+              请附上相关日志 / Please attach relevant logs
+              - Windows: 应用目录/logs/
+              - macOS: ~/Library/Logs/SteamCloudFileManager/
+              - Linux: ~/.local/share/SteamCloudFileManager/logs/
+          render: shell
 
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: 截图 / Screenshots
-      description: 如有相关截图请附上 / Attach screenshots if available
+    - type: textarea
+      id: screenshots
+      attributes:
+          label: 截图 / Screenshots
+          description: 如有相关截图请附上 / Attach screenshots if available
 
-  - type: checkboxes
-    id: checklist
-    attributes:
-      label: 检查项 / Checklist
-      options:
-        - label: 已确认 Steam 以调试模式运行 / Confirmed Steam is running in debug mode
-        - label: 已查看现有 Issue 没有重复 / Checked existing issues for duplicates
+    - type: checkboxes
+      id: checklist
+      attributes:
+          label: 检查项 / Checklist
+          options:
+              - label: 已确认 Steam 以调试模式运行 / Confirmed Steam is running in debug mode
+              - label: 已查看现有 Issue 没有重复 / Checked existing issues for duplicates

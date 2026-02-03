@@ -2,106 +2,106 @@ name: Update AUR Package
 # 当 Release 发布时自动更新 AUR 包
 
 on:
-  release:
-    types: [published]
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
-  workflow_dispatch:
-    inputs:
-      version:
-        description: '要更新的版本号 (不带 v 前缀)'
-        required: true
+    release:
+        types: [published]
+    workflow_run:
+        workflows: ["Release"]
+        types: [completed]
+    workflow_dispatch:
+        inputs:
+            version:
+                description: "要更新的版本号 (不带 v 前缀)"
+                required: true
 permissions:
-  contents: read
+    contents: read
 jobs:
-  update-aur:
-    name: Update AUR Package
-    runs-on: ubuntu-latest
-    # 只有当 Release workflow 成功完成时才执行
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          fetch-tags: true
-      - name: 获取版本号
-        run: |
-          if [ -n "${{ github.event.inputs.version }}" ]; then
-            # 手动触发
-            VERSION="${{ github.event.inputs.version }}"
-          elif [ -n "${{ github.event.release.tag_name }}" ]; then
-            # release 事件触发
-            VERSION="${{ github.event.release.tag_name }}"
-            VERSION="${VERSION#v}"
-          else
-            # workflow_run 触发，获取最新 tag
-            git fetch --tags
-            VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-            VERSION="${VERSION#v}"
-          fi
+    update-aur:
+        name: Update AUR Package
+        runs-on: ubuntu-latest
+        # 只有当 Release workflow 成功完成时才执行
+        if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  fetch-tags: true
+            - name: 获取版本号
+              run: |
+                  if [ -n "${{ github.event.inputs.version }}" ]; then
+                    # 手动触发
+                    VERSION="${{ github.event.inputs.version }}"
+                  elif [ -n "${{ github.event.release.tag_name }}" ]; then
+                    # release 事件触发
+                    VERSION="${{ github.event.release.tag_name }}"
+                    VERSION="${VERSION#v}"
+                  else
+                    # workflow_run 触发，获取最新 tag
+                    git fetch --tags
+                    VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+                    VERSION="${VERSION#v}"
+                  fi
 
-          if [ -z "$VERSION" ]; then
-            echo "错误: 无法获取版本号"
-            exit 1
-          fi
+                  if [ -z "$VERSION" ]; then
+                    echo "错误: 无法获取版本号"
+                    exit 1
+                  fi
 
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "检测到版本: $VERSION"
-      - name: 下载 Linux 构建产物
-        run: |
-          BASE_URL="https://github.com/${{ github.repository }}/releases/download"
-          VERSION="${{ env.VERSION }}"
-          curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-linux-x86_64.tar.gz" \
-            -o linux-x86_64.tar.gz
-      - name: 计算 SHA256
-        run: |
-          SHA256=$(sha256sum linux-x86_64.tar.gz | cut -d' ' -f1)
-          echo "SHA256=$SHA256" >> $GITHUB_ENV
-          echo "SHA256: $SHA256"
-      - name: 生成 PKGBUILD
-        run: |
-          chmod +x scripts/packaging/aur/generate-pkgbuild.sh
-          ./scripts/packaging/aur/generate-pkgbuild.sh \
-            "${{ env.VERSION }}" \
-            "${{ env.SHA256 }}" \
-            "aur-package"
-          cat aur-package/PKGBUILD
-      - name: 配置 AUR SSH
-        env:
-          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
-          cat >> ~/.ssh/config << EOF
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            User aur
-          EOF
-      - name: 推送到 AUR
-        env:
-          AUR_USERNAME: ${{ secrets.AUR_USERNAME }}
-        run: |
-          # 克隆 AUR 仓库
-          git clone ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git aur-repo || {
-            # 如果仓库不存在则初始化
-            mkdir -p aur-repo
-            cd aur-repo
-            git init
-            git remote add origin ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git
-            cd ..
-          }
+                  echo "VERSION=$VERSION" >> $GITHUB_ENV
+                  echo "检测到版本: $VERSION"
+            - name: 下载 Linux 构建产物
+              run: |
+                  BASE_URL="https://github.com/${{ github.repository }}/releases/download"
+                  VERSION="${{ env.VERSION }}"
+                  curl -sL "${BASE_URL}/v${VERSION}/SteamCloudFileManager-${VERSION}-linux-x86_64.tar.gz" \
+                    -o linux-x86_64.tar.gz
+            - name: 计算 SHA256
+              run: |
+                  SHA256=$(sha256sum linux-x86_64.tar.gz | cut -d' ' -f1)
+                  echo "SHA256=$SHA256" >> $GITHUB_ENV
+                  echo "SHA256: $SHA256"
+            - name: 生成 PKGBUILD
+              run: |
+                  chmod +x scripts/packaging/aur/generate-pkgbuild.sh
+                  ./scripts/packaging/aur/generate-pkgbuild.sh \
+                    "${{ env.VERSION }}" \
+                    "${{ env.SHA256 }}" \
+                    "aur-package"
+                  cat aur-package/PKGBUILD
+            - name: 配置 AUR SSH
+              env:
+                  AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+              run: |
+                  mkdir -p ~/.ssh
+                  echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+                  chmod 600 ~/.ssh/aur
+                  ssh-keyscan -t ed25519 aur.archlinux.org >> ~/.ssh/known_hosts
+                  cat >> ~/.ssh/config << EOF
+                  Host aur.archlinux.org
+                    IdentityFile ~/.ssh/aur
+                    User aur
+                  EOF
+            - name: 推送到 AUR
+              env:
+                  AUR_USERNAME: ${{ secrets.AUR_USERNAME }}
+              run: |
+                  # 克隆 AUR 仓库
+                  git clone ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git aur-repo || {
+                    # 如果仓库不存在则初始化
+                    mkdir -p aur-repo
+                    cd aur-repo
+                    git init
+                    git remote add origin ssh://aur@aur.archlinux.org/steam-cloud-file-manager-bin.git
+                    cd ..
+                  }
 
-          # 复制生成的文件
-          cp aur-package/PKGBUILD aur-repo/
-          cp aur-package/.SRCINFO aur-repo/
+                  # 复制生成的文件
+                  cp aur-package/PKGBUILD aur-repo/
+                  cp aur-package/.SRCINFO aur-repo/
 
-          # 提交并推送
-          cd aur-repo
-          git config user.name "${{ env.AUR_USERNAME }}"
-          git config user.email "${{ env.AUR_USERNAME }}@users.noreply.github.com"
-          git add PKGBUILD .SRCINFO
-          git commit -m "Update to ${{ env.VERSION }}" || echo "无更改需要提交"
-          git push origin master || git push origin main
+                  # 提交并推送
+                  cd aur-repo
+                  git config user.name "${{ env.AUR_USERNAME }}"
+                  git config user.email "${{ env.AUR_USERNAME }}@users.noreply.github.com"
+                  git add PKGBUILD .SRCINFO
+                  git commit -m "Update to ${{ env.VERSION }}" || echo "无更改需要提交"
+                  git push origin master || git push origin main

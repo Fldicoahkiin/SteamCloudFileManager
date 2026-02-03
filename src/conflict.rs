@@ -176,8 +176,12 @@ impl FileComparison {
     pub fn status_display(&self) -> String {
         match self.status {
             SyncStatus::Synced => format!("{} 已同步", crate::icons::CHECK),
-            SyncStatus::LocalNewer => format!("{} 本地较新", crate::icons::ARROW_UP),
-            SyncStatus::CloudNewer => format!("{} 云端较新", crate::icons::ARROW_DOWN),
+            SyncStatus::LocalNewer => {
+                format!("{} 本地较新", crate::icons::ARROW_UP)
+            }
+            SyncStatus::CloudNewer => {
+                format!("{} 云端较新", crate::icons::ARROW_DOWN)
+            }
             SyncStatus::Conflict => format!("{} 冲突", crate::icons::WARNING),
             SyncStatus::LocalOnly => format!("{} 仅本地", crate::icons::FILE),
             SyncStatus::CloudOnly => format!("{} 仅云端", crate::icons::CLOUD),

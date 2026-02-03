@@ -65,14 +65,14 @@ pub fn app_title(&self) -> &'static str {
 
 ### 翻译函数分类
 
-| 分类 | 说明 | 示例 |
-|------|------|------|
-| UI 通用文本 | 按钮、标签等 | `refresh()`, `confirm()`, `cancel()` |
-| 连接面板 | Steam 连接相关 | `connect()`, `disconnect()`, `steam_running()` |
-| 文件操作 | 文件管理相关 | `download()`, `upload()`, `delete()`, `forget()` |
-| 窗口标题 | 各窗口标题 | `about_title()`, `error_title()` |
-| 状态消息 | 操作状态提示 | `loading()`, `success()`, `failed()` |
-| 错误消息 | 错误提示 | `error_enter_app_id()`, `download_failed()` |
+| 分类        | 说明           | 示例                                             |
+| ----------- | -------------- | ------------------------------------------------ |
+| UI 通用文本 | 按钮、标签等   | `refresh()`, `confirm()`, `cancel()`             |
+| 连接面板    | Steam 连接相关 | `connect()`, `disconnect()`, `steam_running()`   |
+| 文件操作    | 文件管理相关   | `download()`, `upload()`, `delete()`, `forget()` |
+| 窗口标题    | 各窗口标题     | `about_title()`, `error_title()`                 |
+| 状态消息    | 操作状态提示   | `loading()`, `success()`, `failed()`             |
+| 错误消息    | 错误提示       | `error_enter_app_id()`, `download_failed()`      |
 
 ### 翻译注意事项
 
@@ -160,14 +160,14 @@ pub fn app_title(&self) -> &'static str {
 
 ### Translation Function Categories
 
-| Category | Description | Examples |
-|----------|-------------|----------|
-| UI Common | Buttons, labels | `refresh()`, `confirm()`, `cancel()` |
-| Connection Panel | Steam connection | `connect()`, `disconnect()`, `steam_running()` |
-| File Operations | File management | `download()`, `upload()`, `delete()`, `forget()` |
-| Window Titles | Window titles | `about_title()`, `error_title()` |
-| Status Messages | Operation status | `loading()`, `success()`, `failed()` |
-| Error Messages | Error prompts | `error_enter_app_id()`, `download_failed()` |
+| Category         | Description      | Examples                                         |
+| ---------------- | ---------------- | ------------------------------------------------ |
+| UI Common        | Buttons, labels  | `refresh()`, `confirm()`, `cancel()`             |
+| Connection Panel | Steam connection | `connect()`, `disconnect()`, `steam_running()`   |
+| File Operations  | File management  | `download()`, `upload()`, `delete()`, `forget()` |
+| Window Titles    | Window titles    | `about_title()`, `error_title()`                 |
+| Status Messages  | Operation status | `loading()`, `success()`, `failed()`             |
+| Error Messages   | Error prompts    | `error_enter_app_id()`, `download_failed()`      |
 
 ### Translation Notes
 

@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 💬 讨论 / Discussions
-    url: https://github.com/Fldicoahkiin/SteamCloudFileManager/discussions
-    about: 有问题想讨论？欢迎到 Discussions！/ Have questions? Use Discussions!
-  - name: 📖 文档 / Documentation
-    url: https://github.com/Fldicoahkiin/SteamCloudFileManager#readme
-    about: 查看 README 和使用说明 / Check the README and usage guide
+    - name: 💬 讨论 / Discussions
+      url: https://github.com/Fldicoahkiin/SteamCloudFileManager/discussions
+      about: 有问题想讨论？欢迎到 Discussions！/ Have questions? Use Discussions!
+    - name: 📖 文档 / Documentation
+      url: https://github.com/Fldicoahkiin/SteamCloudFileManager#readme
+      about: 查看 README 和使用说明 / Check the README and usage guide

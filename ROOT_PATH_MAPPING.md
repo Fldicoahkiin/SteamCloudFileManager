@@ -1,16 +1,16 @@
 # Steam Cloud Root 路径映射表
 
-> **重要说明**  
+> **重要说明**\
 > Steam 官方文档只公开了根路径的字符串名称。数字 Root ID (0-12) 在任何官方文档中都未公开，仅在 `remotecache.vdf` 文件中使用。
 
 ---
 
 ## 为什么需要这个映射表
 
-| 配置位置 | 使用的标识 | 示例 |
-|---------|-----------|------|
+| 配置位置                      | 使用的标识 | 示例              |
+| ----------------------------- | ---------- | ----------------- |
 | Steamworks 后台 / appinfo.vdf | 字符串名称 | `WinAppDataLocal` |
-| 本地 remotecache.vdf | 数字 ID | `4` |
+| 本地 remotecache.vdf          | 数字 ID    | `4`               |
 
 本工具的"跳转到本地文件"功能需要将 remotecache.vdf 中的数字 Root ID 转换为实际的文件系统路径。官方未公开它们的对应关系，本文档通过实际游戏验证建立这个映射。
 
@@ -22,56 +22,56 @@
 
 ### 官方公开的 Root 名称
 
-| Root 名称 | 平台 | 路径 |
-|----------|------|------|
-| `App Install Directory` | All | `[Steam]\steamapps\common\[Game]\` |
-| `SteamCloudDocuments` | All | `~/.SteamCloud/[username]/[Game]/` |
-| `WinMyDocuments` | Windows | `%USERPROFILE%\My Documents\` |
-| `WinAppDataLocal` | Windows | `%USERPROFILE%\AppData\Local\` |
-| `WinAppDataLocalLow` | Windows | `%USERPROFILE%\AppData\LocalLow\` |
-| `WinAppDataRoaming` | Windows | `%USERPROFILE%\AppData\Roaming\` |
-| `WinSavedGames` | Windows | `%USERPROFILE%\Saved Games\` |
-| `MacHome` | macOS | `~/` |
-| `MacAppSupport` | macOS | `~/Library/Application Support/` |
-| `MacDocuments` | macOS | `~/Documents/` |
-| `LinuxHome` | Linux | `~/` |
-| `LinuxXdgDataHome` | Linux | `$XDG_DATA_HOME/` |
+| Root 名称               | 平台    | 路径                               |
+| ----------------------- | ------- | ---------------------------------- |
+| `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\` |
+| `SteamCloudDocuments`   | All     | `~/.SteamCloud/[username]/[Game]/` |
+| `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`      |
+| `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`     |
+| `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`  |
+| `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`   |
+| `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`       |
+| `MacHome`               | macOS   | `~/`                               |
+| `MacAppSupport`         | macOS   | `~/Library/Application Support/`   |
+| `MacDocuments`          | macOS   | `~/Documents/`                     |
+| `LinuxHome`             | Linux   | `~/`                               |
+| `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                  |
 
 ### 数字 Root ID 映射（待验证）
 
 > **注意**：数字 Root ID 与字符串名称的对应关系**官方未公开**，以下基于实际验证和代码推测。
 
-| Root ID | 已验证的名称 | 来源 |
-|:-------:|-------------|------|
-| **0** | `SteamCloudDocuments` | [默认路径](#root-0---steamclouddocuments) |
-| **1** | `GameInstall` | [✅ macOS](#root-1---gameinstall-app-install-directory) |
-| **2** | `WinMyDocuments` | [待验证](#root-2---winmydocuments) |
-| **3** | `WinAppDataRoaming` | [待验证](#root-3---winappdataroaming) |
-| **4** | `WinAppDataLocal` (Win) / `MacHome` (Mac) | [✅ macOS](#root-4---winappdatalocal--machome) |
-| **5** | （未知） | [待验证](#root-5---winpictures) |
-| **6** | （未知） | [待验证](#root-6---winmusic) |
-| **7** | `MacAppSupport` | [✅ macOS](#root-7---macappsupport) |
-| **8** | `LinuxXdgDataHome` | [待验证](#root-8---linuxxdgdatahome) |
-| **9** | `WinSavedGames` | [待验证](#root-9---winsavedgames) |
-| **10** | （未知） | [待验证](#root-10---windownloads) |
-| **11** | （未知） | [待验证](#root-11---winpublic) |
-| **12** | `WinAppDataLocalLow` | [待验证](#root-12---winappdatalocallow) |
+| Root ID | 已验证的名称                              | 来源                                                    |
+| :-----: | ----------------------------------------- | ------------------------------------------------------- |
+|  **0**  | `SteamCloudDocuments`                     | [默认路径](#root-0---steamclouddocuments)               |
+|  **1**  | `GameInstall`                             | [✅ macOS](#root-1---gameinstall-app-install-directory) |
+|  **2**  | `WinMyDocuments`                          | [待验证](#root-2---winmydocuments)                      |
+|  **3**  | `WinAppDataRoaming`                       | [待验证](#root-3---winappdataroaming)                   |
+|  **4**  | `WinAppDataLocal` (Win) / `MacHome` (Mac) | [✅ macOS](#root-4---winappdatalocal--machome)          |
+|  **5**  | （未知）                                  | [待验证](#root-5---winpictures)                         |
+|  **6**  | （未知）                                  | [待验证](#root-6---winmusic)                            |
+|  **7**  | `MacAppSupport`                           | [✅ macOS](#root-7---macappsupport)                     |
+|  **8**  | `LinuxXdgDataHome`                        | [待验证](#root-8---linuxxdgdatahome)                    |
+|  **9**  | `WinSavedGames`                           | [待验证](#root-9---winsavedgames)                       |
+| **10**  | （未知）                                  | [待验证](#root-10---windownloads)                       |
+| **11**  | （未知）                                  | [待验证](#root-11---winpublic)                          |
+| **12**  | `WinAppDataLocalLow`                      | [待验证](#root-12---winappdatalocallow)                 |
 
 ### Windows 环境变量
 
-| 变量 | 典型值 |
-|------|--------|
-| `%USERPROFILE%` | `C:\Users\{Username}` |
-| `%USERPROFILE%\My Documents` | `C:\Users\{Username}\Documents`|
-| `%APPDATA%` | `C:\Users\{Username}\AppData\Roaming` |
-| `%LOCALAPPDATA%` | `C:\Users\{Username}\AppData\Local` |
+| 变量                         | 典型值                                |
+| ---------------------------- | ------------------------------------- |
+| `%USERPROFILE%`              | `C:\Users\{Username}`                 |
+| `%USERPROFILE%\My Documents` | `C:\Users\{Username}\Documents`       |
+| `%APPDATA%`                  | `C:\Users\{Username}\AppData\Roaming` |
+| `%LOCALAPPDATA%`             | `C:\Users\{Username}\AppData\Local`   |
 
 ### Linux 环境变量
 
-| 变量 | 默认值 |
-|------|--------|
-| `$XDG_CONFIG_HOME` | `~/.config` |
-| `$XDG_DATA_HOME` | `~/.local/share` |
+| 变量               | 默认值           |
+| ------------------ | ---------------- |
+| `$XDG_CONFIG_HOME` | `~/.config`      |
+| `$XDG_DATA_HOME`   | `~/.local/share` |
 
 ---
 
@@ -85,8 +85,8 @@
 
 ### Root 1 - GameInstall (App Install Directory)
 
-| 游戏 | AppID | 平台 | 完整路径 |
-|------|-------|------|----------|
+| 游戏    | AppID  | 平台  | 完整路径                                 |
+| ------- | ------ | ----- | ---------------------------------------- |
 | Celeste | 504230 | macOS | `~/Library/Application Support/Celeste/` |
 
 通过 rootoverrides 将 gameinstall 重定向到 MacAppSupport
@@ -95,6 +95,7 @@
 <summary><b>Celeste (504230) 完整配置</b></summary>
 
 **appinfo.vdf ufs 配置：**
+
 ```vdf
 "ufs"
 {
@@ -132,6 +133,7 @@
 ```
 
 **remotecache.vdf：**
+
 ```vdf
 "504230"
 {
@@ -156,6 +158,7 @@
 ```
 
 **路径解析：**
+
 - 原始：`root=gameinstall`, `path=Saves`
 - macOS rootoverrides：`useinstead=MacAppSupport`, `addpath=Celeste`
 - 最终：`~/Library/Application Support/Celeste/Saves/`
@@ -166,20 +169,20 @@
 
 ### Root 2 - WinMyDocuments
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 3 - WinAppDataRoaming
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 4 - WinAppDataLocal / MacHome
 
-| 游戏 | AppID | 平台 | 完整路径 |
-|------|-------|------|----------|
+| 游戏             | AppID  | 平台  | 完整路径                               |
+| ---------------- | ------ | ----- | -------------------------------------- |
 | Finding Paradise | 337340 | macOS | `~/Finding Paradise - Freebird Games/` |
 
 > **关键发现**：Root 4 在 macOS 上映射到 `~/`（用户主目录），而不是 Windows 上的 `AppData\Local`
@@ -188,26 +191,27 @@
 
 ### Root 5 - WinPictures
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 6 - WinMusic
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 7 - MacAppSupport
 
-| 游戏 | AppID | 完整路径 |
-|------|-------|----------|
+| 游戏             | AppID  | 完整路径                                                       |
+| ---------------- | ------ | -------------------------------------------------------------- |
 | Finding Paradise | 337340 | `~/Library/Application Support/freebirdgames/findingparadise/` |
 
 <details>
 <summary><b>Finding Paradise (337340) 完整配置</b></summary>
 
 **appinfo.vdf ufs 配置：**
+
 ```vdf
 "savefiles" {
     "0" { "root" "LinuxXdgDataHome" "path" "freebirdgames/findingparadise" "platforms" { "1" "Linux" } }
@@ -218,6 +222,7 @@
 ```
 
 **remotecache.vdf 示例 (macOS)：**
+
 ```vdf
 "freebirdgames/findingparadise/Save4.rxdata" { "root" "7" "size" "323614" "syncstate" "1" }
 ```
@@ -228,31 +233,31 @@
 
 ### Root 8 - LinuxXdgDataHome
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 9 - WinSavedGames
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 10 - WinDownloads
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 11 - WinPublic
 
-*待验证*
+_待验证_
 
 ---
 
 ### Root 12 - WinAppDataLocalLow
 
-*待验证*
+_待验证_
 
 ## 如何验证
 
@@ -361,14 +366,14 @@
 
 ![Steamworks Auto-Cloud 配置界面](docs/steamworks_autocloud_ui.png)
 
-| Steamworks 后台 | VDF 字段 | 说明 |
-|----------------|----------|------|
-| Original Root | `root` | 要覆盖的原始根目录 |
-| OS | `os` | 目标操作系统 (`Windows`, `MacOS`, `Linux`，大小写敏感) |
-| (隐藏) | `oscompare` | 比较符，UI 不可编辑，目前观察到的值均为 `"="` |
-| New Root | `useinstead` | 新的根目录名称 (字符串类型) |
-| Add/Replace Path | `addpath` | 附加路径，未勾选 "Replace Path" 时使用 |
-| Replace Path [✓] | `pathtransforms` | 勾选后使用 pathtransforms 结构替代 addpath |
+| Steamworks 后台  | VDF 字段         | 说明                                                   |
+| ---------------- | ---------------- | ------------------------------------------------------ |
+| Original Root    | `root`           | 要覆盖的原始根目录                                     |
+| OS               | `os`             | 目标操作系统 (`Windows`, `MacOS`, `Linux`，大小写敏感) |
+| (隐藏)           | `oscompare`      | 比较符，UI 不可编辑，目前观察到的值均为 `"="`          |
+| New Root         | `useinstead`     | 新的根目录名称 (字符串类型)                            |
+| Add/Replace Path | `addpath`        | 附加路径，未勾选 "Replace Path" 时使用                 |
+| Replace Path [✓] | `pathtransforms` | 勾选后使用 pathtransforms 结构替代 addpath             |
 
 ### pathtransforms 结构
 
@@ -378,6 +383,7 @@
 - **已勾选**：只有 `pathtransforms` 结构，无 `addpath`
 
 `pathtransforms` 是一个包含索引子节 ("0", "1", ...) 的结构，每个子节包含：
+
 - `find`: 匹配模式，空字符串表示匹配所有路径
 - `replace`: 替换内容
 
@@ -388,10 +394,12 @@
 ### oscompare 字段分析
 
 **已验证**：
+
 - 目前观察到的所有 rootoverride 条目中，`oscompare` 值均为 `"="`
 - Steamworks UI 中该字段不可编辑
 
 **推测**：
+
 - 该字段以比较操作符的形式存在，暗示可能支持其他值（如 `"!="` 表示"不等于"）
 - 可能是 Valve 预留的扩展字段，用于未来支持更复杂的平台匹配逻辑
 - 可能存在通过直接编辑配置使用其他操作符的内部用法
@@ -401,16 +409,18 @@
 
 以下字段在 Steamworks 后台 UI 中可见，但在已分析的 appinfo.vdf 中均未观察到：
 
-| 字段 | 已验证 | 推测用途 |
-|------|--------|----------|
-| `hidecloudui` | Steamworks 后台可见，appinfo 中未观察到 | 控制 Steam 客户端是否显示云存储相关 UI（同步状态、冲突解决对话框等） |
-| `sync_while_suspended` | Steamworks 后台可见，appinfo 中未观察到 | 控制游戏挂起时是否继续同步云存档（可能用于 Steam Deck 休眠场景） |
-| `ignoreexternalfiles` | Steamworks 后台可见，appinfo 中未观察到 | 控制是否忽略外部文件（非 Steam 创建的文件），可能用于防止第三方工具干扰云存档 |
+| 字段                   | 已验证                                  | 推测用途                                                                      |
+| ---------------------- | --------------------------------------- | ----------------------------------------------------------------------------- |
+| `hidecloudui`          | Steamworks 后台可见，appinfo 中未观察到 | 控制 Steam 客户端是否显示云存储相关 UI（同步状态、冲突解决对话框等）          |
+| `sync_while_suspended` | Steamworks 后台可见，appinfo 中未观察到 | 控制游戏挂起时是否继续同步云存档（可能用于 Steam Deck 休眠场景）              |
+| `ignoreexternalfiles`  | Steamworks 后台可见，appinfo 中未观察到 | 控制是否忽略外部文件（非 Steam 创建的文件），可能用于防止第三方工具干扰云存档 |
 
 **推测**：
+
 - 这些字段可能是服务端配置，不需要下发到客户端的 appinfo.vdf
 - 或者默认值均为 0/false，VDF 序列化时省略默认值
 - 需要进一步验证：在 Steamworks 后台启用这些选项后，观察 appinfo.vdf 是否会出现对应字段
 
 # 查看指定游戏的 UFS 配置
+
 cargo run -- --ufs <app_id>

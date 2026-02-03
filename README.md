@@ -55,7 +55,7 @@
 支持 **Windows (x64)**、**macOS (Intel & Apple Silicon)** 以及 **Linux (x64)**。
 构建产物包含常规的安装包及免安装版本（Generic Binary / AppImage）。
 
-> *注：由于 Steamworks SDK 的上游限制，目前无法构建 Windows 和 Linux 的 ARM64 版本。*
+> _注：由于 Steamworks SDK 的上游限制，目前无法构建 Windows 和 Linux 的 ARM64 版本。_
 
 ## 安装
 
@@ -290,7 +290,6 @@ graph TB
     
     %% 双向同步
     RemoteCache <===>|双向同步| Cloud
-
 ```
 
 **本工具交互流程：**
@@ -381,25 +380,26 @@ graph LR
 
 </details>
 
-
 #### Steam 云同步的两种方式
 
 Steam 提供两种云同步机制：
 
-**自动云（Auto-Cloud）**  
+**自动云（Auto-Cloud）**\
 开发者在 Steamworks 后台配置，Steam 自动扫描指定目录：
+
 - Steam 会主动扫描配置的目录
 - 根据 pattern（如 `*.sav`）自动匹配文件
 - 新文件会自动添加到 remotecache.vdf 并同步
 - 配置存储在 appinfo.vdf 的 `ufs` 节中
 
-**Steam Cloud API**  
+**Steam Cloud API**\
 游戏代码调用 `ISteamRemoteStorage::FileWrite()` 显式注册文件：
+
 - Steam 不会主动扫描
 - 需要游戏调用 API 注册文件
 - 用户手动创建的文件不会自动同步
 
-**本工具的定位**：  
+**本工具的定位**：\
 本工具提供两种方式控制云同步：
 
 1. **Steam Cloud API**：手动调用 API 注册文件，解决游戏不写入软链接目录的问题
@@ -471,11 +471,11 @@ graph TD
 
 ### 数据源优先级
 
-| 来源 | 数据内容 | 优先级 | 说明 |
-|------|----------|--------|------|
-| **VDF** | 本地缓存的文件列表、同步状态 | 主要 | 解析 `remotecache.vdf` |
-| **CDP** | 云端实时文件列表、下载链接 | 补充 | 通过 Steam 内置浏览器获取 |
-| **Steam API** | 文件读写、删除、配额查询 | 操作 | `ISteamRemoteStorage` 接口 |
+| 来源          | 数据内容                     | 优先级 | 说明                       |
+| ------------- | ---------------------------- | ------ | -------------------------- |
+| **VDF**       | 本地缓存的文件列表、同步状态 | 主要   | 解析 `remotecache.vdf`     |
+| **CDP**       | 云端实时文件列表、下载链接   | 补充   | 通过 Steam 内置浏览器获取  |
+| **Steam API** | 文件读写、删除、配额查询     | 操作   | `ISteamRemoteStorage` 接口 |
 
 ### 同步状态 (`is_persisted`)
 
@@ -508,14 +508,14 @@ graph TD
 
 Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位置。**这个数字 ID 到路径的映射关系在任何官方文档中都没有公开**，是通过解析 VDF 文件和实际游戏测试验证得出的。
 
-| Root ID | Steamworks 根名称 | Windows 路径示例 |
-|---------|------------------|------------------|
-| 0 | `SteamCloudDocuments` | `userdata/{uid}/{appid}/remote/` |
-| 1 | `App Install Directory` | `steamapps/common/GameName/` |
-| 2 | `WinMyDocuments` | `%USERPROFILE%\Documents\` |
-| 4 | `WinAppDataLocal` | `%LOCALAPPDATA%\` |
-| 9 | `WinSavedGames` | `%USERPROFILE%\Saved Games\` |
-| 12 | `WinAppDataLocalLow` | `%USERPROFILE%\AppData\LocalLow\` |
+| Root ID | Steamworks 根名称       | Windows 路径示例                  |
+| ------- | ----------------------- | --------------------------------- |
+| 0       | `SteamCloudDocuments`   | `userdata/{uid}/{appid}/remote/`  |
+| 1       | `App Install Directory` | `steamapps/common/GameName/`      |
+| 2       | `WinMyDocuments`        | `%USERPROFILE%\Documents\`        |
+| 4       | `WinAppDataLocal`       | `%LOCALAPPDATA%\`                 |
+| 9       | `WinSavedGames`         | `%USERPROFILE%\Saved Games\`      |
+| 12      | `WinAppDataLocalLow`    | `%USERPROFILE%\AppData\LocalLow\` |
 
 **详细说明**：
 
