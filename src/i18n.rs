@@ -195,8 +195,8 @@ impl I18n {
 
     pub fn show_appinfo_vdf(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "显示 appinfo.vdf",
-            Language::English => "Show appinfo.vdf",
+            Language::Chinese => "配置 appinfo.vdf",
+            Language::English => "Configure appinfo.vdf",
         }
     }
 

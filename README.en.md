@@ -47,7 +47,7 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 - **Search & Filter**: Supports regex search for filenames, paths, and sync status.
 - **Game Library Scanning**: Automatically discovers local games by parsing `libraryfolders.vdf`.
 - **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
-- **UFS Config Injection**: Directly modify `appinfo.vdf` to add custom cloud sync paths for any game (Experimental).
+- **UFS Config Management**: Directly read/write `appinfo.vdf` to edit Auto-Cloud configuration like the Steamworks backend (Experimental). Add/edit/delete savefiles rules and rootoverrides path mappings to customize cloud sync behavior.
 - **Multi-Platform Support**: Windows / macOS / Linux.
 
 ## Platform Compatibility
@@ -262,36 +262,31 @@ graph TB
         GameCode["Game Code"]
     end
     
-    Cloud(("☁️ Steam Server"))
+    Cloud(("🌐 Steam Server"))
     
     subgraph client["🖥️ Steam Client"]
-        subgraph vdf["📁 VDF Files"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["🔄 Steam Cloud"]
-            Auto["Auto-Cloud<br/>Auto Scan & Match"]
+        subgraph sync["☁️ Steam Cloud Sync"]
+            Auto["Steam Auto-Cloud<br/>Auto recursive file matching"]
             API["Steam Cloud API<br/>ISteamRemoteStorage"]
         end
-        
-        SteamBrowser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
     end
     
-    ThirdParty["🛠️ Third-Party Tools<br/>(e.g., This Tool)"]
-    
-    %% Steamworks Config → Auto-Cloud
+    %% Steamworks config delivery
     Steamworks --> Cloud
-    Cloud -->|Deliver Config| AppInfo
+    Cloud -->|Deliver ufs Config| AppInfo
     AppInfo -->|ufs Config Rules| Auto
     Auto --> RemoteCache
     
-    %% Game Code/Third-Party → API
-    GameCode -->|Call| API
-    ThirdParty -->|Call| API
+    %% Game code calls API
+    GameCode -->|Call API| API
     API -->|Write File| RemoteCache
     
-    %% Bidirectional Sync
+    %% Bidirectional sync
     RemoteCache <===>|Bidirectional Sync| Cloud
 
 ```
@@ -300,117 +295,86 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph tool["🛠️ This Tool"]
-        App["Steam Cloud File Manager"]
-        Parser["VDF Parser"]
-        Resolver["Root ID Path Mapping"]
-        UI["File Management UI"]
-    end
+    Tool["🛠️ This Tool"]
     
     subgraph client["🖥️ Steam Client"]
-        subgraph vdf["📁 VDF Files"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
-        API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        
+        subgraph sync["☁️ Steam Cloud Sync"]
+            Auto["Steam Auto-Cloud"]
+            API["Steam Cloud API"]
+        end
+        
         Browser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
     end
     
-    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
-    Cloud(("☁️ Steam Server"))
+    Cloud(("🌐 Steam Server"))
     
-    %% Read VDF
-    App --> Parser
-    Parser -.Read File List.-> RemoteCache
-    Parser -.Read ufs Config.-> AppInfo
+    %% This tool's operations (inject into flow)
+    Tool -.->|Read| AppInfo
+    Tool -.->|Read| RemoteCache
+    Tool ==>|Inject ufs Config| AppInfo
+    Tool -->|Call API| API
+    Tool -->|CDP Get Download Link| Browser
     
-    %% Root ID Mapping
-    RemoteCache -.Extract Root ID.-> Resolver
-    AppInfo -.Path Mapping Rules.-> Resolver
-    Resolver --> UI
-    
-    %% API Operations
-    UI -->|Upload/Delete/Sync/Remove| API
+    %% Steam internal flow
+    AppInfo -->|ufs Config Rules| Auto
+    Auto --> RemoteCache
     API -->|Write File| RemoteCache
-    
-    %% Download Link
-    UI -->|Get Download Link| CDP
-    CDP --> Browser
-    Browser -->|Access Cloud Storage| Cloud
-    Cloud -.-> Browser
-    Browser -.Return Download Link.-> UI
+    RemoteCache <===>|Bidirectional Sync| Cloud
+    Browser <-->|Access Cloud Storage| Cloud
 ```
 
 <details>
 <summary><b>Full Architecture Diagram (Click to Expand)</b></summary>
 
 ```mermaid
-graph TB
-    subgraph dev["🔧 Developer"]
-        Steamworks["Steamworks Backend<br/>Configure ufs"]
-        GameCode["Game Code"]
+graph LR
+    subgraph left["External"]
+        subgraph dev["🔧 Developer"]
+            Steamworks["Steamworks Backend<br/>Configure ufs"]
+            GameCode["Game Code"]
+        end
+        Tool["🛠️ This Tool"]
     end
     
-    Cloud(("☁️ Steam Server"))
-    
     subgraph client["🖥️ Steam Client"]
-        subgraph vdf["📁 VDF Files"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["🔄 Steam Cloud"]
-            Auto["Auto-Cloud<br/>Auto Scan & Match"]
-            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        subgraph sync["☁️ Steam Cloud Sync"]
+            Auto["Auto-Cloud"]
+            API["Steam Cloud API"]
         end
         
-        SteamBrowser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
+        Browser["🌐 Built-in Browser"]
     end
     
-    CDP["CDP Protocol<br/>Chrome DevTools Protocol"]
+    Cloud(("🌐 Steam<br/>Server"))
     
-    ThirdParty["🛠️ Third-Party Tools<br/>(e.g., This Tool)"]
-    
-    subgraph tool["🛠️ This Tool"]
-        App["Steam Cloud File Manager"]
-        Parser["VDF Parser"]
-        Resolver["Root ID Path Mapping"]
-        UI["File Management UI"]
-    end
-    
-    %% Steamworks Config → Auto-Cloud
+    %% Developer flow
     Steamworks --> Cloud
-    Cloud -->|Deliver Config| AppInfo
-    AppInfo -->|ufs Config Rules| Auto
+    Cloud -->|Deliver ufs Config| AppInfo
+    GameCode -->|Call API| API
+    
+    %% Steam internal flow
+    AppInfo --> Auto
     Auto --> RemoteCache
+    API --> RemoteCache
+    RemoteCache <===> Cloud
+    Browser <--> Cloud
     
-    %% Game Code/Third-Party → API
-    GameCode -->|Call| API
-    ThirdParty -->|Call| API
-    
-    %% Bidirectional Sync
-    API -->|Write File| RemoteCache
-    RemoteCache <===>|Bidirectional Sync| Cloud
-    
-    %% This Tool Reads
-    App --> Parser
-    Parser -.Read File List.-> RemoteCache
-    Parser -.Read ufs Config.-> AppInfo
-    
-    %% Root ID Mapping
-    RemoteCache -.Extract Root ID.-> Resolver
-    AppInfo -.Path Mapping Rules.-> Resolver
-    Resolver --> UI
-    
-    %% This Tool Calls API (Same as Game Code)
-    UI -->|Upload/Delete/Sync/Remove| API
-    
-    %% Download Link
-    UI -->|Get Download Link| CDP
-    CDP --> SteamBrowser
-    SteamBrowser -->|Access Cloud Storage| Cloud
-    Cloud -.-> SteamBrowser
-    SteamBrowser -.Return Download Link.-> UI
+    %% This tool's operations
+    Tool -.->|Read| AppInfo
+    Tool -.->|Read| RemoteCache
+    Tool ==>|Inject ufs| AppInfo
+    Tool -->|Call| API
+    Tool -->|CDP| Browser
 ```
 
 </details>
@@ -435,7 +399,15 @@ Game code calls `ISteamRemoteStorage::FileWrite()` to explicitly register files:
 - User-created files are not automatically synced
 
 **This Tool's Positioning**:  
-As a third-party tool, we can only use Steam Cloud API. The main scenario we address: games don't write to symlinked config directories, so those files won't sync. We manually call the API to register these files and enable cloud sync.
+This tool provides two ways to control cloud sync:
+
+1. **Steam Cloud API**: Manually call API to register files, solving the problem of games not writing to symlinked directories
+2. **UFS Config Injection** (New Feature): Directly modify local `appinfo.vdf`'s `ufs` section, enabling Steamworks-like configuration management. You can:
+   - Add/edit/delete `savefiles` rules (specify sync directories and file patterns)
+   - Add/edit/delete `rootoverrides` path mappings (cross-platform path conversion)
+   - Customize cloud sync paths for any game
+
+> ⚠️ **Note**: UFS config injection modifies local appinfo.vdf. Steam updates may overwrite these changes. Backup your configuration before modifying.
 
 ### Data Flow
 
@@ -565,7 +537,7 @@ Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage
 - [x] File conflict detection and handling
 - [x] Cloud save backup
 - [x] Symlink sync support (experimental)
-- [x] UFS config injection (experimental) - Directly modify appinfo.vdf to add custom cloud sync paths
+- [x] UFS config management (experimental) - Steamworks-like Auto-Cloud configuration editing
 - [ ] Automatic backup schedule
 
 ### Package Manager Support

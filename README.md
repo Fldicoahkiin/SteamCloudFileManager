@@ -47,7 +47,7 @@
 - **搜索与过滤**：支持文件名、路径及同步状态的正则表达式检索。
 - **游戏库扫描**：通过解析 `libraryfolders.vdf` 自动发现本地游戏。
 - **软链接同步**：支持将非原生支持的本地文件通过软链接挂载至 Steam Cloud（实验性）。
-- **UFS 配置注入**：直接修改 `appinfo.vdf`，为任意游戏添加自定义云同步路径（实验性）。
+- **UFS 配置管理**：直接读写 `appinfo.vdf`，实现类 Steamworks 后台的 Auto-Cloud 配置编辑（实验性）。可添加/编辑/删除 savefiles 规则和 rootoverrides 路径映射，自定义游戏的云同步行为。
 - **多平台支持**：Windows / macOS / Linux。
 
 ## 平台兼容性
@@ -264,33 +264,28 @@ graph TB
         GameCode["游戏代码"]
     end
     
-    Cloud(("☁️ Steam 服务器"))
+    Cloud(("🌐 Steam 服务器"))
     
     subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["📁 VDF 文件"]
+        subgraph vdf["本地 VDF 文件"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["🔄 Steam Cloud"]
-            Auto["Auto-Cloud<br/>自动扫描匹配"]
-            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        subgraph sync["☁️ Steam 云同步"]
+            Auto["Steam 自动云 Auto-Cloud<br/>自动递归查找匹配文件"]
+            API["Steam 云 API<br/>ISteamRemoteStorage接口"]
         end
-        
-        SteamBrowser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
     end
     
-    ThirdParty["🛠️ 第三方工具<br/>（如本工具）"]
-    
-    %% Steamworks 配置 → Auto-Cloud
+    %% Steamworks 配置下发流程
     Steamworks --> Cloud
-    Cloud -->|下发配置| AppInfo
+    Cloud -->|下发 ufs 配置| AppInfo
     AppInfo -->|ufs 配置规则| Auto
     Auto --> RemoteCache
     
-    %% 游戏代码/第三方工具 → API
-    GameCode -->|调用| API
-    ThirdParty -->|调用| API
+    %% 游戏代码调用 API
+    GameCode -->|调用 API| API
     API -->|写入文件| RemoteCache
     
     %% 双向同步
@@ -302,117 +297,86 @@ graph TB
 
 ```mermaid
 graph TB
-    subgraph tool["🛠️ 本工具"]
-        App["Steam 云文件管理器"]
-        Parser["VDF 解析器"]
-        Resolver["Root ID 路径映射"]
-        UI["文件管理界面"]
-    end
+    Tool["🛠️ 本工具"]
     
     subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["📁 VDF 文件"]
+        subgraph vdf["本地 VDF 文件"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
-        API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        
+        subgraph sync["☁️ Steam 云同步"]
+            Auto["Steam 自动云 Auto-Cloud"]
+            API["Steam 云 API"]
+        end
+        
         Browser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
     end
     
-    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
-    Cloud(("☁️ Steam 服务器"))
+    Cloud(("🌐 Steam 服务器"))
     
-    %% 读取 VDF
-    App --> Parser
-    Parser -.读取文件列表.-> RemoteCache
-    Parser -.读取ufs配置.-> AppInfo
+    %% 本工具的操作（介入流程）
+    Tool -.->|读取| AppInfo
+    Tool -.->|读取| RemoteCache
+    Tool ==>|注入 ufs 配置| AppInfo
+    Tool -->|调用 API| API
+    Tool -->|CDP 获取下载链接| Browser
     
-    %% Root ID 映射
-    RemoteCache -.提取 Root ID.-> Resolver
-    AppInfo -.路径映射规则.-> Resolver
-    Resolver --> UI
-    
-    %% API 操作
-    UI -->|上传/删除/同步/移除| API
+    %% Steam 内部流程
+    AppInfo -->|ufs 配置规则| Auto
+    Auto --> RemoteCache
     API -->|写入文件| RemoteCache
-    
-    %% 下载链接
-    UI -->|获取下载链接| CDP
-    CDP --> Browser
-    Browser -->|访问云存储| Cloud
-    Cloud -.-> Browser
-    Browser -.返回下载链接.-> UI
+    RemoteCache <===>|双向同步| Cloud
+    Browser <-->|访问云存储| Cloud
 ```
 
 <details>
 <summary><b>完整架构图（点击展开）</b></summary>
 
 ```mermaid
-graph TB
-    subgraph dev["🔧 开发者"]
-        Steamworks["Steamworks 后台<br/>配置 ufs"]
-        GameCode["游戏代码"]
+graph LR
+    subgraph left["外部"]
+        subgraph dev["🔧 开发者"]
+            Steamworks["Steamworks 后台<br/>配置 ufs"]
+            GameCode["游戏代码"]
+        end
+        Tool["🛠️ 本工具"]
     end
     
-    Cloud(("☁️ Steam 服务器"))
-    
     subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["📁 VDF 文件"]
+        subgraph vdf["本地 VDF 文件"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["🔄 Steam Cloud"]
-            Auto["Auto-Cloud<br/>自动扫描匹配"]
-            API["Steam Cloud API<br/>ISteamRemoteStorage"]
+        subgraph sync["☁️ Steam 云同步"]
+            Auto["Auto-Cloud"]
+            API["Steam 云 API"]
         end
         
-        SteamBrowser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
+        Browser["🌐 内置浏览器"]
     end
     
-    CDP["CDP 协议<br/>Chrome DevTools Protocol"]
+    Cloud(("🌐 Steam<br/>服务器"))
     
-    ThirdParty["🛠️ 第三方工具<br/>（如本工具）"]
-    
-    subgraph tool["🛠️ 本工具"]
-        App["Steam 云文件管理器"]
-        Parser["VDF 解析器"]
-        Resolver["Root ID 路径映射"]
-        UI["文件管理界面"]
-    end
-    
-    %% Steamworks 配置 → Auto-Cloud
+    %% 开发者流程
     Steamworks --> Cloud
-    Cloud -->|下发配置| AppInfo
-    AppInfo -->|ufs 配置规则| Auto
+    Cloud -->|下发 ufs 配置| AppInfo
+    GameCode -->|调用 API| API
+    
+    %% Steam 内部流程
+    AppInfo --> Auto
     Auto --> RemoteCache
+    API --> RemoteCache
+    RemoteCache <===> Cloud
+    Browser <--> Cloud
     
-    %% 游戏代码/第三方工具 → API
-    GameCode -->|调用| API
-    ThirdParty -->|调用| API
-    
-    %% 双向同步
-    API -->|写入文件| RemoteCache
-    RemoteCache <===>|双向同步| Cloud
-    
-    %% 本工具读取
-    App --> Parser
-    Parser -.读取文件列表.-> RemoteCache
-    Parser -.读取ufs配置.-> AppInfo
-    
-    %% Root ID 映射
-    RemoteCache -.提取 Root ID.-> Resolver
-    AppInfo -.路径映射规则.-> Resolver
-    Resolver --> UI
-    
-    %% 本工具调用 API（与游戏代码相同）
-    UI -->|上传/删除/同步/移除| API
-    
-    %% 下载链接
-    UI -->|获取下载链接| CDP
-    CDP --> SteamBrowser
-    SteamBrowser -->|访问云存储| Cloud
-    Cloud -.-> SteamBrowser
-    SteamBrowser -.返回下载链接.-> UI
+    %% 本工具的操作
+    Tool -.->|读取| AppInfo
+    Tool -.->|读取| RemoteCache
+    Tool ==>|注入 ufs| AppInfo
+    Tool -->|调用| API
+    Tool -->|CDP| Browser
 ```
 
 </details>
@@ -436,7 +400,15 @@ Steam 提供两种云同步机制：
 - 用户手动创建的文件不会自动同步
 
 **本工具的定位**：  
-作为第三方工具，我们只能使用 Steam Cloud API。主要解决的场景是：游戏不会写入软链接目录中的配置文件，导致这些文件无法同步。我们通过手动调用 API 注册这些文件，让它们进入云同步。
+本工具提供两种方式控制云同步：
+
+1. **Steam Cloud API**：手动调用 API 注册文件，解决游戏不写入软链接目录的问题
+2. **UFS 配置注入**（新功能）：直接修改本地 `appinfo.vdf` 的 `ufs` 节，实现类似 Steamworks 后台的配置管理。可以：
+   - 添加/编辑/删除 `savefiles` 规则（指定同步目录和文件匹配模式）
+   - 添加/编辑/删除 `rootoverrides` 路径映射（跨平台路径转换）
+   - 为任意游戏自定义云同步路径
+
+> ⚠️ **注意**：UFS 配置注入修改的是本地 appinfo.vdf，Steam 更新可能会覆盖这些修改。建议在修改前备份配置。
 
 ### 数据流
 
@@ -566,7 +538,7 @@ Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位
 - [x] 文件冲突检测与处理
 - [x] 云存档备份
 - [x] 软链接同步支持（实验性）
-- [x] UFS 配置注入（实验性）- 直接修改 appinfo.vdf 添加自定义云同步路径
+- [x] UFS 配置管理（实验性）- 类 Steamworks 后台的 Auto-Cloud 配置编辑
 - [ ] 自动备份计划
 
 ### 包管理器支持
