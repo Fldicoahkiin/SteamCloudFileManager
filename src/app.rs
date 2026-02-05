@@ -209,11 +209,17 @@ impl SteamCloudApp {
                         dialog.config = config;
                     }
                     Err(e) => {
-                        tracing::warn!("刷新 appinfo 配置失败: {}", e);
+                        // Steam 重启后 appinfo.vdf 暂时不存在是正常的，使用 debug 级别
+                        let msg = e.to_string();
+                        if msg.contains("不存在") {
+                            tracing::debug!("appinfo.vdf 暂不可用（Steam 可能正在启动）: {}", e);
+                        } else {
+                            tracing::warn!("刷新 appinfo 配置失败: {}", e);
+                        }
                     }
                 },
                 Err(e) => {
-                    tracing::warn!("VDF 解析器初始化失败: {}", e);
+                    tracing::debug!("VDF 解析器初始化失败: {}", e);
                 }
             }
         }

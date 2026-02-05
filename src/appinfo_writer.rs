@@ -64,8 +64,10 @@ impl AppInfoWriter {
             return Err(anyhow!("appinfo.vdf 不存在: {:?}", appinfo_path));
         }
 
-        // 备份原文件
-        let backup_path = appinfo_path.with_extension("vdf.bak");
+        // 备份原文件（带时间戳，便于追溯问题）
+        let timestamp = chrono::Local::now().format("%Y-%m-%d_%H-%M-%S");
+        let backup_filename = format!("appinfo.{}.bak", timestamp);
+        let backup_path = appinfo_path.parent().unwrap().join(&backup_filename);
         fs::copy(&appinfo_path, &backup_path)?;
         tracing::info!("已备份 appinfo.vdf 到 {:?}", backup_path);
 
