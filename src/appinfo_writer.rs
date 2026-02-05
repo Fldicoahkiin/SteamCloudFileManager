@@ -228,6 +228,9 @@ impl AppInfoWriter {
                 result[pos..pos + 8].copy_from_slice(&offset_bytes);
             }
 
+            // 写入字符串数量头部（4 字节 little-endian）
+            result.write_u32::<LittleEndian>(string_table.len() as u32)?;
+
             // 写入更新后的字符串表
             for s in &string_table {
                 result.extend_from_slice(s.as_bytes());
@@ -1137,16 +1140,20 @@ impl AppInfoWriter {
         Ok(())
     }
 
-    // 解析字符串表
+    // 解析字符串表（V29 格式：4 字节字符串数量 + null-terminated strings）
     fn parse_string_table(&self, data: &[u8], offset: usize) -> Result<Vec<String>> {
-        if offset >= data.len() {
+        if offset + 4 >= data.len() {
             return Ok(Vec::new());
         }
 
-        let mut strings = Vec::new();
-        let mut pos = offset;
+        // 读取字符串数量头部（4 字节 little-endian）
+        let mut cursor = Cursor::new(&data[offset..]);
+        let string_count = cursor.read_u32::<LittleEndian>()? as usize;
 
-        while pos < data.len() {
+        let mut strings = Vec::with_capacity(string_count.min(50000));
+        let mut pos = offset + 4; // 跳过头部
+
+        while pos < data.len() && strings.len() < string_count {
             let start = pos;
             while pos < data.len() && data[pos] != 0 {
                 pos += 1;
@@ -1158,13 +1165,14 @@ impl AppInfoWriter {
                 strings.push(s);
             }
 
-            pos += 1;
-
-            if strings.len() > 50000 {
-                break;
-            }
+            pos += 1; // skip null terminator
         }
 
+        tracing::debug!(
+            "解析字符串表: 头部声明 {} 个, 实际解析 {} 个",
+            string_count,
+            strings.len()
+        );
         Ok(strings)
     }
 }

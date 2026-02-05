@@ -290,9 +290,8 @@ fn draw_log_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &
     );
     ui.add_space(4.0);
 
-    let steam_log_path = crate::vdf_parser::VdfParser::find_steam_path()
-        .map(|p| p.join("logs").display().to_string())
-        .unwrap_or_default();
+    // 使用缓存的路径，避免每帧调用 find_steam_path
+    let steam_log_path = state.steam_log_dir_display.clone();
     draw_readonly_path_field(
         ui,
         &mut state.steam_log_dir_display,

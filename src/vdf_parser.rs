@@ -646,15 +646,24 @@ impl VdfParser {
     }
 
     // 解析字符串表 (版本 29+)
+    // V29 格式：4 字节字符串数量 + null-terminated strings
     fn parse_string_table(data: &[u8], offset: usize) -> Result<Vec<String>> {
-        if offset >= data.len() {
+        if offset + 4 >= data.len() {
             return Ok(Vec::new());
         }
 
-        let mut strings = Vec::new();
-        let mut pos = offset;
+        // 读取字符串数量头部（4 字节 little-endian）
+        let string_count = u32::from_le_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]) as usize;
 
-        while pos < data.len() {
+        let mut strings = Vec::with_capacity(string_count.min(50000));
+        let mut pos = offset + 4; // 跳过头部
+
+        while pos < data.len() && strings.len() < string_count {
             let start = pos;
             while pos < data.len() && data[pos] != 0 {
                 pos += 1;
@@ -671,13 +680,13 @@ impl VdfParser {
             }
 
             pos += 1; // 跳过 null
-
-            // 防止无限循环
-            if strings.len() > 50000 {
-                break;
-            }
         }
 
+        tracing::debug!(
+            "解析字符串表: 头部声明 {} 个, 实际解析 {} 个",
+            string_count,
+            strings.len()
+        );
         Ok(strings)
     }
 
