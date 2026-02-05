@@ -79,6 +79,7 @@ pub struct SettingsWindowState {
     pub steam_path_changed: bool,
     pub show_reset_confirm: bool,
     pub log_dir_display: String,
+    pub steam_log_dir_display: String,
     pub config_path_display: String,
     pub backup_dir_display: String,
 }
@@ -95,6 +96,9 @@ impl Default for SettingsWindowState {
         let log_dir = crate::logger::get_log_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
+        let steam_log_dir = crate::vdf_parser::VdfParser::find_steam_path()
+            .map(|p| p.join("logs").display().to_string())
+            .unwrap_or_default();
         let config_path = crate::config::get_config_path()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
@@ -110,6 +114,7 @@ impl Default for SettingsWindowState {
             steam_path_changed: false,
             show_reset_confirm: false,
             log_dir_display: log_dir,
+            steam_log_dir_display: steam_log_dir,
             config_path_display: config_path,
             backup_dir_display: backup_dir,
         }
@@ -272,6 +277,35 @@ fn draw_log_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n: &
         || {
             if let Err(e) = crate::logger::open_log_directory() {
                 tracing::error!("打开日志目录失败: {}", e);
+            }
+        },
+    );
+
+    // Steam 日志目录
+    ui.add_space(16.0);
+    ui.label(
+        egui::RichText::new(i18n.steam_log_dir_label())
+            .size(11.0)
+            .color(text_subtle),
+    );
+    ui.add_space(4.0);
+
+    let steam_log_path = crate::vdf_parser::VdfParser::find_steam_path()
+        .map(|p| p.join("logs").display().to_string())
+        .unwrap_or_default();
+    draw_readonly_path_field(
+        ui,
+        &mut state.steam_log_dir_display,
+        &steam_log_path,
+        i18n.open_steam_log_dir(),
+        || {
+            if let Ok(steam_path) = crate::vdf_parser::VdfParser::find_steam_path() {
+                let logs_path = steam_path.join("logs");
+                if logs_path.exists() {
+                    let _ = open::that(&logs_path);
+                } else {
+                    tracing::warn!("Steam 日志目录不存在: {:?}", logs_path);
+                }
             }
         },
     );

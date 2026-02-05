@@ -678,6 +678,20 @@ impl I18n {
         }
     }
 
+    pub fn steam_log_dir_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Steam 日志目录:",
+            Language::English => "Steam Log Directory:",
+        }
+    }
+
+    pub fn open_steam_log_dir(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => " 打开 Steam 日志目录",
+            Language::English => " Open Steam Log Directory",
+        }
+    }
+
     // ========== Guide 对话框 ==========
     pub fn restarting_steam(&self) -> &'static str {
         match self.lang {
