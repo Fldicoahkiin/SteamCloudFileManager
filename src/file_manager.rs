@@ -422,6 +422,29 @@ impl FileOperations {
         Self { steam_manager }
     }
 
+    // 确保应用的云同步已启用
+    fn ensure_cloud_enabled(&self) {
+        if let Ok(mut manager) = self.steam_manager.lock() {
+            // 检查云同步是否已启用
+            match manager.is_cloud_enabled_for_app() {
+                Ok(true) => {
+                    tracing::debug!("应用云同步已启用");
+                }
+                Ok(false) => {
+                    tracing::info!("应用云同步未启用，尝试启用...");
+                    if let Err(e) = manager.set_cloud_enabled_for_app(true) {
+                        tracing::warn!("启用应用云同步失败: {}", e);
+                    } else {
+                        tracing::info!("应用云同步已启用");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("检查云同步状态失败: {}", e);
+                }
+            }
+        }
+    }
+
     // 删除文件
     pub fn delete_file(&self, filename: &str) -> Result<bool> {
         let mut manager = self
@@ -504,6 +527,9 @@ impl FileOperations {
 
     // 批量移出云端
     pub fn forget_files(&self, filenames: &[String]) -> (usize, Vec<String>) {
+        // 确保云同步已启用（未安装的游戏可能被禁用）
+        self.ensure_cloud_enabled();
+
         let (success_count, failed_files) =
             self.batch_operation(filenames, |filename| self.forget_file(filename));
 
@@ -521,6 +547,9 @@ impl FileOperations {
 
     // 批量删除文件
     pub fn delete_files(&self, filenames: &[String]) -> (usize, Vec<String>) {
+        // 确保云同步已启用（未安装的游戏可能被禁用）
+        self.ensure_cloud_enabled();
+
         let (success_count, failed_files) =
             self.batch_operation(filenames, |filename| self.delete_file(filename));
 
