@@ -100,18 +100,21 @@ impl AppHandlers {
         let (tx, rx) = std::sync::mpsc::channel();
         async_handlers.loader_rx = Some(rx);
 
-        let app_id = connection.app_id_input.trim().parse::<u32>().unwrap_or(0);
+        let app_id = if let Ok(id) = connection.app_id_input.trim().parse::<u32>() {
+            id
+        } else {
+            tracing::error!("刷新文件列表时 App ID 无效: {}", connection.app_id_input);
+            return Err(anyhow!("App ID 无效"));
+        };
 
         std::thread::spawn(move || {
             let file_service = crate::file_manager::FileService::with_steam_manager(steam_manager);
 
-            // 系统级 App ID 只使用 CDP 获取文件列表
             let files = if is_system_app_id(app_id) {
-                tracing::info!("App ID {} 是系统级应用，只使用 CDP 获取文件列表", app_id);
                 file_service
                     .get_files_from_cdp_only(app_id)
                     .unwrap_or_else(|e| {
-                        tracing::error!("CDP 获取文件列表失败: {}", e);
+                        tracing::error!("CDP 获取失败: {}", e);
                         Vec::new()
                     })
             } else {
@@ -126,7 +129,7 @@ impl AppHandlers {
                         }
                     }
                     Err(e) => {
-                        tracing::error!("获取文件列表失败: {}", e);
+                        tracing::error!("Steam API 获取失败: {}", e);
                         Vec::new()
                     }
                 }
@@ -310,11 +313,13 @@ impl AppHandlers {
         file_list: &FileListState,
         misc: &mut MiscState,
         dialogs: &mut DialogState,
+        app_id: u32,
     ) -> bool {
         use crate::file_manager::FileOperationResult;
 
         let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
         let result = file_ops.sync_to_cloud_by_indices(
+            app_id,
             &file_list.files,
             &file_list.selected_files,
             &file_list.local_save_paths,
@@ -337,11 +342,13 @@ impl AppHandlers {
         file_list: &FileListState,
         misc: &mut MiscState,
         dialogs: &mut DialogState,
+        app_id: u32,
     ) -> bool {
         use crate::file_manager::FileOperationResult;
 
         let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
         let result = file_ops.delete_by_indices(
+            app_id,
             &file_list.files,
             &file_list.selected_files,
             &file_list.local_save_paths,
@@ -467,7 +474,7 @@ impl AppHandlers {
                 file_list.files = files;
                 file_list.selected_files.clear();
 
-                let app_id = connection.app_id_input.parse::<u32>().unwrap_or(0);
+                let app_id = connection.app_id_input.parse::<u32>().unwrap_or_default();
                 self.update_quota(misc, app_id);
 
                 if app_id > 0 {
@@ -476,14 +483,12 @@ impl AppHandlers {
                         .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
                     if let Some((steam_path, user_id)) = parser_data {
-                        // 从 appinfo.vdf 获取 savefiles 配置
                         let savefiles = self
                             .ensure_vdf_parser()
                             .and_then(|p| p.get_ufs_config(app_id).ok())
                             .map(|c| c.savefiles)
                             .unwrap_or_default();
 
-                        // 基于 appinfo.vdf 收集本地存档路径（默认包含 root=0）
                         file_list.local_save_paths =
                             crate::path_resolver::collect_local_save_paths_from_ufs(
                                 &savefiles,
@@ -492,11 +497,7 @@ impl AppHandlers {
                                 app_id,
                             );
 
-                        // 如果没有 savefiles 配置，默认扫描 root=0 (SteamCloudDocuments)
                         let scan_savefiles = if savefiles.is_empty() {
-                            tracing::debug!(
-                                "appinfo.vdf 无 savefiles 配置，默认扫描 SteamCloudDocuments"
-                            );
                             vec![crate::path_resolver::SaveFileConfig {
                                 root: "0".to_string(),
                                 root_type: Some(

@@ -747,9 +747,9 @@ pub fn scan_local_files_from_ufs(
     app_id: u32,
 ) -> Vec<ScannedLocalFile> {
     let mut results = Vec::new();
+    let overrides = get_root_overrides_cache(app_id);
 
     for config in savefiles {
-        // 检查平台是否匹配
         if !platform_matches_current(&config.platforms) {
             tracing::debug!(
                 "跳过不匹配平台的配置: root={}, platforms={:?}",
@@ -759,17 +759,45 @@ pub fn scan_local_files_from_ufs(
             continue;
         }
 
-        // 获取 root 类型
-        let root_type = match config.root_type {
+        let mut root_type = match config.root_type {
             Some(rt) => rt,
             None => {
                 tracing::warn!("无法解析 root 类型: {}", config.root);
                 continue;
             }
         };
-        let root_id = root_type.to_u32();
 
-        // 解析基础路径
+        let mut relative_scan_path = config.path.clone();
+
+        if let Some(ref overrides) = overrides
+            && let Some((new_root, add_path, path_transforms)) =
+                apply_root_override(&config.root, overrides)
+            && let Some(new_rt) = RootType::from_name(&new_root)
+        {
+            root_type = new_rt;
+            tracing::debug!(
+                "应用扫描 Override: {} -> {} (path: {})",
+                config.root,
+                new_root,
+                relative_scan_path
+            );
+
+            for transform in &path_transforms {
+                if !transform.find.is_empty() {
+                    relative_scan_path =
+                        relative_scan_path.replace(&transform.find, &transform.replace);
+                }
+            }
+
+            if path_transforms.is_empty() && !add_path.is_empty() {
+                if relative_scan_path.is_empty() {
+                    relative_scan_path = add_path;
+                } else {
+                    relative_scan_path = format!("{}/{}", add_path, relative_scan_path);
+                }
+            }
+        }
+
         let base_path = match resolve_root_base_path(root_type, steam_path, user_id, app_id) {
             Ok(p) => p,
             Err(e) => {
@@ -778,12 +806,12 @@ pub fn scan_local_files_from_ufs(
             }
         };
 
-        // 构建完整扫描路径
-        let scan_path = if config.path.is_empty() {
+        let scan_path = if relative_scan_path.is_empty() {
             base_path.clone()
         } else {
-            // 移除路径开头的斜杠
-            let clean_path = config.path.trim_start_matches('/').trim_start_matches('\\');
+            let clean_path = relative_scan_path
+                .trim_start_matches('/')
+                .trim_start_matches('\\');
             base_path.join(clean_path)
         };
 
@@ -793,17 +821,17 @@ pub fn scan_local_files_from_ufs(
         }
 
         tracing::debug!(
-            "扫描本地目录: {} (pattern={})",
+            "扫描本地目录: {} (pattern={}, original_path={})",
             scan_path.display(),
-            config.pattern
+            config.pattern,
+            config.path
         );
 
-        // 扫描目录
         let files = scan_directory_with_pattern(&scan_path, &config.pattern, config.recursive);
 
         for (full_path, relative_to_scan) in files {
-            // 计算相对于 base_path 的路径 (用于匹配云端文件名)
-            let relative_path = if config.path.is_empty() {
+            // cloud_relative_path 使用原始 config.path 拼接，用于匹配云端文件名
+            let cloud_relative_path = if config.path.is_empty() {
                 relative_to_scan
             } else {
                 let clean_path = config.path.trim_start_matches('/').trim_start_matches('\\');
@@ -812,8 +840,8 @@ pub fn scan_local_files_from_ufs(
 
             if let Ok(metadata) = std::fs::metadata(&full_path) {
                 results.push(ScannedLocalFile {
-                    relative_path,
-                    root_id,
+                    relative_path: cloud_relative_path,
+                    root_id: config.root_type.unwrap().to_u32(),
                     size: metadata.len(),
                     modified: metadata
                         .modified()

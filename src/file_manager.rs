@@ -605,12 +605,9 @@ impl FileOperations {
     }
 
     // 删除指定索引的文件
-    // 根据文件状态分类处理：
-    // - 仅云端存在 (is_persisted=true, exists=false): 调用 Steam API delete
-    // - 仅本地存在 (is_persisted=false, exists=true): 直接删除本地文件
-    // - 两边都存在 (is_persisted=true, exists=true): 调用 Steam API delete + 删除本地文件
     pub fn delete_by_indices(
         &self,
+        app_id: u32,
         files: &[CloudFile],
         selected_files: &[usize],
         local_save_paths: &[(String, PathBuf)],
@@ -619,23 +616,16 @@ impl FileOperations {
             return FileOperationResult::Error("请选择要删除的文件".to_string());
         }
 
-        // 按文件状态分类
         let mut cloud_to_delete = Vec::new();
         let mut local_to_delete = Vec::new();
 
         for &index in selected_files {
             if let Some(file) = files.get(index) {
                 if file.is_persisted {
-                    // 云端存在，需要调用 Steam API 删除
                     cloud_to_delete.push(file.name.clone());
                 }
                 if file.exists {
-                    // 本地存在，需要删除本地文件
                     local_to_delete.push(file.clone());
-                }
-                // 如果两边都不存在 (is_persisted=false, exists=false)，跳过
-                if !file.is_persisted && !file.exists {
-                    tracing::debug!("跳过不存在的文件 (云端和本地都不存在): {}", file.name);
                 }
             }
         }
@@ -643,75 +633,66 @@ impl FileOperations {
         let mut total_deleted = 0;
         let mut all_failed = Vec::new();
 
-        // 删除云端文件（通过 Steam API）
         if !cloud_to_delete.is_empty() {
             tracing::info!("删除 {} 个云端文件", cloud_to_delete.len());
-            let (deleted, failed) = self.delete_files(&cloud_to_delete);
-            total_deleted += deleted;
-            all_failed.extend(failed);
+            // 同时调用两个 API：delete 删除本地副本，forget 移除云端
+            let (deleted_local, failed_local) = self.delete_files(&cloud_to_delete);
+            let (deleted_cloud, failed_cloud) = self.forget_files(&cloud_to_delete);
+            total_deleted += deleted_local.max(deleted_cloud);
+            all_failed.extend(failed_local);
+            all_failed.extend(failed_cloud);
         }
 
-        // 删除本地文件
         if !local_to_delete.is_empty() {
-            tracing::info!("删除 {} 个本地文件", local_to_delete.len());
-            for file in &local_to_delete {
-                // 先尝试通过 local_save_paths 查找
-                let local_path = crate::conflict::find_local_path_for_file(file, local_save_paths)
-                    .map(|base| base.join(&file.name));
+            let steam_info = crate::vdf_parser::VdfParser::new().ok().map(|p| {
+                (
+                    p.get_steam_path().to_path_buf(),
+                    p.get_user_id().to_string(),
+                )
+            });
 
-                // 如果 local_save_paths 匹配失败，尝试直接解析路径
-                let full_path = local_path.or_else(|| {
-                    let parser = crate::vdf_parser::VdfParser::new().ok()?;
-                    let steam_path = parser.get_steam_path();
-                    let user_id = parser.get_user_id().to_string();
-                    // app_id 用于解析路径，这里使用 0 作为默认值
-                    let app_id = 0u32;
+            for file in &local_to_delete {
+                let full_path = if let Some((steam_path, user_id)) = &steam_info {
                     crate::path_resolver::resolve_cloud_file_path(
-                        file.root, &file.name, steam_path, &user_id, app_id,
+                        file.root, &file.name, steam_path, user_id, app_id,
                     )
                     .ok()
+                } else {
+                    None
+                };
+
+                let path_to_use = full_path.or_else(|| {
+                    crate::conflict::find_local_path_for_file(file, local_save_paths)
+                        .map(|base| base.join(&file.name))
                 });
 
-                if let Some(path) = full_path {
+                if let Some(path) = path_to_use {
                     if path.exists() {
                         match std::fs::remove_file(&path) {
                             Ok(_) => {
                                 tracing::info!("已删除本地文件: {}", path.display());
-                                // 只有当文件不在云端时才增加计数（避免重复计数）
                                 if !file.is_persisted {
                                     total_deleted += 1;
                                 }
                             }
                             Err(e) => {
                                 tracing::error!("删除本地文件失败: {} - {}", path.display(), e);
-                                // 只有当文件不在云端时才记录失败（避免重复报告）
                                 if !file.is_persisted {
                                     all_failed.push(file.name.clone());
                                 }
                             }
                         }
-                    } else {
-                        // 本地文件已不存在，视为成功
-                        tracing::debug!("本地文件已不存在: {}", path.display());
-                        if !file.is_persisted {
-                            total_deleted += 1;
-                        }
+                    } else if !file.is_persisted {
+                        total_deleted += 1;
                     }
-                } else {
-                    tracing::warn!("无法解析本地路径: {}", file.name);
-                    // 如果无法解析路径但文件标记为本地存在，记录警告但不视为失败
-                    // 因为 Steam API 删除后本地文件可能会自动清理
-                    if !file.is_persisted {
-                        all_failed.push(file.name.clone());
-                    }
+                } else if !file.is_persisted {
+                    all_failed.push(file.name.clone());
                 }
             }
         }
 
         if !all_failed.is_empty() {
-            tracing::error!("删除失败: {:?}", all_failed);
             if total_deleted > 0 {
-                // 部分成功
                 return FileOperationResult::SuccessWithRefresh(format!(
                     "已删除 {} 个文件，{} 个失败",
                     total_deleted,
@@ -722,25 +703,21 @@ impl FileOperations {
         }
 
         if total_deleted > 0 {
-            tracing::info!("删除完成: {} 个文件", total_deleted);
             FileOperationResult::SuccessWithRefresh(format!("已删除 {} 个文件", total_deleted))
+        } else if !cloud_to_delete.is_empty() {
+            FileOperationResult::SuccessWithRefresh(format!(
+                "已删除 {} 个云端文件",
+                cloud_to_delete.len()
+            ))
         } else {
-            // 可能所有文件都是"两边都存在"的情况，云端删除成功但本地删除被跳过计数
-            // 检查是否有云端删除成功
-            if !cloud_to_delete.is_empty() {
-                FileOperationResult::SuccessWithRefresh(format!(
-                    "已删除 {} 个云端文件",
-                    cloud_to_delete.len()
-                ))
-            } else {
-                FileOperationResult::Error("没有文件被删除".to_string())
-            }
+            FileOperationResult::Error("没有文件被删除".to_string())
         }
     }
 
     // 同步本地文件到云端（针对本地独有文件）
     pub fn sync_to_cloud_by_indices(
         &self,
+        app_id: u32,
         files: &[CloudFile],
         selected_files: &[usize],
         local_save_paths: &[(String, PathBuf)],
@@ -749,52 +726,60 @@ impl FileOperations {
             return FileOperationResult::Error("请选择要同步的文件".to_string());
         }
 
-        tracing::info!("开始同步 {} 个文件到云端", selected_files.len());
         let mut synced_count = 0;
         let mut skipped_count = 0;
         let mut failed_files = Vec::new();
 
+        let steam_info = crate::vdf_parser::VdfParser::new().ok().map(|p| {
+            (
+                p.get_steam_path().to_path_buf(),
+                p.get_user_id().to_string(),
+            )
+        });
+
         for &index in selected_files {
             if let Some(file) = files.get(index) {
-                // 只同步本地独有文件（云端不存在的）
                 if file.is_persisted {
                     skipped_count += 1;
-                    continue; // 已在云端，跳过
+                    continue;
                 }
 
-                // 查找本地文件路径
-                let local_path = crate::conflict::find_local_path_for_file(file, local_save_paths);
+                let full_path = if let Some((steam_path, user_id)) = &steam_info {
+                    crate::path_resolver::resolve_cloud_file_path(
+                        file.root, &file.name, steam_path, user_id, app_id,
+                    )
+                    .ok()
+                } else {
+                    None
+                };
 
-                if let Some(base_path) = local_path {
-                    let full_path = base_path.join(&file.name);
+                let path_to_use = full_path.or_else(|| {
+                    crate::conflict::find_local_path_for_file(file, local_save_paths)
+                        .map(|base| base.join(&file.name))
+                });
 
-                    if full_path.exists() {
-                        // 读取本地文件内容
-                        match std::fs::read(&full_path) {
-                            Ok(data) => {
-                                // 上传到云端
-                                match self.write_file(&file.name, &data) {
-                                    Ok(_) => {
-                                        tracing::info!("同步文件到云端: {}", file.name);
-                                        synced_count += 1;
-                                    }
-                                    Err(e) => {
-                                        tracing::error!("同步失败: {} - {}", file.name, e);
-                                        failed_files.push(file.name.clone());
-                                    }
+                if let Some(path) = path_to_use {
+                    if path.exists() {
+                        match std::fs::read(&path) {
+                            Ok(data) => match self.write_file(&file.name, &data) {
+                                Ok(_) => {
+                                    tracing::info!("同步文件到云端: {}", file.name);
+                                    synced_count += 1;
                                 }
-                            }
+                                Err(e) => {
+                                    tracing::error!("同步失败: {} - {}", file.name, e);
+                                    failed_files.push(file.name.clone());
+                                }
+                            },
                             Err(e) => {
-                                tracing::error!("读取文件失败: {} - {}", full_path.display(), e);
+                                tracing::error!("读取文件失败: {} - {}", path.display(), e);
                                 failed_files.push(file.name.clone());
                             }
                         }
                     } else {
-                        tracing::warn!("本地文件不存在: {}", full_path.display());
                         failed_files.push(file.name.clone());
                     }
                 } else {
-                    tracing::warn!("无法找到本地路径: {}", file.name);
                     failed_files.push(file.name.clone());
                 }
             }
@@ -807,15 +792,7 @@ impl FileOperations {
             ));
         }
 
-        // 同步完成后触发云同步
         if synced_count > 0 {
-            tracing::info!(
-                "同步完成: {} 个成功, {} 个跳过(已在云端), {} 个失败",
-                synced_count,
-                skipped_count,
-                failed_files.len()
-            );
-            tracing::info!("触发云同步...");
             if let Ok(mut manager) = self.steam_manager.lock()
                 && let Err(e) = manager.sync_cloud_files()
             {
@@ -823,7 +800,6 @@ impl FileOperations {
             }
             FileOperationResult::SuccessWithRefresh(format!("已同步 {} 个文件到云端", synced_count))
         } else if skipped_count > 0 {
-            tracing::info!("所有选中文件已在云端，跳过 {} 个", skipped_count);
             FileOperationResult::Error(format!("所有 {} 个文件已在云端，无需同步", skipped_count))
         } else {
             FileOperationResult::Error("没有文件被同步".to_string())

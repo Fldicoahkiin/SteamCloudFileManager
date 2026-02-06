@@ -92,11 +92,13 @@ impl SteamCloudApp {
     }
 
     fn refresh_files(&mut self) {
-        let _ = self.handlers.refresh_files(
+        if let Err(e) = self.handlers.refresh_files(
             &self.connection,
             &mut self.file_list,
             &mut self.async_handlers,
-        );
+        ) {
+            self.show_error(&e.to_string());
+        }
     }
 
     fn open_cloud_url(&mut self) {
@@ -133,20 +135,32 @@ impl SteamCloudApp {
     }
 
     fn sync_to_cloud(&mut self) {
-        if self
-            .handlers
-            .sync_to_cloud(&self.file_list, &mut self.misc, &mut self.dialogs)
-        {
-            self.refresh_files();
+        if let Ok(app_id) = self.connection.app_id_input.trim().parse::<u32>() {
+            if self.handlers.sync_to_cloud(
+                &self.file_list,
+                &mut self.misc,
+                &mut self.dialogs,
+                app_id,
+            ) {
+                self.refresh_files();
+            }
+        } else {
+            self.show_error(self.misc.i18n.error_invalid_app_id());
         }
     }
 
     fn delete(&mut self) {
-        if self
-            .handlers
-            .delete_files(&self.file_list, &mut self.misc, &mut self.dialogs)
-        {
-            self.refresh_files();
+        if let Ok(app_id) = self.connection.app_id_input.trim().parse::<u32>() {
+            if self.handlers.delete_files(
+                &self.file_list,
+                &mut self.misc,
+                &mut self.dialogs,
+                app_id,
+            ) {
+                self.refresh_files();
+            }
+        } else {
+            self.show_error(self.misc.i18n.error_invalid_app_id());
         }
     }
 
