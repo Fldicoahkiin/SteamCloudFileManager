@@ -402,8 +402,9 @@ This tool provides two ways to control cloud sync:
 
 1. **Steam Cloud API**: Manually call API to register files, solving the problem of games not writing to symlinked directories
 2. **UFS Config Injection** (New Feature): Directly modify local `appinfo.vdf`'s `ufs` section, enabling Steamworks-like configuration management. You can:
-   - Add/edit/delete `savefiles` rules (specify sync directories and file patterns)
+   - Add/edit/delete `savefiles` rules (specify sync directories, file patterns, and recursive search option)
    - Add/edit/delete `rootoverrides` path mappings (cross-platform path conversion)
+   - Configure `pathtransforms` path transformation rules (optional, for dynamic path substitution)
    - Customize cloud sync paths for any game
 
 > ⚠️ **Note**: UFS config injection modifies local appinfo.vdf. Steam updates may overwrite these changes. Backup your configuration before modifying.
