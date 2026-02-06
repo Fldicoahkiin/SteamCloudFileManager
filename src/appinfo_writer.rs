@@ -775,6 +775,13 @@ impl AppInfoWriter {
             result.push(0);
         }
 
+        // recursive 字段 (当 recursive=true 时输出 INT32 值 1)
+        if savefile.recursive {
+            result.push(VDF_TYPE_INT32);
+            result.extend_from_slice(b"recursive\0");
+            result.extend_from_slice(&1u32.to_le_bytes());
+        }
+
         // Section 结束
         result.push(VDF_TYPE_SECTION_END);
 
@@ -865,6 +872,16 @@ impl AppInfoWriter {
             let platforms_str = self.platforms_to_oslist(&savefile.platforms);
             result.extend_from_slice(platforms_str.as_bytes());
             result.push(0);
+        }
+
+        // recursive 字段 (当 recursive=true 时输出 INT32 值 1)
+        // 注意: Steam 期望字段名是 "recursive"，类型是 INT32 (0x02)，值是 1
+        if savefile.recursive {
+            let recursive_idx =
+                self.get_or_create_string_index("recursive", string_table, string_to_idx);
+            result.push(VDF_TYPE_INT32);
+            result.extend_from_slice(&(recursive_idx as u32).to_le_bytes());
+            result.extend_from_slice(&1u32.to_le_bytes());
         }
 
         // Section 结束

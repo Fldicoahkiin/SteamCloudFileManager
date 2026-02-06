@@ -65,7 +65,10 @@ pub struct AppInfoDialog {
     pub temp_savefile: SaveFileEntry,
     pub temp_override: RootOverrideEntry,
     // UI 临时状态：是否使用路径转换（对应 Steamworks 的 "Replace Path" 勾选框）
+    // pathtransforms 行为：find 是要替换的原始路径，replace 是新路径
     pub temp_use_path_transform: bool,
+    // pathtransforms.find 的值（原始路径）
+    pub temp_path_transform_find: String,
 
     // 状态
     pub inject_status: Option<String>,
@@ -112,6 +115,7 @@ impl AppInfoDialog {
                 path_transforms: Vec::new(),
             },
             temp_use_path_transform: false,
+            temp_path_transform_find: String::new(),
             inject_status: None,
             game_config,
         }
@@ -326,6 +330,12 @@ pub fn draw_appinfo_dialog(
                                         .desired_width(80.0),
                                 );
                             });
+                            ui.horizontal(|ui| {
+                                ui.checkbox(
+                                    &mut dialog.temp_savefile.recursive,
+                                    i18n.ufs_label_recursive(),
+                                );
+                            });
 
                             ui.horizontal(|ui| {
                                 if ui.button(icons::CHECK).clicked() {
@@ -508,17 +518,48 @@ pub fn draw_appinfo_dialog(
                                     });
                             });
                             ui.horizontal(|ui| {
-                                ui.label(format!("{}:", i18n.ufs_label_add_path()));
-                                ui.add(
-                                    egui::TextEdit::singleline(&mut dialog.temp_override.add_path)
-                                        .hint_text("optional")
-                                        .desired_width(120.0),
-                                );
                                 ui.checkbox(
                                     &mut dialog.temp_use_path_transform,
                                     i18n.ufs_label_replace_path(),
                                 );
                             });
+
+                            if dialog.temp_use_path_transform {
+                                // Replace Path 模式：显示 find（原始路径）和 replace（替代路径）两个输入框
+                                // pathtransforms 行为：find 是要替换的原始路径，replace 是新路径
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{}:", i18n.ufs_label_find_path()));
+                                    ui.add(
+                                        egui::TextEdit::singleline(
+                                            &mut dialog.temp_path_transform_find,
+                                        )
+                                        .hint_text(i18n.ufs_hint_auto_fill())
+                                        .desired_width(180.0),
+                                    );
+                                });
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{}:", i18n.ufs_label_replace_with()));
+                                    ui.add(
+                                        egui::TextEdit::singleline(
+                                            &mut dialog.temp_override.add_path,
+                                        )
+                                        .hint_text("MBWarband/Savegames")
+                                        .desired_width(180.0),
+                                    );
+                                });
+                            } else {
+                                // Add Path 模式：只显示一个字段
+                                ui.horizontal(|ui| {
+                                    ui.label(format!("{}:", i18n.ufs_label_add_path()));
+                                    ui.add(
+                                        egui::TextEdit::singleline(
+                                            &mut dialog.temp_override.add_path,
+                                        )
+                                        .hint_text("optional")
+                                        .desired_width(180.0),
+                                    );
+                                });
+                            }
 
                             ui.horizontal(|ui| {
                                 if ui.button(icons::CHECK).clicked() {
@@ -527,9 +568,42 @@ pub fn draw_appinfo_dialog(
 
                                     if dialog.temp_use_path_transform {
                                         // 勾选了 "Replace Path"：使用 pathtransforms
-                                        // find="" 表示匹配所有，replace=add_path 表示替换为该路径
+                                        // find 是要替换的原始路径，replace 是新路径
+                                        // 如果用户没有输入 find，自动从关联的 savefile.path 填充
+                                        let find_value = if dialog
+                                            .temp_path_transform_find
+                                            .is_empty()
+                                        {
+                                            // 查找与此 rootoverride 关联的 savefile
+                                            // 匹配条件：savefile.root == override.original_root
+                                            tracing::debug!(
+                                                "Auto-fill find: looking for savefile with root={}",
+                                                override_entry.original_root
+                                            );
+                                            tracing::debug!(
+                                                "Available savefiles: {:?}",
+                                                dialog
+                                                    .editing_savefiles
+                                                    .iter()
+                                                    .map(|sf| (&sf.root, &sf.path))
+                                                    .collect::<Vec<_>>()
+                                            );
+                                            let result = dialog
+                                                .editing_savefiles
+                                                .iter()
+                                                .find(|sf| sf.root == override_entry.original_root)
+                                                .map(|sf| sf.path.clone())
+                                                .unwrap_or_default();
+                                            tracing::debug!(
+                                                "Auto-fill result: find_value = {:?}",
+                                                result
+                                            );
+                                            result
+                                        } else {
+                                            dialog.temp_path_transform_find.clone()
+                                        };
                                         override_entry.path_transforms = vec![PathTransform {
-                                            find: String::new(),
+                                            find: find_value,
                                             replace: override_entry.add_path.clone(),
                                         }];
                                         // pathtransforms 和 addpath 互斥，清空 add_path
@@ -649,13 +723,14 @@ pub fn draw_appinfo_dialog(
                                 dialog.temp_override = entry.clone();
                                 // 恢复 UI 状态
                                 dialog.temp_use_path_transform = !entry.path_transforms.is_empty();
-                                // 如果使用 pathtransforms，将 replace 值恢复到 add_path 以便 UI 编辑
+                                // 如果使用 pathtransforms，恢复 find 和 replace 值
                                 if dialog.temp_use_path_transform {
-                                    dialog.temp_override.add_path = entry
-                                        .path_transforms
-                                        .first()
-                                        .map(|t| t.replace.clone())
-                                        .unwrap_or_default();
+                                    if let Some(t) = entry.path_transforms.first() {
+                                        dialog.temp_path_transform_find = t.find.clone();
+                                        dialog.temp_override.add_path = t.replace.clone();
+                                    }
+                                } else {
+                                    dialog.temp_path_transform_find = String::new();
                                 }
                                 dialog.edit_mode = EditMode::EditOverride(idx);
                             }

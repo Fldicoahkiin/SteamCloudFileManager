@@ -384,12 +384,10 @@ _待验证_
 
 `pathtransforms` 是一个包含索引子节 ("0", "1", ...) 的结构，每个子节包含：
 
-- `find`: 匹配模式，空字符串表示匹配所有路径
-- `replace`: 替换内容
+- `find`: 要查找替换的原始路径（通常是 savefile 的 path 值）
+- `replace`: 替换后的新路径
 
-典型用法：`find=""` (匹配所有) + `replace="<path>"` (替换为指定路径)
-
-多个 transform 可以链式应用。
+**重要说明**：根据对 Steam `appinfo.vdf` 的实际分析，`pathtransforms` 的 `find` 字段应包含原始 savefile 的 `path` 值（要被替换的路径），`replace` 字段是新的路径。当 `find` 为空字符串时，`replace` 值会被**插入到路径开头**而非完全替换。
 
 ### oscompare 字段分析
 

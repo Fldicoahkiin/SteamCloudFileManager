@@ -2141,6 +2141,13 @@ impl I18n {
         }
     }
 
+    pub fn ufs_label_recursive(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "递归搜索子目录",
+            Language::English => "Recursive (search subdirectories)",
+        }
+    }
+
     pub fn ufs_label_actions(&self) -> &'static str {
         match self.lang {
             Language::Chinese => "操作",
@@ -2180,6 +2187,27 @@ impl I18n {
         match self.lang {
             Language::Chinese => "替换路径",
             Language::English => "Replace Path",
+        }
+    }
+
+    pub fn ufs_label_replace_with(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "替换为:",
+            Language::English => "Replace:",
+        }
+    }
+
+    pub fn ufs_label_find_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "原始路径",
+            Language::English => "Find Path",
+        }
+    }
+
+    pub fn ufs_hint_auto_fill(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "留空自动填充",
+            Language::English => "Auto-fill if empty",
         }
     }
 
