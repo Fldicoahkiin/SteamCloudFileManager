@@ -47,7 +47,16 @@ pub enum CdpTarget {
 impl CdpClient {
     // 检查 CDP 服务是否可用
     pub fn is_cdp_running() -> bool {
-        ureq::get("http://127.0.0.1:8080/json").call().is_ok()
+        static LOG_ONCE: std::sync::Once = std::sync::Once::new();
+        let result = ureq::get("http://127.0.0.1:8080/json").call().is_ok();
+        LOG_ONCE.call_once(|| {
+            if result {
+                tracing::debug!("Steam CEF 调试端口可用 (127.0.0.1:8080)");
+            } else {
+                tracing::debug!("Steam CEF 调试端口不可用");
+            }
+        });
+        result
     }
 
     // 连接到指定类型的页面
@@ -64,6 +73,12 @@ impl CdpClient {
             CdpTarget::GameList => "游戏列表页",
             CdpTarget::FileList => "文件详情页",
         };
+
+        tracing::debug!(
+            "CDP 发现 {} 个调试目标，正在查找{}...",
+            targets.len(),
+            target_desc
+        );
 
         // 精确匹配目标页面
         let target = targets

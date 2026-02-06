@@ -276,6 +276,9 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
     let all_manifests = scan_app_manifests(steam_path).unwrap_or_default();
     let all_categories = parse_shared_config(steam_path, user_id).unwrap_or_default();
 
+    // 收集有云存档的 app 信息用于日志汇总
+    let mut app_file_counts: Vec<(u32, usize)> = Vec::new();
+
     if let Ok(entries) = fs::read_dir(&userdata_path) {
         let entries: Vec<_> = entries.flatten().collect();
         tracing::debug!("用户数据目录条目数: {}", entries.len());
@@ -293,7 +296,7 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
                     };
 
                     if !files.is_empty() {
-                        tracing::debug!("  -> App {}: 发现 {} 个云存档文件", app_id, files.len());
+                        app_file_counts.push((app_id, files.len()));
                     }
 
                     let total_size: u64 = files.iter().map(|f| f.size).sum();
@@ -321,6 +324,15 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
                 }
             }
         }
+    }
+
+    // 汇总输出有云存档的 app 信息，格式: App {id}({count})
+    if !app_file_counts.is_empty() {
+        let summary: Vec<String> = app_file_counts
+            .iter()
+            .map(|(id, count)| format!("{}({})", id, count))
+            .collect();
+        tracing::debug!("云存档: {}", summary.join(", "));
     }
 
     games.sort_by(|a, b| b.last_played.unwrap_or(0).cmp(&a.last_played.unwrap_or(0)));

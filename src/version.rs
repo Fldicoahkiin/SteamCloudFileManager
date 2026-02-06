@@ -27,11 +27,14 @@ pub fn is_dirty() -> bool {
 pub fn version_info() -> String {
     let dirty_marker = if is_dirty() { " (modified)" } else { "" };
     format!(
-        "Steam Cloud File Manager v{}\nGit: {} ({}){}",
+        "Steam Cloud File Manager v{}\nGit: {} ({}){}\nOS: {} ({}), Build: {}",
         version(),
         git_hash(),
         git_branch(),
-        dirty_marker
+        dirty_marker,
+        os_name(),
+        os_arch(),
+        build_profile()
     )
 }
 

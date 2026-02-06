@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{Cursor, Read};
 use std::path::PathBuf;
+use std::sync::Once;
 
 #[derive(Clone)]
 pub struct VdfParser {
@@ -58,10 +59,14 @@ impl VdfParser {
     }
 
     pub fn find_steam_path() -> Result<PathBuf> {
+        static LOG_ONCE: Once = Once::new();
+
         // 检查用户配置的自定义路径
         if let Some(custom_path) = crate::config::get_custom_steam_path() {
             if custom_path.join("userdata").exists() {
-                tracing::debug!("使用用户配置的 Steam 路径: {:?}", custom_path);
+                LOG_ONCE.call_once(|| {
+                    tracing::debug!("使用用户配置的 Steam 路径: {:?}", custom_path);
+                });
                 return Ok(custom_path);
             } else {
                 tracing::warn!("用户配置的 Steam 路径无效: {:?}", custom_path);
