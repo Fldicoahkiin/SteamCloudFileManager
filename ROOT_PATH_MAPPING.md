@@ -321,6 +321,7 @@ _待验证_
             "root"       "根目录名称"    // 如 WinAppDataLocal, MacAppSupport
             "path"       "子目录路径"    // 如 MyGame/Saves/
             "pattern"    "文件匹配模式"  // 如 *.sav, *
+            "recursive"  "1"             // 可选，"1" 表示递归扫描子目录
             "platforms"                  // 可选
             {
                 "1"      "平台名称"      // Windows, MacOS, Linux
