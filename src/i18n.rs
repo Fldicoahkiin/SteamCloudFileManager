@@ -1158,8 +1158,8 @@ impl I18n {
 
     pub fn debug_mode_hint(&self) -> &'static str {
         match self.lang {
-            Language::Chinese => "需要启用 Steam 的 CEF 调试模式才能使用网页登录功能",
-            Language::English => "CEF debug mode is required for web login functionality",
+            Language::Chinese => "需要启用 Steam 的 CEF 调试模式才能获取到云端数据",
+            Language::English => "CEF debug mode is required to access cloud data",
         }
     }
 
@@ -2291,6 +2291,38 @@ impl I18n {
             Language::English => {
                 "Load existing savefiles and root overrides from game's VDF config"
             }
+        }
+    }
+
+    pub fn ufs_save_success(&self, savefiles: usize, overrides: usize) -> String {
+        match self.lang {
+            Language::Chinese => {
+                format!("已保存 {} 个存档路径, {} 个路径映射", savefiles, overrides)
+            }
+            Language::English => {
+                format!("Saved {} savefiles, {} overrides", savefiles, overrides)
+            }
+        }
+    }
+
+    pub fn ufs_save_error(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("保存失败: {}", error),
+            Language::English => format!("Save error: {}", error),
+        }
+    }
+
+    pub fn ufs_clear_success(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "已清除所有自定义配置",
+            Language::English => "Cleared all custom configurations",
+        }
+    }
+
+    pub fn ufs_clear_error(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("清除失败: {}", error),
+            Language::English => format!("Clear error: {}", error),
         }
     }
 }

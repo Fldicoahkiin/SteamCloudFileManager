@@ -280,16 +280,15 @@ impl SteamCloudApp {
 
             match crate::config::save_ufs_game_config(game_config.clone()) {
                 Ok(_) => {
-                    dialog.inject_status = Some(format!(
-                        "Saved {} savefiles, {} overrides",
+                    dialog.inject_status = Some(self.misc.i18n.ufs_save_success(
                         game_config.savefiles.len(),
-                        game_config.root_overrides.len()
+                        game_config.root_overrides.len(),
                     ));
                     dialog.game_config = Some(game_config);
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
-                    dialog.inject_status = Some(format!("Save error: {}", e));
+                    dialog.inject_status = Some(self.misc.i18n.ufs_save_error(&e.to_string()));
                 }
             }
         }
@@ -301,12 +300,12 @@ impl SteamCloudApp {
 
             match crate::config::remove_ufs_game_config(app_id) {
                 Ok(_) => {
-                    dialog.inject_status = Some("Cleared all custom configurations".to_string());
+                    dialog.inject_status = Some(self.misc.i18n.ufs_clear_success().to_string());
                     dialog.game_config = None;
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
-                    dialog.inject_status = Some(format!("Clear error: {}", e));
+                    dialog.inject_status = Some(self.misc.i18n.ufs_clear_error(&e.to_string()));
                 }
             }
         }
