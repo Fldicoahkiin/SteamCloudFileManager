@@ -489,7 +489,10 @@ impl FileOperations {
                     // Steam API 返回 false 表示操作未生效：
                     // - 对于 UFS 文件 (root != 0)，API 无权操作，始终返回 false
                     // - 对于 API 文件 (root == 0)，表示文件不存在
-                    tracing::debug!("API 操作返回 false (文件可能为 UFS 类型或不存在于 API 域): {}", filename);
+                    tracing::debug!(
+                        "API 操作返回 false (文件可能为 UFS 类型或不存在于 API 域): {}",
+                        filename
+                    );
                     failed_files.push(filename.to_string());
                 }
                 Err(e) => failed_files.push(format!("{} (错误: {})", filename, e)),
@@ -816,7 +819,8 @@ impl FileOperations {
         }
 
         // UFS 文件删除后触发云同步
-        let ufs_deleted = ufs_files.len() - ufs_no_local.len()
+        let ufs_deleted = ufs_files.len()
+            - ufs_no_local.len()
             - all_failed
                 .iter()
                 .filter(|f| ufs_files.iter().any(|u| &u.name == *f))
