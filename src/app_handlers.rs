@@ -564,7 +564,7 @@ impl AppHandlers {
                 }
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
-                let comparisons = file_list.update_sync_status(); // 更新同步状态
+                let comparisons = file_list.update_sync_status(app_id); // 更新同步状态
 
                 // 自动启动 Hash 检测
                 if app_id > 0 && !file_list.files.is_empty() {
@@ -699,7 +699,7 @@ impl AppHandlers {
 
         // 没有检测过或检测被取消，启动新检测
         let comparisons =
-            crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths);
+            crate::conflict::detect_all(&file_list.files, &file_list.local_save_paths, app_id);
         dialogs.conflict_dialog.set_comparisons(comparisons.clone());
         dialogs.conflict_dialog.show = true;
 

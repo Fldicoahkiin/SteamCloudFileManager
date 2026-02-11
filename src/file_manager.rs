@@ -725,7 +725,12 @@ impl FileOperations {
             );
 
             for file in &ufs_files {
-                let full_path = if let Some((steam_path, user_id)) = &steam_info {
+                // 优先用 local_save_paths（已应用 rootoverrides），再用 resolve_cloud_file_path 兜底
+                // 两者不一致时优先用存在的路径
+                let local_path = crate::conflict::find_local_path_for_file(file, local_save_paths)
+                    .map(|base| base.join(&file.name));
+
+                let resolved_path = if let Some((steam_path, user_id)) = &steam_info {
                     crate::path_resolver::resolve_cloud_file_path(
                         file.root, &file.name, steam_path, user_id, app_id,
                     )
@@ -734,10 +739,34 @@ impl FileOperations {
                     None
                 };
 
-                let path_to_use = full_path.or_else(|| {
-                    crate::conflict::find_local_path_for_file(file, local_save_paths)
-                        .map(|base| base.join(&file.name))
-                });
+                let path_to_use = match (&local_path, &resolved_path) {
+                    (Some(lp), Some(rp)) if lp != rp => {
+                        // rootoverrides 导致路径不一致，优先用存在的
+                        if lp.exists() {
+                            tracing::debug!(
+                                "UFS 路径不一致，使用 local_save_paths 路径 (存在): {}",
+                                lp.display()
+                            );
+                            Some(lp.clone())
+                        } else if rp.exists() {
+                            tracing::debug!(
+                                "UFS 路径不一致，使用 resolve 路径 (存在): {}",
+                                rp.display()
+                            );
+                            Some(rp.clone())
+                        } else {
+                            tracing::warn!(
+                                "UFS 路径均不存在: local_save_paths={}, resolve={}",
+                                lp.display(),
+                                rp.display()
+                            );
+                            Some(lp.clone())
+                        }
+                    }
+                    (Some(lp), _) => Some(lp.clone()),
+                    (_, Some(rp)) => Some(rp.clone()),
+                    _ => None,
+                };
 
                 if let Some(path) = path_to_use {
                     if path.exists() {

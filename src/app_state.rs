@@ -65,8 +65,8 @@ impl FileListState {
     }
 
     // 更新同步状态
-    pub fn update_sync_status(&mut self) -> Vec<crate::conflict::FileComparison> {
-        let comparisons = crate::conflict::detect_all(&self.files, &self.local_save_paths);
+    pub fn update_sync_status(&mut self, app_id: u32) -> Vec<crate::conflict::FileComparison> {
+        let comparisons = crate::conflict::detect_all(&self.files, &self.local_save_paths, app_id);
 
         self.sync_status_map.clear();
         self.comparison_map.clear();

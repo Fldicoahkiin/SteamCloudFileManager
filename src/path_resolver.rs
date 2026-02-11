@@ -517,20 +517,59 @@ pub fn collect_local_save_paths_from_ufs(
             continue;
         }
 
-        // 解析基础路径
-        let base_path = if root_num == 1 {
-            // GameInstallDir 使用缓存
-            game_install_dir_cache.clone()
-        } else {
-            resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
+        // 解析基础路径，优先应用 rootoverrides
+        let (final_desc, final_path) = {
+            let root_name = root_type.to_name();
+
+            if let Some(overrides) = get_root_overrides_cache(app_id)
+                && let Some((new_root_name, _add_path, _transforms)) =
+                    apply_root_override(root_name, &overrides)
+            {
+                if let Some(new_root_type) = RootType::from_name(&new_root_name) {
+                    let new_root_num = new_root_type.to_u32();
+                    let override_path = if new_root_num == 1 {
+                        game_install_dir_cache.clone()
+                    } else {
+                        resolve_root_base_path(new_root_type, steam_path, user_id, app_id).ok()
+                    };
+
+                    if let Some(path) = override_path {
+                        let desc = format!("{} ({})", new_root_name, root_num);
+                        (desc, Some(path))
+                    } else {
+                        // override 路径解析失败，回退
+                        let base = if root_num == 1 {
+                            game_install_dir_cache.clone()
+                        } else {
+                            resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
+                        };
+                        (get_root_description(root_num), base)
+                    }
+                } else {
+                    // override 的 root 名称无法解析，回退
+                    let base = if root_num == 1 {
+                        game_install_dir_cache.clone()
+                    } else {
+                        resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
+                    };
+                    (get_root_description(root_num), base)
+                }
+            } else {
+                // 无 override
+                let base = if root_num == 1 {
+                    game_install_dir_cache.clone()
+                } else {
+                    resolve_root_base_path(root_type, steam_path, user_id, app_id).ok()
+                };
+                (get_root_description(root_num), base)
+            }
         };
 
-        if let Some(base_path) = base_path
+        if let Some(base_path) = final_path
             && base_path.exists()
         {
-            let desc = get_root_description(root_num);
-            tracing::debug!("✓ {}: {}", desc, base_path.display());
-            path_map.insert(root_num, (desc, base_path));
+            tracing::debug!("✓ {}: {}", final_desc, base_path.display());
+            path_map.insert(root_num, (final_desc, base_path));
         }
     }
 

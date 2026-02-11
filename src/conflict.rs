@@ -204,21 +204,38 @@ impl FileComparison {
 pub fn detect_all(
     cloud_files: &[crate::steam_api::CloudFile],
     local_save_paths: &[(String, PathBuf)],
+    app_id: u32,
 ) -> Vec<FileComparison> {
     tracing::info!("开始文件对比检测，共 {} 个云端文件", cloud_files.len());
+
+    let steam_info = crate::vdf_parser::VdfParser::new().ok().map(|p| {
+        (
+            p.get_steam_path().to_path_buf(),
+            p.get_user_id().to_string(),
+        )
+    });
 
     let comparisons: Vec<FileComparison> = cloud_files
         .iter()
         .map(|cf| {
-            let local_base_path = find_local_path_for_file(cf, local_save_paths);
-
             // 提取下载 URL
             let (download_url, _) =
                 crate::path_resolver::parse_cdp_root_description(&cf.root_description);
             let download_url = download_url.map(|s| s.to_string());
 
-            // 计算完整本地路径
-            let full_local_path = local_base_path.as_ref().map(|p| p.join(&cf.name));
+            // 优先用 resolve_cloud_file_path（处理 rootoverrides + pathtransforms），回退到 find_local_path_for_file
+            let resolved_path = steam_info.as_ref().and_then(|(steam_path, user_id)| {
+                crate::path_resolver::resolve_cloud_file_path(
+                    cf.root, &cf.name, steam_path, user_id, app_id,
+                )
+                .ok()
+            });
+
+            let full_local_path = if let Some(path) = resolved_path {
+                Some(path)
+            } else {
+                find_local_path_for_file(cf, local_save_paths).map(|p| p.join(&cf.name))
+            };
 
             let cloud_info = CloudFileInfo {
                 size: cf.size,
@@ -227,7 +244,7 @@ pub fn detect_all(
                 hash: None,
                 download_url: None,
             };
-            let local_info = local_base_path.and_then(|p| get_local_file_info(&p.join(&cf.name)));
+            let local_info = full_local_path.as_ref().and_then(get_local_file_info);
             FileComparison::new(
                 cf.name.clone(),
                 local_info,
@@ -277,8 +294,7 @@ pub fn find_local_path_for_file(
     cloud_file: &crate::steam_api::CloudFile,
     local_save_paths: &[(String, PathBuf)],
 ) -> Option<PathBuf> {
-    // 优先尝试通过 root ID 匹配 (最可靠)
-    // local_save_paths 的 desc 格式是 "TypeName (ID)"，所以我们查找以 "(ID)" 结尾的项
+    // 通过 root ID 精确匹配 (desc 格式: "TypeName (ID)")
     let target_id_suffix = format!("({})", cloud_file.root);
     for (desc, base_path) in local_save_paths {
         if desc.ends_with(&target_id_suffix) {
@@ -286,20 +302,48 @@ pub fn find_local_path_for_file(
         }
     }
 
-    // 尝试通过 root_description 字符串匹配 (兼容旧逻辑或处理特殊情况)
-    // 获取去除 CDP 前缀后的描述符
+    // 通过 root_description 字符串匹配
     let (_, file_root_desc) =
         crate::path_resolver::parse_cdp_root_description(&cloud_file.root_description);
 
     for (desc, base_path) in local_save_paths {
-        // 如果描述符完全相等，或者文件描述符包含了本地路径描述符（反之亦然）
         if desc == file_root_desc || file_root_desc.contains(desc) {
             return Some(base_path.clone());
         }
     }
 
-    // 默认回退
-    local_save_paths.first().map(|(_, p)| p.clone())
+    // 通过 CDP folder 名称模糊匹配 desc 中的 root 类型名
+    // 处理 VDF root 值和实际存储位置因 rootoverrides 不一致的情况
+    for (desc, base_path) in local_save_paths {
+        // 提取 desc 中括号前的类型名
+        let desc_root_name = if let Some(paren_pos) = desc.rfind('(') {
+            desc[..paren_pos].trim()
+        } else {
+            desc.as_str()
+        };
+
+        if !desc_root_name.is_empty()
+            && desc_root_name.to_lowercase() == file_root_desc.to_lowercase()
+        {
+            tracing::debug!(
+                "通过 CDP folder 名称匹配到本地路径: {} -> {} (文件 root={}, CDP={})",
+                desc,
+                base_path.display(),
+                cloud_file.root,
+                file_root_desc
+            );
+            return Some(base_path.clone());
+        }
+    }
+
+    // 所有匹配失败，返回 None
+    tracing::debug!(
+        "无法匹配本地路径: root={}, root_desc={}, local_paths={:?}",
+        cloud_file.root,
+        cloud_file.root_description,
+        local_save_paths.iter().map(|(d, _)| d).collect::<Vec<_>>()
+    );
+    None
 }
 
 fn get_local_file_info(path: &PathBuf) -> Option<LocalFileInfo> {
