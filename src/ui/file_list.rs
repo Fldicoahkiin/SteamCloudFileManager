@@ -334,7 +334,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
     TableBuilder::new(ui)
         .striped(true)
         .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .column(Column::exact(130.0)) // 根文件夹
+        .column(Column::auto()) // 根文件夹
         .column(Column::remainder().at_least(200.0)) // 文件名（树状）
         .column(Column::exact(80.0)) // 文件大小
         .column(Column::exact(140.0)) // 写入日期
