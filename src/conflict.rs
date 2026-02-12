@@ -24,6 +24,7 @@ pub enum SyncStatus {
 pub enum HashStatus {
     #[default]
     Pending, // 等待检测
+    Skipped,  // 已跳过
     Checking, // 正在检测
     Match,    // Hash 匹配
     Mismatch, // Hash 不匹配
@@ -90,6 +91,13 @@ impl FileComparison {
             c
         });
 
+        // 已同步的文件无需 hash 检测，直接标记为跳过
+        let hash_status = if status == SyncStatus::Synced {
+            HashStatus::Skipped
+        } else {
+            HashStatus::Pending
+        };
+
         Self {
             filename,
             status,
@@ -98,7 +106,7 @@ impl FileComparison {
             time_diff_secs,
             size_diff_bytes,
             diff_flags,
-            hash_status: HashStatus::Pending,
+            hash_status,
             local_path,
         }
     }
@@ -192,6 +200,7 @@ impl FileComparison {
     pub fn hash_status_display(&self) -> String {
         match self.hash_status {
             HashStatus::Pending => format!("{} 等待", crate::icons::HOURGLASS),
+            HashStatus::Skipped => format!("{} 已跳过", crate::icons::CHECK),
             HashStatus::Checking => format!("{} 检测中", crate::icons::SPINNER),
             HashStatus::Match => format!("{} 一致", crate::icons::CHECK),
             HashStatus::Mismatch => format!("{} 不一致", crate::icons::ERROR),
@@ -440,7 +449,11 @@ impl AsyncHashChecker {
         let tasks: Vec<HashCheckTask> = comparisons
             .iter()
             .filter(|c| {
-                // 只检测需要 hash 确认的文件（本地和云端都存在）
+                // 跳过已同步的文件，不需要浪费性能做 hash 检测
+                if c.status == SyncStatus::Synced {
+                    return false;
+                }
+                // 只检测本地和云端都存在的文件
                 c.local.as_ref().map(|l| l.exists).unwrap_or(false)
                     && c.cloud.as_ref().map(|c| c.is_persisted).unwrap_or(false)
                     && c.local_path.is_some()
@@ -453,6 +466,12 @@ impl AsyncHashChecker {
             .collect();
 
         let total = tasks.len();
+        let skipped = comparisons.len() - total;
+        tracing::info!(
+            "Hash 检测任务: {} 个待检测, {} 个已同步跳过",
+            total,
+            skipped
+        );
         *self.progress.lock().unwrap() = (0, total);
         *self.tasks.lock().unwrap() = tasks.clone();
         self.results.lock().unwrap().clear();

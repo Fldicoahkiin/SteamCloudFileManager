@@ -544,6 +544,9 @@ fn get_hash_display(
         crate::conflict::HashStatus::Pending => {
             (icons::HOURGLASS, crate::ui::theme::muted_color(ctx))
         }
+        crate::conflict::HashStatus::Skipped => {
+            (icons::CHECK, crate::ui::theme::success_color(ctx))
+        }
         crate::conflict::HashStatus::Checking => {
             (icons::SPINNER, crate::ui::theme::warning_color(ctx))
         }
