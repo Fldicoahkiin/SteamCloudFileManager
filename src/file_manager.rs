@@ -486,11 +486,10 @@ impl FileOperations {
             match operation(filename) {
                 Ok(true) => success_count += 1,
                 Ok(false) => {
-                    // Steam API 返回 false 表示操作未生效：
-                    // - 对于 UFS 文件 (root != 0)，API 无权操作，始终返回 false
-                    // - 对于 API 文件 (root == 0)，表示文件不存在
+                    // Steam API 返回 false：自动云同步文件 (root != 0) 不支持 API 操作；
+                    // root=0 的文件返回 false 则表示文件不存在
                     tracing::debug!(
-                        "API 操作返回 false (文件可能为 UFS 类型或不存在于 API 域): {}",
+                        "Steam API 返回 false (自动云同步文件或文件不存在): {}",
                         filename
                     );
                     failed_files.push(filename.to_string());
@@ -578,7 +577,7 @@ impl FileOperations {
             return FileOperationResult::Error("请选择要移出云端的文件".to_string());
         }
 
-        // 分类：API 文件 (root=0) 和 UFS 文件 (root!=0)
+        // 分类：root=0 文件（支持 API 操作）和自动云同步文件（root!=0，不支持 API）
         let mut api_cloud_files = Vec::new();
         let mut skipped_local_only = 0;
         let mut ufs_count = 0;
@@ -590,9 +589,9 @@ impl FileOperations {
                     tracing::debug!("跳过本地独有文件 (云端不存在): {}", file.name);
                     skipped_local_only += 1;
                 } else if file.root != 0 {
-                    // UFS 文件，API 无法操作
+                    // 自动云同步文件，不支持通过 API 移出
                     tracing::debug!(
-                        "跳过 UFS 文件 (root={}, API 无法移出云端): {}",
+                        "跳过自动云同步文件 (root={}, 不支持移出云端): {}",
                         file.root,
                         file.name
                     );
@@ -606,25 +605,22 @@ impl FileOperations {
         if api_cloud_files.is_empty() {
             let mut reasons = Vec::new();
             if ufs_count > 0 {
-                reasons.push(format!(
-                    "{} 个为 Auto-Cloud 文件，API 无法移出云端",
-                    ufs_count
-                ));
+                reasons.push(format!("{} 个为自动云同步文件，不支持移出云端", ufs_count));
             }
             if skipped_local_only > 0 {
-                reasons.push(format!("{} 个为本地独有，云端不存在", skipped_local_only));
+                reasons.push(format!("{} 个仅存在于本地，云端无记录", skipped_local_only));
             }
             if reasons.is_empty() {
                 return FileOperationResult::Error("请选择要移出云端的文件".to_string());
             }
             return FileOperationResult::Error(format!(
-                "所选文件均无法通过 API 移出云端：{}",
+                "所选文件均无法移出云端：{}",
                 reasons.join("，")
             ));
         }
 
         tracing::info!(
-            "开始移出云端 {} 个 API 文件 (跳过 {} 个 UFS + {} 个本地独有)",
+            "开始移出云端 {} 个文件 (跳过 {} 个自动云同步 + {} 个本地独有)",
             api_cloud_files.len(),
             ufs_count,
             skipped_local_only
@@ -644,12 +640,12 @@ impl FileOperations {
             let mut msg = format!("已移出云端 {} 个文件", forgotten_count);
             if ufs_count > 0 {
                 msg.push_str(&format!(
-                    "，{} 个 Auto-Cloud 文件已跳过（API 无法操作）",
+                    "，跳过 {} 个自动云同步文件（不支持此操作）",
                     ufs_count
                 ));
             }
             if skipped_local_only > 0 {
-                msg.push_str(&format!("，跳过 {} 个本地独有", skipped_local_only));
+                msg.push_str(&format!("，跳过 {} 个本地独有文件", skipped_local_only));
             }
             FileOperationResult::SuccessWithRefresh(msg)
         } else {
@@ -671,7 +667,7 @@ impl FileOperations {
 
         // 按 root 类型分类文件
         let mut api_cloud_files = Vec::new(); // root=0, 云端已同步，用 API 删除
-        let mut ufs_files = Vec::new(); // root!=0, UFS 文件
+        let mut ufs_files = Vec::new(); // root!=0, 自动云同步文件
         let mut local_only_files = Vec::new(); // 仅本地存在、未同步的文件
 
         for &index in selected_files {
@@ -685,7 +681,7 @@ impl FileOperations {
                         local_only_files.push(file.clone());
                     }
                 } else {
-                    // UFS 文件 (root != 0)：需要通过删除本地文件来触发同步
+                    // 自动云同步文件 (root != 0)：需要通过删除本地文件来触发同步
                     ufs_files.push(file.clone());
                 }
             }
@@ -693,11 +689,11 @@ impl FileOperations {
 
         let mut total_deleted = 0;
         let mut all_failed = Vec::new();
-        let mut ufs_no_local: Vec<String> = Vec::new(); // UFS 文件但本地不存在
+        let mut ufs_no_local: Vec<String> = Vec::new(); // 自动云同步文件但本地不存在
 
         // API 域文件 (root=0)：使用 Steam API 删除
         if !api_cloud_files.is_empty() {
-            tracing::info!("通过 API 删除 {} 个 root=0 文件", api_cloud_files.len());
+            tracing::info!("通过 Steam API 删除 {} 个云端文件", api_cloud_files.len());
             let (deleted_local, failed_local) = self.delete_files(&api_cloud_files);
             let (deleted_cloud, failed_cloud) = self.forget_files(&api_cloud_files);
             total_deleted += deleted_local.max(deleted_cloud);
@@ -710,7 +706,7 @@ impl FileOperations {
             all_failed.extend(both_failed);
         }
 
-        // UFS 文件 (root != 0)：通过删除本地文件触发云同步
+        // 自动云同步文件 (root != 0)：通过删除本地文件触发云同步
         let steam_info = crate::vdf_parser::VdfParser::new().ok().map(|p| {
             (
                 p.get_steam_path().to_path_buf(),
@@ -720,7 +716,7 @@ impl FileOperations {
 
         if !ufs_files.is_empty() {
             tracing::info!(
-                "处理 {} 个 UFS 文件 (root != 0)，将通过删除本地文件触发云同步",
+                "处理 {} 个自动云同步文件，将通过删除本地文件触发云同步",
                 ufs_files.len()
             );
 
@@ -744,19 +740,19 @@ impl FileOperations {
                         // rootoverrides 导致路径不一致，优先用存在的
                         if lp.exists() {
                             tracing::debug!(
-                                "UFS 路径不一致，使用 local_save_paths 路径 (存在): {}",
+                                "自动云同步路径不一致，使用 local_save_paths 路径 (存在): {}",
                                 lp.display()
                             );
                             Some(lp.clone())
                         } else if rp.exists() {
                             tracing::debug!(
-                                "UFS 路径不一致，使用 resolve 路径 (存在): {}",
+                                "自动云同步路径不一致，使用 resolve 路径 (存在): {}",
                                 rp.display()
                             );
                             Some(rp.clone())
                         } else {
                             tracing::warn!(
-                                "UFS 路径均不存在: local_save_paths={}, resolve={}",
+                                "自动云同步路径均不存在: local_save_paths={}, resolve={}",
                                 lp.display(),
                                 rp.display()
                             );
@@ -773,7 +769,7 @@ impl FileOperations {
                         match std::fs::remove_file(&path) {
                             Ok(_) => {
                                 tracing::info!(
-                                    "已删除 UFS 本地文件 (root={}): {}",
+                                    "已删除自动云同步文件的本地副本 (root={}): {}",
                                     file.root,
                                     path.display()
                                 );
@@ -781,7 +777,7 @@ impl FileOperations {
                             }
                             Err(e) => {
                                 tracing::error!(
-                                    "删除 UFS 本地文件失败 (root={}): {} - {}",
+                                    "删除自动云同步文件的本地副本失败 (root={}): {} - {}",
                                     file.root,
                                     path.display(),
                                     e
@@ -790,9 +786,9 @@ impl FileOperations {
                             }
                         }
                     } else {
-                        // 本地文件不存在（游戏未安装等情况）
+                        // 本地文件不存在（游戏未安装或存档目录不存在等情况）
                         tracing::warn!(
-                            "UFS 文件本地不存在，无法删除 (root={}, 路径={}): {}",
+                            "自动云同步文件的本地副本不存在 (root={}, 路径={}): {}",
                             file.root,
                             path.display(),
                             file.name
@@ -800,9 +796,9 @@ impl FileOperations {
                         ufs_no_local.push(file.name.clone());
                     }
                 } else {
-                    // 无法解析本地路径（游戏未安装等情况）
+                    // 无法解析本地路径（游戏未安装或 Steam 路径不可用等情况）
                     tracing::warn!(
-                        "无法解析 UFS 文件本地路径 (root={}): {}",
+                        "无法解析自动云同步文件的本地路径 (root={}): {}",
                         file.root,
                         file.name
                     );
@@ -847,7 +843,7 @@ impl FileOperations {
             }
         }
 
-        // UFS 文件删除后触发云同步
+        // 自动云同步文件删除后触发云同步
         let ufs_deleted = ufs_files.len()
             - ufs_no_local.len()
             - all_failed
@@ -856,7 +852,7 @@ impl FileOperations {
                 .count();
         if ufs_deleted > 0 {
             tracing::info!(
-                "已删除 {} 个 UFS 本地文件，触发云同步以同步删除到云端...",
+                "已删除 {} 个自动云同步文件的本地副本，触发云同步以同步删除到云端...",
                 ufs_deleted
             );
             if let Ok(mut manager) = self.steam_manager.lock()
@@ -874,7 +870,7 @@ impl FileOperations {
         }
         if !ufs_no_local.is_empty() {
             messages.push(format!(
-                "{} 个 Auto-Cloud 文件无法删除（本地文件不存在，需安装游戏后重试）",
+                "{} 个自动云同步文件无法删除（游戏未安装，本地没有对应文件，请安装游戏后重试）",
                 ufs_no_local.len()
             ));
         }
