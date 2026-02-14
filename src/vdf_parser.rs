@@ -204,7 +204,6 @@ impl VdfParser {
                     if let Ok(path_str) = String::from_utf8(buffer[..path_len].to_vec()) {
                         let path = PathBuf::from(path_str.trim());
                         if path.exists() {
-                            tracing::info!("从注册表读取到 Steam 路径: {:?}", path);
                             return Some(path);
                         }
                     }
