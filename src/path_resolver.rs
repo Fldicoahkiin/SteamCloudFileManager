@@ -934,18 +934,6 @@ pub fn scan_local_files_from_ufs(
     results
 }
 
-// 递归扫描最大深度，防止扫描家目录等大范围路径时卡死
-const MAX_SCAN_DEPTH: u32 = 10;
-
-// 不应递归的目录（隐藏目录和系统目录）
-const SKIP_DIR_PREFIXES: &[&str] = &[".", "$"];
-#[cfg(target_os = "macos")]
-const SKIP_DIR_NAMES: &[&str] = &["Library", "Applications", "System"];
-#[cfg(target_os = "windows")]
-const SKIP_DIR_NAMES: &[&str] = &["AppData", "Windows", "Program Files", "Program Files (x86)"];
-#[cfg(target_os = "linux")]
-const SKIP_DIR_NAMES: &[&str] = &[];
-
 // 根据 pattern 扫描目录
 fn scan_directory_with_pattern(
     dir: &Path,
@@ -959,18 +947,8 @@ fn scan_directory_with_pattern(
         base: &Path,
         pattern: &str,
         recursive: bool,
-        depth: u32,
         results: &mut Vec<(PathBuf, String)>,
     ) {
-        if depth > MAX_SCAN_DEPTH {
-            tracing::debug!(
-                "扫描深度超过 {} 层，跳过: {}",
-                MAX_SCAN_DEPTH,
-                dir.display()
-            );
-            return;
-        }
-
         let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
             Err(_) => return,
@@ -980,32 +958,19 @@ fn scan_directory_with_pattern(
             let path = entry.path();
 
             if path.is_dir() && recursive {
-                // 跳过隐藏目录和系统目录
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if SKIP_DIR_PREFIXES.iter().any(|p| name.starts_with(p)) {
-                        continue;
-                    }
-                    if SKIP_DIR_NAMES.contains(&name) {
-                        continue;
-                    }
-                }
-                scan_dir(&path, base, pattern, recursive, depth + 1, results);
-            } else if path.is_file() {
-                // 检查文件名是否匹配 pattern
-                if let Some(filename) = path.file_name().and_then(|n| n.to_str())
-                    && pattern_matches(filename, pattern)
-                {
-                    // 计算相对路径
-                    if let Ok(rel) = path.strip_prefix(base) {
-                        let rel_str = rel.to_string_lossy().replace('\\', "/");
-                        results.push((path.clone(), rel_str));
-                    }
-                }
+                scan_dir(&path, base, pattern, recursive, results);
+            } else if path.is_file()
+                && let Some(filename) = path.file_name().and_then(|n| n.to_str())
+                && pattern_matches(filename, pattern)
+                && let Ok(rel) = path.strip_prefix(base)
+            {
+                let rel_str = rel.to_string_lossy().replace('\\', "/");
+                results.push((path.clone(), rel_str));
             }
         }
     }
 
-    scan_dir(dir, dir, pattern, recursive, 0, &mut results);
+    scan_dir(dir, dir, pattern, recursive, &mut results);
     results
 }
 

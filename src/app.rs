@@ -401,6 +401,17 @@ impl SteamCloudApp {
                 &mut self.file_list,
                 &mut self.misc,
                 &mut self.dialogs,
+                &mut self.async_handlers,
+            );
+        }
+
+        // 本地文件扫描结果
+        if let Some(scanned) = self.async_handlers.poll_local_scan() {
+            self.handlers.handle_local_scan_result(
+                scanned,
+                &mut self.file_list,
+                &self.connection,
+                &mut self.dialogs,
             );
         }
 

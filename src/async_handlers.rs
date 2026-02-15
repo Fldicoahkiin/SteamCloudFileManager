@@ -1,3 +1,4 @@
+use crate::path_resolver::ScannedLocalFile;
 use crate::steam_api::CloudFile;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,6 +20,7 @@ pub struct AsyncHandlers {
     pub download_rx: Option<Receiver<crate::downloader::DownloadResult>>,
     pub download_progress_rx: Option<Receiver<crate::downloader::DownloadProgress>>,
     pub download_cancel: Option<Arc<AtomicBool>>,
+    pub local_scan_rx: Option<Receiver<Vec<ScannedLocalFile>>>,
 }
 
 impl AsyncHandlers {
@@ -147,6 +149,24 @@ impl AsyncHandlers {
                 }
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.update_download_rx = None;
+                    None
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn poll_local_scan(&mut self) -> Option<Vec<ScannedLocalFile>> {
+        if let Some(rx) = &self.local_scan_rx {
+            match rx.try_recv() {
+                Ok(result) => {
+                    self.local_scan_rx = None;
+                    Some(result)
+                }
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.local_scan_rx = None;
                     None
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => None,

@@ -467,6 +467,7 @@ impl AppHandlers {
         file_list: &mut FileListState,
         misc: &mut MiscState,
         dialogs: &mut DialogState,
+        async_handlers: &mut AsyncHandlers,
     ) {
         match result {
             Ok(files) => {
@@ -512,50 +513,20 @@ impl AppHandlers {
                             savefiles
                         };
 
-                        let cloud_filenames: std::collections::HashSet<_> =
-                            file_list.files.iter().map(|f| f.name.as_str()).collect();
-
-                        let scanned = crate::path_resolver::scan_local_files_from_ufs(
-                            &scan_savefiles,
-                            &steam_path,
-                            &user_id,
-                            app_id,
-                        );
-
-                        // 过滤出云端没有的文件，转换为 CloudFile 并添加到主列表
-                        let local_only: Vec<_> = scanned
-                            .into_iter()
-                            .filter(|f| !cloud_filenames.contains(f.relative_path.as_str()))
-                            .collect();
-
-                        if !local_only.is_empty() {
-                            tracing::info!("发现 {} 个本地独有文件 (云端无)", local_only.len());
-
-                            // 转换为 CloudFile 并添加到文件列表
-                            for local_file in local_only {
-                                let timestamp = local_file
-                                    .modified
-                                    .duration_since(std::time::UNIX_EPOCH)
-                                    .map(|d| d.as_secs() as i64)
-                                    .unwrap_or(0);
-
-                                let cloud_file = crate::steam_api::CloudFile {
-                                    name: local_file.relative_path,
-                                    size: local_file.size,
-                                    timestamp: chrono::Local
-                                        .timestamp_opt(timestamp, 0)
-                                        .single()
-                                        .unwrap_or_default(),
-                                    is_persisted: false,
-                                    exists: true, // 本地存在
-                                    root: local_file.root_id,
-                                    root_description: crate::path_resolver::get_root_description(
-                                        local_file.root_id,
-                                    ),
-                                };
-                                file_list.files.push(cloud_file);
-                            }
-                        }
+                        // 后台线程扫描本地文件
+                        let (tx, rx) = std::sync::mpsc::channel();
+                        async_handlers.local_scan_rx = Some(rx);
+                        let steam_path = steam_path.clone();
+                        let user_id = user_id.clone();
+                        std::thread::spawn(move || {
+                            let scanned = crate::path_resolver::scan_local_files_from_ufs(
+                                &scan_savefiles,
+                                &steam_path,
+                                &user_id,
+                                app_id,
+                            );
+                            let _ = tx.send(scanned);
+                        });
                     } else {
                         file_list.local_save_paths.clear();
                     }
@@ -564,13 +535,13 @@ impl AppHandlers {
                 }
 
                 file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
-                let comparisons = file_list.update_sync_status(app_id); // 更新同步状态
+                let comparisons = file_list.update_sync_status(app_id);
 
                 // 自动启动 Hash 检测
                 if app_id > 0 && !file_list.files.is_empty() {
                     dialogs.conflict_dialog.set_comparisons(comparisons.clone());
                     file_list.hash_checker.start(app_id, &comparisons);
-                    file_list.hash_checked_app_id = None; // 正在检测中，尚未完成
+                    file_list.hash_checked_app_id = None;
                     tracing::info!("已启动异步 Hash 检测");
                 }
 
@@ -581,6 +552,62 @@ impl AppHandlers {
             Err(err) => {
                 dialogs.show_error(&misc.i18n.refresh_files_failed(&err));
                 file_list.is_refreshing = false;
+            }
+        }
+    }
+
+    // 处理后台本地扫描结果
+    pub fn handle_local_scan_result(
+        &self,
+        scanned: Vec<crate::path_resolver::ScannedLocalFile>,
+        file_list: &mut FileListState,
+        connection: &ConnectionState,
+        dialogs: &mut DialogState,
+    ) {
+        let cloud_filenames: std::collections::HashSet<_> =
+            file_list.files.iter().map(|f| f.name.as_str()).collect();
+
+        let local_only: Vec<_> = scanned
+            .into_iter()
+            .filter(|f| !cloud_filenames.contains(f.relative_path.as_str()))
+            .collect();
+
+        if !local_only.is_empty() {
+            tracing::info!("发现 {} 个本地独有文件 (云端无)", local_only.len());
+
+            for local_file in local_only {
+                let timestamp = local_file
+                    .modified
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0);
+
+                let cloud_file = crate::steam_api::CloudFile {
+                    name: local_file.relative_path,
+                    size: local_file.size,
+                    timestamp: chrono::Local
+                        .timestamp_opt(timestamp, 0)
+                        .single()
+                        .unwrap_or_default(),
+                    is_persisted: false,
+                    exists: true,
+                    root: local_file.root_id,
+                    root_description: crate::path_resolver::get_root_description(
+                        local_file.root_id,
+                    ),
+                };
+                file_list.files.push(cloud_file);
+            }
+
+            // 重建文件树和同步状态
+            file_list.file_tree = Some(crate::file_tree::FileTree::new(&file_list.files));
+            let app_id = connection.app_id_input.parse::<u32>().unwrap_or_default();
+            let comparisons = file_list.update_sync_status(app_id);
+
+            if app_id > 0 && !file_list.files.is_empty() {
+                dialogs.conflict_dialog.set_comparisons(comparisons.clone());
+                file_list.hash_checker.start(app_id, &comparisons);
+                file_list.hash_checked_app_id = None;
             }
         }
     }
