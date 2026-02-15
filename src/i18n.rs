@@ -2278,22 +2278,6 @@ impl I18n {
         }
     }
 
-    pub fn ufs_load_from_vdf(&self) -> String {
-        match self.lang {
-            Language::Chinese => format!("{} 从 VDF 加载", icons::DOWNLOAD),
-            Language::English => format!("{} Load from VDF", icons::DOWNLOAD),
-        }
-    }
-
-    pub fn ufs_load_from_vdf_tooltip(&self) -> &'static str {
-        match self.lang {
-            Language::Chinese => "从游戏的 VDF 配置加载现有的存档路径和路径映射",
-            Language::English => {
-                "Load existing savefiles and root overrides from game's VDF config"
-            }
-        }
-    }
-
     pub fn ufs_save_success(&self, savefiles: usize, overrides: usize) -> String {
         match self.lang {
             Language::Chinese => {

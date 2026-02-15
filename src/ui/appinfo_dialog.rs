@@ -4,6 +4,7 @@ use crate::config::{
 use crate::i18n::I18n;
 use crate::icons;
 use crate::path_resolver::get_current_platform;
+use crate::ufs_text;
 use crate::vdf_parser::UfsConfig;
 
 // Steamworks 后台支持的所有 Root 类型
@@ -63,6 +64,9 @@ pub struct AppInfoDialog {
     pub editing_overrides: Vec<RootOverrideEntry>,
     pub edit_mode: EditMode,
 
+    // 可编辑的 UFS 原始文本（与表格双向同步）
+    pub editing_raw_text: String,
+
     // 临时编辑字段
     pub temp_savefile: SaveFileEntry,
     pub temp_override: RootOverrideEntry,
@@ -88,6 +92,10 @@ impl AppInfoDialog {
             (Vec::new(), Vec::new())
         };
 
+        // 从编辑数据生成初始 raw_text
+        let editing_raw_text =
+            ufs_text::entries_to_ufs_text(&editing_savefiles, &editing_overrides);
+
         // 根据当前平台选择默认 Root
         let default_root = match get_current_platform() {
             "windows" => "WinAppDataLocal",
@@ -102,6 +110,7 @@ impl AppInfoDialog {
             editing_savefiles,
             editing_overrides,
             edit_mode: EditMode::None,
+            editing_raw_text,
             temp_savefile: SaveFileEntry {
                 root: default_root.to_string(),
                 path: String::new(),
@@ -130,49 +139,20 @@ impl AppInfoDialog {
             self.editing_savefiles = gc.savefiles.clone();
             self.editing_overrides = gc.root_overrides.clone();
         }
+        self.sync_raw_text_from_entries();
     }
 
-    // 从 VDF 配置加载到编辑界面
-    // 将 VDF 中的 SaveFileConfig 和 RootOverrideConfig 转换为可编辑的 Entry 格式
-    pub fn load_from_vdf(&mut self) {
-        // 转换 savefiles
-        self.editing_savefiles = self
-            .config
-            .savefiles
-            .iter()
-            .map(|sf| SaveFileEntry {
-                root: sf.root.clone(),
-                path: sf.path.clone(),
-                pattern: sf.pattern.clone(),
-                platforms: if sf.platforms.is_empty() {
-                    vec!["all".to_string()]
-                } else {
-                    sf.platforms.clone()
-                },
-                recursive: sf.recursive,
-            })
-            .collect();
+    // 表格 → raw_text 同步
+    pub fn sync_raw_text_from_entries(&mut self) {
+        self.editing_raw_text =
+            ufs_text::entries_to_ufs_text(&self.editing_savefiles, &self.editing_overrides);
+    }
 
-        // 转换 rootoverrides
-        self.editing_overrides = self
-            .config
-            .rootoverrides
-            .iter()
-            .map(|ro| RootOverrideEntry {
-                original_root: ro.original_root.clone(),
-                os: ro.oslist.first().cloned().unwrap_or_default(),
-                new_root: ro.new_root.clone(),
-                add_path: ro.add_path.clone(),
-                path_transforms: ro
-                    .path_transforms
-                    .iter()
-                    .map(|t| PathTransform {
-                        find: t.find.clone(),
-                        replace: t.replace.clone(),
-                    })
-                    .collect(),
-            })
-            .collect();
+    // raw_text → 表格同步
+    pub fn sync_entries_from_raw_text(&mut self) {
+        let (savefiles, overrides) = ufs_text::parse_ufs_text(&self.editing_raw_text);
+        self.editing_savefiles = savefiles;
+        self.editing_overrides = overrides;
     }
 
     // 构建当前编辑的 UfsGameConfig
@@ -211,7 +191,6 @@ pub enum AppInfoDialogAction {
     InjectFullConfig, // 注入完整配置到 VDF
     SaveGameConfig,   // 保存配置到文件
     ClearGameConfig,  // 清空所有自定义配置
-    LoadFromVdf,      // 从 VDF 加载现有配置
     RestartSteam,
     RefreshConfig,
 }
@@ -253,19 +232,24 @@ pub fn draw_appinfo_dialog(
 
             ui.separator();
 
-            // UFS 配置文本
+            // UFS 配置文本（可编辑，与下方表格双向同步）
             ui.label(i18n.appinfo_current_ufs());
 
+            let text_before = dialog.editing_raw_text.clone();
             egui::ScrollArea::vertical()
                 .id_salt("ufs_config_scroll")
                 .max_height(150.0)
                 .show(ui, |ui| {
                     ui.add(
-                        egui::TextEdit::multiline(&mut dialog.config.raw_text.as_str())
+                        egui::TextEdit::multiline(&mut dialog.editing_raw_text)
                             .font(egui::TextStyle::Monospace)
                             .desired_width(f32::INFINITY),
                     );
                 });
+            // 文本被编辑时，同步到表格
+            if dialog.editing_raw_text != text_before {
+                dialog.sync_entries_from_raw_text();
+            }
 
             ui.separator();
 
@@ -356,6 +340,7 @@ pub fn draw_appinfo_dialog(
                                         _ => {}
                                     }
                                     dialog.edit_mode = EditMode::None;
+                                    dialog.sync_raw_text_from_entries();
                                 }
                                 if ui.button(icons::CLOSE).clicked() {
                                     dialog.edit_mode = EditMode::None;
@@ -422,6 +407,7 @@ pub fn draw_appinfo_dialog(
                             // 处理删除
                             if let Some(idx) = to_delete {
                                 dialog.editing_savefiles.remove(idx);
+                                dialog.sync_raw_text_from_entries();
                             }
                             // 处理编辑
                             if let Some(idx) = to_edit {
@@ -627,6 +613,7 @@ pub fn draw_appinfo_dialog(
                                         _ => {}
                                     }
                                     dialog.edit_mode = EditMode::None;
+                                    dialog.sync_raw_text_from_entries();
                                 }
                                 if ui.button(icons::CLOSE).clicked() {
                                     dialog.edit_mode = EditMode::None;
@@ -718,6 +705,7 @@ pub fn draw_appinfo_dialog(
                             // 处理删除
                             if let Some(idx) = to_delete {
                                 dialog.editing_overrides.remove(idx);
+                                dialog.sync_raw_text_from_entries();
                             }
                             // 处理编辑
                             if let Some(idx) = to_edit {
@@ -759,17 +747,6 @@ pub fn draw_appinfo_dialog(
                     action = AppInfoDialogAction::InjectFullConfig;
                 }
 
-                // Load from VDF 按钮：当 VDF 中有配置时可用
-                let has_vdf_config =
-                    !dialog.config.savefiles.is_empty() || !dialog.config.rootoverrides.is_empty();
-                if ui
-                    .add_enabled(has_vdf_config, egui::Button::new(i18n.ufs_load_from_vdf()))
-                    .on_hover_text(i18n.ufs_load_from_vdf_tooltip())
-                    .clicked()
-                {
-                    action = AppInfoDialogAction::LoadFromVdf;
-                }
-
                 // 清空按钮：当有内容时可以点击
                 let can_clear =
                     !dialog.editing_savefiles.is_empty() || !dialog.editing_overrides.is_empty();
@@ -785,6 +762,7 @@ pub fn draw_appinfo_dialog(
                     // 清空本地编辑状态
                     dialog.editing_savefiles.clear();
                     dialog.editing_overrides.clear();
+                    dialog.sync_raw_text_from_entries();
                     action = AppInfoDialogAction::ClearGameConfig;
                 }
             });

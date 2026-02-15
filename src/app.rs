@@ -653,11 +653,7 @@ impl eframe::App for SteamCloudApp {
                     self.handlers
                         .start_restart_steam(ctx, &mut self.async_handlers);
                 }
-                crate::ui::AppInfoDialogAction::LoadFromVdf => {
-                    if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
-                        dialog.load_from_vdf();
-                    }
-                }
+
                 crate::ui::AppInfoDialogAction::RefreshConfig => {
                     self.refresh_appinfo_config();
                 }

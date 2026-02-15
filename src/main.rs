@@ -22,6 +22,7 @@ mod steam_process;
 mod steam_worker;
 mod symlink_manager;
 mod ufs_dump;
+mod ufs_text;
 mod ui;
 mod update;
 mod user_manager;
