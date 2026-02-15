@@ -6,7 +6,7 @@ use crate::icons;
 use crate::path_resolver::get_current_platform;
 use crate::vdf_parser::UfsConfig;
 
-// 官方文档支持的所有 Root 类型
+// Steamworks 后台支持的所有 Root 类型
 // 参考: https://partner.steamgames.com/doc/features/cloud
 pub const ALL_ROOT_TYPES: &[(&str, &str, &str)] = &[
     // (名称, 平台, 描述)
@@ -33,11 +33,13 @@ pub const ALL_ROOT_TYPES: &[(&str, &str, &str)] = &[
         "%USERPROFILE%\\AppData\\Roaming\\",
     ),
     ("WinSavedGames", "windows", "%USERPROFILE%\\Saved Games\\"),
+    ("WindowsHome", "windows", "%USERPROFILE%\\"),
     ("MacHome", "macos", "~/"),
     ("MacAppSupport", "macos", "~/Library/Application Support/"),
     ("MacDocuments", "macos", "~/Documents/"),
     ("LinuxHome", "linux", "~/"),
     ("LinuxXdgDataHome", "linux", "$XDG_DATA_HOME/"),
+    ("LinuxXdgConfigHome", "linux", "$XDG_CONFIG_HOME/"),
 ];
 
 // 编辑模式

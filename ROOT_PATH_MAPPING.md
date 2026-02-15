@@ -31,11 +31,14 @@
 | `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`  |
 | `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`   |
 | `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`       |
+| `WindowsHome`           | Windows | `%USERPROFILE%\`                   |
 | `MacHome`               | macOS   | `~/`                               |
 | `MacAppSupport`         | macOS   | `~/Library/Application Support/`   |
 | `MacDocuments`          | macOS   | `~/Documents/`                     |
 | `LinuxHome`             | Linux   | `~/`                               |
 | `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                  |
+| `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                |
+| `AndroidExternalData`   | Android | `Android/data/<package>/files/`    |
 
 ### 数字 Root ID 映射（待验证）
 
@@ -56,6 +59,8 @@
 | **10**  | （未知）                                  | [待验证](#root-10---windownloads)                       |
 | **11**  | （未知）                                  | [待验证](#root-11---winpublic)                          |
 | **12**  | `WinAppDataLocalLow`                      | [待验证](#root-12---winappdatalocallow)                 |
+| **13**  | `LinuxHome`                               | [待验证](#root-13---linuxhome)                          |
+|  **?**  | `AndroidExternalData`                     | [待验证](#androidexternaldata)                          |
 
 ### Windows 环境变量
 
@@ -256,6 +261,18 @@ _待验证_
 ---
 
 ### Root 12 - WinAppDataLocalLow
+
+_待验证_
+
+---
+
+### Root 13 - LinuxHome
+
+_待验证_
+
+---
+
+### AndroidExternalData
 
 _待验证_
 

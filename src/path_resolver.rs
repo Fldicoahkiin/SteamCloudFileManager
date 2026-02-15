@@ -42,7 +42,7 @@ pub enum RootType {
     // 可通过 rootoverrides 重定向到其他位置
     GameInstall = 1,
 
-    // Root 2: WinMyDocuments / MacDocuments / LinuxHome
+    // Root 2: WinMyDocuments / MacDocuments
     // Win: %USERPROFILE%\Documents, Mac/Linux: ~/Documents
     WinMyDocuments = 2,
 
@@ -50,8 +50,8 @@ pub enum RootType {
     // Win: %APPDATA%, Mac: ~/Library/Application Support, Linux: ~/.config
     WinAppDataRoaming = 3,
 
-    // Root 4: WinAppDataLocal / MacHome / LinuxXdgDataHome
-    // Win: %LOCALAPPDATA%, Mac: ~/, Linux: ~/.local/share
+    // Root 4: WinAppDataLocal / MacHome
+    // Win: %LOCALAPPDATA%, Mac: ~/
     WinAppDataLocal = 4,
 
     // Root 5: 未知（官方文档未列出）
@@ -64,8 +64,9 @@ pub enum RootType {
     // Win: 未知, Mac: ~/Library/Application Support, Linux: ~/.config
     MacAppSupport = 7,
 
-    // Root 8: LinuxXdgDataHome（官方文档）/ 或 Desktop
-    Root8 = 8,
+    // Root 8: LinuxXdgDataHome
+    // Linux: $XDG_DATA_HOME 或 ~/.local/share
+    LinuxXdgDataHome = 8,
 
     // Root 9: WinSavedGames
     // Win: %USERPROFILE%\Saved Games
@@ -80,6 +81,10 @@ pub enum RootType {
     // Root 12: WinAppDataLocalLow
     // Win: %USERPROFILE%\AppData\LocalLow
     WinAppDataLocalLow = 12,
+
+    // Root 13（推测）: LinuxHome
+    // Linux: ~/ (用户主目录)
+    LinuxHome = 13,
 }
 
 impl RootType {
@@ -94,11 +99,12 @@ impl RootType {
             5 => Some(Self::Root5),
             6 => Some(Self::Root6),
             7 => Some(Self::MacAppSupport),
-            8 => Some(Self::Root8),
+            8 => Some(Self::LinuxXdgDataHome),
             9 => Some(Self::WinSavedGames),
             10 => Some(Self::Root10),
             11 => Some(Self::Root11),
             12 => Some(Self::WinAppDataLocalLow),
+            13 => Some(Self::LinuxHome),
             _ => None,
         }
     }
@@ -119,11 +125,12 @@ impl RootType {
             Self::Root5 => "Root5",
             Self::Root6 => "Root6",
             Self::MacAppSupport => "MacAppSupport",
-            Self::Root8 => "Root8",
+            Self::LinuxXdgDataHome => "LinuxXdgDataHome",
             Self::WinSavedGames => "WinSavedGames",
             Self::Root10 => "Root10",
             Self::Root11 => "Root11",
             Self::WinAppDataLocalLow => "WinAppDataLocalLow",
+            Self::LinuxHome => "LinuxHome",
         }
     }
 
@@ -138,11 +145,15 @@ impl RootType {
                 Some(Self::GameInstall)
             }
             // Root 2
-            "winmydocuments" | "macdocuments" | "linuxhome" => Some(Self::WinMyDocuments),
+            "winmydocuments" | "macdocuments" => Some(Self::WinMyDocuments),
             // Root 3
             "winappdataroaming" => Some(Self::WinAppDataRoaming),
             // Root 4
-            "winappdatalocal" | "machome" | "linuxxdgdatahome" => Some(Self::WinAppDataLocal),
+            "winappdatalocal" | "machome" => Some(Self::WinAppDataLocal),
+            // Root 8
+            "linuxxdgdatahome" => Some(Self::LinuxXdgDataHome),
+            // Root 13
+            "linuxhome" => Some(Self::LinuxHome),
             // Root 7: macOS Application Support / Linux XDG Config
             "macappsupport" | "linuxxdgconfighome" => Some(Self::MacAppSupport),
             // Root 9
@@ -264,10 +275,38 @@ pub fn resolve_root_base_path(
             }
         }
 
-        // Root 8: 未知，暂时映射到 Desktop
-        RootType::Root8 => {
+        // Root 8: LinuxXdgDataHome
+        RootType::LinuxXdgDataHome => {
+            #[cfg(target_os = "linux")]
+            {
+                if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+                    Ok(PathBuf::from(xdg))
+                } else {
+                    let home = std::env::var("HOME")?;
+                    Ok(PathBuf::from(home).join(".local").join("share"))
+                }
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                #[cfg(target_os = "windows")]
+                {
+                    let localappdata = std::env::var("LOCALAPPDATA")?;
+                    Ok(PathBuf::from(localappdata))
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    let home = std::env::var("HOME")?;
+                    Ok(PathBuf::from(home)
+                        .join("Library")
+                        .join("Application Support"))
+                }
+            }
+        }
+
+        // Root 13: LinuxHome
+        RootType::LinuxHome => {
             let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
-            Ok(PathBuf::from(home).join("Desktop"))
+            Ok(PathBuf::from(home))
         }
 
         // Root 9: WinSavedGames
@@ -617,6 +656,7 @@ pub fn get_root_type_name(root: u32) -> &'static str {
         6 => "Root6", // 未在官方文档中
         7 => "MacAppSupport",
         8 => "LinuxXdgDataHome",
+        13 => "LinuxHome",
         9 => "WinSavedGames",
         10 => "Root10", // 未在官方文档中
         11 => "Root11", // 未在官方文档中
@@ -642,8 +682,8 @@ pub fn root_name_to_type(name: &str) -> Option<RootType> {
         "macappsupport" | "7" => Some(RootType::MacAppSupport),
         "macdocuments" => Some(RootType::WinMyDocuments),
         // Linux only
-        "linuxhome" => Some(RootType::WinMyDocuments),
-        "linuxxdgdatahome" | "8" => Some(RootType::Root8),
+        "linuxhome" | "13" => Some(RootType::LinuxHome),
+        "linuxxdgdatahome" | "8" => Some(RootType::LinuxXdgDataHome),
         "linuxxdgconfighome" => Some(RootType::MacAppSupport),
         // 未知 Root
         "5" => Some(RootType::Root5),
@@ -894,6 +934,18 @@ pub fn scan_local_files_from_ufs(
     results
 }
 
+// 递归扫描最大深度，防止扫描家目录等大范围路径时卡死
+const MAX_SCAN_DEPTH: u32 = 10;
+
+// 不应递归的目录（隐藏目录和系统目录）
+const SKIP_DIR_PREFIXES: &[&str] = &[".", "$"];
+#[cfg(target_os = "macos")]
+const SKIP_DIR_NAMES: &[&str] = &["Library", "Applications", "System"];
+#[cfg(target_os = "windows")]
+const SKIP_DIR_NAMES: &[&str] = &["AppData", "Windows", "Program Files", "Program Files (x86)"];
+#[cfg(target_os = "linux")]
+const SKIP_DIR_NAMES: &[&str] = &[];
+
 // 根据 pattern 扫描目录
 fn scan_directory_with_pattern(
     dir: &Path,
@@ -907,8 +959,18 @@ fn scan_directory_with_pattern(
         base: &Path,
         pattern: &str,
         recursive: bool,
+        depth: u32,
         results: &mut Vec<(PathBuf, String)>,
     ) {
+        if depth > MAX_SCAN_DEPTH {
+            tracing::debug!(
+                "扫描深度超过 {} 层，跳过: {}",
+                MAX_SCAN_DEPTH,
+                dir.display()
+            );
+            return;
+        }
+
         let entries = match std::fs::read_dir(dir) {
             Ok(e) => e,
             Err(_) => return,
@@ -918,7 +980,16 @@ fn scan_directory_with_pattern(
             let path = entry.path();
 
             if path.is_dir() && recursive {
-                scan_dir(&path, base, pattern, recursive, results);
+                // 跳过隐藏目录和系统目录
+                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                    if SKIP_DIR_PREFIXES.iter().any(|p| name.starts_with(p)) {
+                        continue;
+                    }
+                    if SKIP_DIR_NAMES.contains(&name) {
+                        continue;
+                    }
+                }
+                scan_dir(&path, base, pattern, recursive, depth + 1, results);
             } else if path.is_file() {
                 // 检查文件名是否匹配 pattern
                 if let Some(filename) = path.file_name().and_then(|n| n.to_str())
@@ -934,7 +1005,7 @@ fn scan_directory_with_pattern(
         }
     }
 
-    scan_dir(dir, dir, pattern, recursive, &mut results);
+    scan_dir(dir, dir, pattern, recursive, 0, &mut results);
     results
 }
 
