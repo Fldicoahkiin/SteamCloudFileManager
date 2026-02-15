@@ -2001,6 +2001,20 @@ impl I18n {
 
     // ========== AppInfo 对话框和 UFS 配置管理 ==========
 
+    pub fn appinfo_tab_local_ufs(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地 UFS 配置",
+            Language::English => "Local UFS Config",
+        }
+    }
+
+    pub fn appinfo_tab_custom_config(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "自定义配置",
+            Language::English => "Custom Config",
+        }
+    }
+
     pub fn appinfo_debug_title(&self, app_id: u32) -> String {
         match self.lang {
             Language::Chinese => format!("appinfo.vdf 调试 - App {}", app_id),
