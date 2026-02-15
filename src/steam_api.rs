@@ -247,7 +247,7 @@ impl SteamCloudManager {
         let mut data = Vec::new();
         reader
             .read_to_end(&mut data)
-            .map_err(|e| anyhow!("读取文件失败: {}", e))?;
+            .map_err(|e| anyhow!("读取文件 '{}' 失败: {}", filename, e))?;
 
         Ok(data)
     }
@@ -263,9 +263,32 @@ impl SteamCloudManager {
 
         use std::io::Write;
         let mut writer = file_handle.write();
-        writer
-            .write_all(data)
-            .map_err(|e| anyhow!("写入文件失败: {}", e))?;
+        writer.write_all(data).map_err(|e| {
+            let size_str = crate::file_manager::format_size(data.len() as u64);
+
+            // 检查云同步状态，辅助诊断
+            let cloud_account = remote_storage.is_cloud_enabled_for_account();
+            let cloud_app = remote_storage.is_cloud_enabled_for_app();
+
+            let mut hints = Vec::new();
+            if !cloud_account {
+                hints.push("Steam 账户未启用云同步");
+            }
+            if !cloud_app {
+                hints.push("该应用未启用云同步");
+            }
+            if hints.is_empty() {
+                hints.push("可能原因: 云存储配额已满或文件名不合法");
+            }
+
+            anyhow!(
+                "写入文件 '{}' 失败 (大小: {}, {}): {}",
+                filename,
+                size_str,
+                hints.join(", "),
+                e
+            )
+        })?;
 
         Ok(true)
     }
