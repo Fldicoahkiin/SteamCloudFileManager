@@ -25,7 +25,7 @@
 | Root 名称               | 平台    | 路径                               |
 | ----------------------- | ------- | ---------------------------------- |
 | `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\` |
-| `SteamCloudDocuments`   | All     | `~/.SteamCloud/[username]/[Game]/` |
+| `SteamCloudDocuments`   | All     | 平台特定路径（见下方说明）         |
 | `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`      |
 | `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`     |
 | `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`  |
@@ -40,27 +40,33 @@
 | `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                |
 | `AndroidExternalData`   | Android | `Android/data/<package>/files/`    |
 
-### 数字 Root ID 映射（待验证）
+### 数字 Root ID 映射
 
-> **注意**：数字 Root ID 与字符串名称的对应关系**官方未公开**，以下基于实际验证和代码推测。
+> **注意**：数字 Root ID 与字符串名称的对应关系**官方未公开**，以下通过自定义 UFS 注入测试验证。
 
-| Root ID | 已验证的名称                              | 来源                                                    |
-| :-----: | ----------------------------------------- | ------------------------------------------------------- |
-|  **0**  | `SteamCloudDocuments`                     | [默认路径](#root-0---steamclouddocuments)               |
-|  **1**  | `GameInstall`                             | [✅ macOS](#root-1---gameinstall-app-install-directory) |
-|  **2**  | `WinMyDocuments`                          | [待验证](#root-2---winmydocuments)                      |
-|  **3**  | `WinAppDataRoaming`                       | [待验证](#root-3---winappdataroaming)                   |
-|  **4**  | `WinAppDataLocal` (Win) / `MacHome` (Mac) | [✅ macOS](#root-4---winappdatalocal--machome)          |
-|  **5**  | （未知）                                  | [待验证](#root-5---winpictures)                         |
-|  **6**  | （未知）                                  | [待验证](#root-6---winmusic)                            |
-|  **7**  | `MacAppSupport`                           | [✅ macOS](#root-7---macappsupport)                     |
-|  **8**  | `LinuxXdgDataHome`                        | [待验证](#root-8---linuxxdgdatahome)                    |
-|  **9**  | `WinSavedGames`                           | [待验证](#root-9---winsavedgames)                       |
-| **10**  | （未知）                                  | [待验证](#root-10---windownloads)                       |
-| **11**  | （未知）                                  | [待验证](#root-11---winpublic)                          |
-| **12**  | `WinAppDataLocalLow`                      | [待验证](#root-12---winappdatalocallow)                 |
-| **13**  | `LinuxHome`                               | [待验证](#root-13---linuxhome)                          |
-|  **?**  | `AndroidExternalData`                     | [待验证](#androidexternaldata)                          |
+| Root ID | 已验证的名称                | 来源                                |
+| :-----: | --------------------------- | ----------------------------------- |
+|  **0**  | `SteamCloudDocuments` (API) | [✅](#root-0---steamclouddocuments) |
+
+| **1** | `GameInstall` | [✅](#root-1---gameinstall-app-install-directory) |
+| **2** | `WinMyDocuments` | [✅](#root-2---winmydocuments) |
+| **3** | `WinAppDataLocal` | [✅](#root-3---winappdatalocal) |
+| **4** | `WinAppDataRoaming` | [✅](#root-4---winappdataroaming) |
+| **5** | （未知） | [待验证](#root-5) |
+| **6** | `MacHome` | [✅](#root-6---machome) |
+| **7** | `MacAppSupport` | [✅](#root-7---macappsupport) |
+| **8** | `MacDocuments` | [✅](#root-8---macdocuments) |
+| **9** | `WinSavedGames` | [✅](#root-9---winsavedgames) |
+| **10** | （未知） | [待验证](#root-10) |
+| **11** | `SteamCloudDocuments` | [✅](#root-11---steamclouddocuments-ufs) |
+| **12** | `WinAppDataLocalLow` | [✅](#root-12---winappdatalocallow) |
+| **13** | （未知） | [待验证](#root-13) |
+| **14** | `LinuxHome` | [✅](#root-14---linuxhome) |
+| **15** | `LinuxXdgDataHome` | [✅](#root-15---linuxxdgdatahome) |
+| **16** | `LinuxXdgConfigHome` | [✅](#root-16---linuxxdgconfighome) |
+| **17** | （未知） | [待验证](#root-17) |
+| **18** | `WindowsHome` | [✅](#root-18---windowshome) |
+| **?** | `AndroidExternalData` | [待验证](#androidexternaldata) |
 
 ### Windows 环境变量
 
@@ -84,7 +90,19 @@
 
 ### Root 0 - SteamCloudDocuments
 
-默认路径：`{Steam}/userdata/{UID}/{AppID}/remote/`
+Root 0 对应 ISteamRemoteStorage API 的工作目录：`{Steam}/userdata/{UID}/{AppID}/remote/`
+
+当作为 UFS Auto-Cloud 的 `SteamCloudDocuments` root 使用时，实际路径取决于平台：
+
+| 平台    | 实际路径                                                              |
+| ------- | --------------------------------------------------------------------- |
+| macOS   | `~/Documents/Steam Cloud/[Steam用户名]/[游戏名]/`                     |
+| Linux   | `~/.SteamCloud/[Steam用户名]/[游戏名]/`                               |
+| Windows | `%USERPROFILE%\Documents\Steam Cloud\[Steam用户名]\[游戏名]\`（推测） |
+
+> **已验证**：macOS 上 `cloud_log.txt` 显示 Steam 将 `SteamCloudDocuments` 解析到
+> `~/Documents/Steam Cloud/[用户名]/[游戏名]/`，而**不是** `userdata/.../remote/`。
+> 这意味着 Root 0 的 API 路径和 SteamCloudDocuments 的 Auto-Cloud 路径是两个完全不同的位置。
 
 ---
 
@@ -174,43 +192,54 @@
 
 ### Root 2 - WinMyDocuments
 
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        2         | UFS 注入 |
+
+---
+
+### Root 3 - WinAppDataLocal
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        3         | UFS 注入 |
+
+> **修正**：之前错误地映射为 `WinAppDataRoaming`，通过 appid 1325860 测试确认 Root 3 = `WinAppDataLocal`
+
+---
+
+### Root 4 - WinAppDataRoaming
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        4         | UFS 注入 |
+
+> **修正**：之前错误地映射为 `WinAppDataLocal`，通过 appid 1325860 测试确认 Root 4 = `WinAppDataRoaming`
+
+---
+
+### Root 5
+
 _待验证_
 
 ---
 
-### Root 3 - WinAppDataRoaming
+### Root 6 - MacHome
 
-_待验证_
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        6         | UFS 注入 |
 
----
-
-### Root 4 - WinAppDataLocal / MacHome
-
-| 游戏             | AppID  | 平台  | 完整路径                               |
-| ---------------- | ------ | ----- | -------------------------------------- |
-| Finding Paradise | 337340 | macOS | `~/Finding Paradise - Freebird Games/` |
-
-> **关键发现**：Root 4 在 macOS 上映射到 `~/`（用户主目录），而不是 Windows 上的 `AppData\Local`
-
----
-
-### Root 5 - WinPictures
-
-_待验证_
-
----
-
-### Root 6 - WinMusic
-
-_待验证_
+macOS: `~/`, Windows: `%USERPROFILE%`, Linux: `~/`
 
 ---
 
 ### Root 7 - MacAppSupport
 
-| 游戏             | AppID  | 完整路径                                                       |
-| ---------------- | ------ | -------------------------------------------------------------- |
-| Finding Paradise | 337340 | `~/Library/Application Support/freebirdgames/findingparadise/` |
+| 游戏             | AppID   | 完整路径                                                       |
+| ---------------- | ------- | -------------------------------------------------------------- |
+| Finding Paradise | 337340  | `~/Library/Application Support/freebirdgames/findingparadise/` |
+| 测试             | 1325860 | `~/Library/Application Support/`（通过 UFS 注入验证 root=7）   |
 
 <details>
 <summary><b>Finding Paradise (337340) 完整配置</b></summary>
@@ -236,39 +265,99 @@ _待验证_
 
 ---
 
-### Root 8 - LinuxXdgDataHome
+### Root 8 - MacDocuments
 
-_待验证_
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        8         | UFS 注入 |
+
+> **修正**：之前错误地映射为 `LinuxXdgDataHome`，通过 appid 1325860 测试确认 Root 8 = `MacDocuments`
 
 ---
 
 ### Root 9 - WinSavedGames
 
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        9         | UFS 注入 |
+
+---
+
+### Root 10
+
 _待验证_
 
 ---
 
-### Root 10 - WinDownloads
+### Root 11 - SteamCloudDocuments (UFS)
 
-_待验证_
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        11        | UFS 注入 |
 
----
+UFS Auto-Cloud 使用的 SteamCloudDocuments 路径（与 Root 0 的 API 路径不同）：
 
-### Root 11 - WinPublic
-
-_待验证_
+| 平台    | 实际路径                                                              |
+| ------- | --------------------------------------------------------------------- |
+| macOS   | `~/Documents/Steam Cloud/[Steam用户名]/[游戏名]/`                     |
+| Linux   | `~/.SteamCloud/[Steam用户名]/[游戏名]/`                               |
+| Windows | `%USERPROFILE%\Documents\Steam Cloud\[Steam用户名]\[游戏名]\`（推测） |
 
 ---
 
 ### Root 12 - WinAppDataLocalLow
 
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        12        | UFS 注入 |
+
+---
+
+### Root 13
+
 _待验证_
 
 ---
 
-### Root 13 - LinuxHome
+### Root 14 - LinuxHome
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        14        | UFS 注入 |
+
+> **修正**：之前错误地映射为 Root 13，通过 appid 1325860 测试确认 LinuxHome = Root 14
+
+---
+
+### Root 15 - LinuxXdgDataHome
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        15        | UFS 注入 |
+
+> **修正**：之前错误地映射为 Root 8，通过 appid 1325860 测试确认 LinuxXdgDataHome = Root 15
+
+---
+
+### Root 16 - LinuxXdgConfigHome
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        16        | UFS 注入 |
+
+---
+
+### Root 17
 
 _待验证_
+
+---
+
+### Root 18 - WindowsHome
+
+| 游戏 | AppID   | 平台  | remotecache root | 验证方式 |
+| ---- | ------- | ----- | :--------------: | -------- |
+| 测试 | 1325860 | macOS |        18        | UFS 注入 |
 
 ---
 

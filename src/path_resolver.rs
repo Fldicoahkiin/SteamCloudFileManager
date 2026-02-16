@@ -30,81 +30,109 @@ fn get_root_overrides_cache(app_id: u32) -> Option<Vec<RootOverrideConfig>> {
 }
 
 // Steam Cloud 存储位置类型
-// 根据官方文档: https://partner.steamgames.com/doc/features/cloud
+// 字符串名称来源: https://partner.steamgames.com/doc/features/cloud
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[repr(u32)]
 pub enum RootType {
-    // Root 0: SteamCloudDocuments - Steam 云文件夹
+    // Root 0: API 默认路径
     // 路径: {Steam}/userdata/{UID}/{AppID}/remote/
-    SteamCloudDocuments = 0,
+    // 通过 ISteamRemoteStorage API (FileWrite/FileRead) 操作的文件存储在此
+    SteamCloudDocumentsApi = 0,
 
     // Root 1: GameInstall - 游戏安装目录
-    // 可通过 rootoverrides 重定向到其他位置
+    // 路径: {Steam}/steamapps/common/{Game}/
     GameInstall = 1,
 
-    // Root 2: WinMyDocuments / MacDocuments
+    // Root 2: WinMyDocuments
     // Win: %USERPROFILE%\Documents, Mac/Linux: ~/Documents
     WinMyDocuments = 2,
 
-    // Root 3: WinAppDataRoaming
+    // Root 3: WinAppDataLocal
+    // Win: %LOCALAPPDATA%, Mac: ~/, Linux: ~/.local/share
+    WinAppDataLocal = 3,
+
+    // Root 4: WinAppDataRoaming
     // Win: %APPDATA%, Mac: ~/Library/Application Support, Linux: ~/.config
-    WinAppDataRoaming = 3,
+    WinAppDataRoaming = 4,
 
-    // Root 4: WinAppDataLocal / MacHome
-    // Win: %LOCALAPPDATA%, Mac: ~/
-    WinAppDataLocal = 4,
-
-    // Root 5: 未知（官方文档未列出）
+    // Root 5: 未知
     Root5 = 5,
 
-    // Root 6: 未知（官方文档未列出）
-    Root6 = 6,
+    // Root 6: MacHome
+    // Mac: ~/, Win: %USERPROFILE%, Linux: ~/
+    MacHome = 6,
 
-    // Root 7: MacAppSupport / LinuxXdgConfigHome
-    // Win: 未知, Mac: ~/Library/Application Support, Linux: ~/.config
+    // Root 7: MacAppSupport
+    // Mac: ~/Library/Application Support, Win: %APPDATA%, Linux: ~/.config
     MacAppSupport = 7,
 
-    // Root 8: LinuxXdgDataHome
-    // Linux: $XDG_DATA_HOME 或 ~/.local/share
-    LinuxXdgDataHome = 8,
+    // Root 8: MacDocuments
+    // Mac/Linux: ~/Documents, Win: %USERPROFILE%\Documents
+    MacDocuments = 8,
 
     // Root 9: WinSavedGames
     // Win: %USERPROFILE%\Saved Games
     WinSavedGames = 9,
 
-    // Root 10: 未知（官方文档未列出）
+    // Root 10: 未知
     Root10 = 10,
 
-    // Root 11: 未知（官方文档未列出）
-    Root11 = 11,
+    // Root 11: SteamCloudDocuments (UFS Auto-Cloud)
+    // Mac: ~/Documents/Steam Cloud/[用户名]/[游戏名]/
+    // Linux: ~/.SteamCloud/[用户名]/[游戏名]/
+    // Win: %USERPROFILE%\Documents\Steam Cloud\[用户名]\[游戏名]\ (推测)
+    SteamCloudDocuments = 11,
 
     // Root 12: WinAppDataLocalLow
     // Win: %USERPROFILE%\AppData\LocalLow
     WinAppDataLocalLow = 12,
 
-    // Root 13（推测）: LinuxHome
-    // Linux: ~/ (用户主目录)
-    LinuxHome = 13,
+    // Root 13: 未知
+    Root13 = 13,
+
+    // Root 14: LinuxHome
+    // Linux: ~/, Mac: ~/, Win: %USERPROFILE%
+    LinuxHome = 14,
+
+    // Root 15: LinuxXdgDataHome
+    // Linux: $XDG_DATA_HOME 或 ~/.local/share
+    LinuxXdgDataHome = 15,
+
+    // Root 16: LinuxXdgConfigHome
+    // Linux: $XDG_CONFIG_HOME 或 ~/.config
+    LinuxXdgConfigHome = 16,
+
+    // Root 17: 未知
+    Root17 = 17,
+
+    // Root 18: WindowsHome
+    // Win: %USERPROFILE%, Mac: ~/, Linux: ~/
+    WindowsHome = 18,
 }
 
 impl RootType {
     // 从 u32 转换为 RootType
     pub fn from_u32(value: u32) -> Option<Self> {
         match value {
-            0 => Some(Self::SteamCloudDocuments),
+            0 => Some(Self::SteamCloudDocumentsApi),
             1 => Some(Self::GameInstall),
             2 => Some(Self::WinMyDocuments),
-            3 => Some(Self::WinAppDataRoaming),
-            4 => Some(Self::WinAppDataLocal),
+            3 => Some(Self::WinAppDataLocal),
+            4 => Some(Self::WinAppDataRoaming),
             5 => Some(Self::Root5),
-            6 => Some(Self::Root6),
+            6 => Some(Self::MacHome),
             7 => Some(Self::MacAppSupport),
-            8 => Some(Self::LinuxXdgDataHome),
+            8 => Some(Self::MacDocuments),
             9 => Some(Self::WinSavedGames),
             10 => Some(Self::Root10),
-            11 => Some(Self::Root11),
+            11 => Some(Self::SteamCloudDocuments),
             12 => Some(Self::WinAppDataLocalLow),
-            13 => Some(Self::LinuxHome),
+            13 => Some(Self::Root13),
+            14 => Some(Self::LinuxHome),
+            15 => Some(Self::LinuxXdgDataHome),
+            16 => Some(Self::LinuxXdgConfigHome),
+            17 => Some(Self::Root17),
+            18 => Some(Self::WindowsHome),
             _ => None,
         }
     }
@@ -114,52 +142,55 @@ impl RootType {
         self as u32
     }
 
-    // 转换为名称字符串（用于日志和调试）
+    // 转换为名称字符串
     pub fn to_name(self) -> &'static str {
         match self {
-            Self::SteamCloudDocuments => "SteamCloudDocuments",
+            Self::SteamCloudDocumentsApi => "SteamCloudDocuments(API)",
             Self::GameInstall => "GameInstall",
             Self::WinMyDocuments => "WinMyDocuments",
-            Self::WinAppDataRoaming => "WinAppDataRoaming",
             Self::WinAppDataLocal => "WinAppDataLocal",
+            Self::WinAppDataRoaming => "WinAppDataRoaming",
             Self::Root5 => "Root5",
-            Self::Root6 => "Root6",
+            Self::MacHome => "MacHome",
             Self::MacAppSupport => "MacAppSupport",
-            Self::LinuxXdgDataHome => "LinuxXdgDataHome",
+            Self::MacDocuments => "MacDocuments",
             Self::WinSavedGames => "WinSavedGames",
             Self::Root10 => "Root10",
-            Self::Root11 => "Root11",
+            Self::SteamCloudDocuments => "SteamCloudDocuments",
             Self::WinAppDataLocalLow => "WinAppDataLocalLow",
+            Self::Root13 => "Root13",
             Self::LinuxHome => "LinuxHome",
+            Self::LinuxXdgDataHome => "LinuxXdgDataHome",
+            Self::LinuxXdgConfigHome => "LinuxXdgConfigHome",
+            Self::Root17 => "Root17",
+            Self::WindowsHome => "WindowsHome",
         }
     }
 
-    // 从名称字符串解析（用于 rootoverrides）
+    // 从名称字符串解析
     pub fn from_name(name: &str) -> Option<Self> {
         let name_lower = name.to_lowercase();
         match name_lower.as_str() {
-            // Root 0
+            // All platforms
             "steamclouddocuments" => Some(Self::SteamCloudDocuments),
-            // Root 1
             "gameinstall" | "appinstalldirectory" | "app install directory" => {
                 Some(Self::GameInstall)
             }
-            // Root 2
-            "winmydocuments" | "macdocuments" => Some(Self::WinMyDocuments),
-            // Root 3
+            // Windows
+            "winmydocuments" => Some(Self::WinMyDocuments),
+            "winappdatalocal" => Some(Self::WinAppDataLocal),
             "winappdataroaming" => Some(Self::WinAppDataRoaming),
-            // Root 4
-            "winappdatalocal" | "machome" => Some(Self::WinAppDataLocal),
-            // Root 8
-            "linuxxdgdatahome" => Some(Self::LinuxXdgDataHome),
-            // Root 13
-            "linuxhome" => Some(Self::LinuxHome),
-            // Root 7: macOS Application Support / Linux XDG Config
-            "macappsupport" | "linuxxdgconfighome" => Some(Self::MacAppSupport),
-            // Root 9
-            "winsavedgames" => Some(Self::WinSavedGames),
-            // Root 12
             "winappdatalocallow" => Some(Self::WinAppDataLocalLow),
+            "winsavedgames" => Some(Self::WinSavedGames),
+            "windowshome" => Some(Self::WindowsHome),
+            // macOS
+            "machome" => Some(Self::MacHome),
+            "macappsupport" => Some(Self::MacAppSupport),
+            "macdocuments" => Some(Self::MacDocuments),
+            // Linux
+            "linuxhome" => Some(Self::LinuxHome),
+            "linuxxdgdatahome" => Some(Self::LinuxXdgDataHome),
+            "linuxxdgconfighome" => Some(Self::LinuxXdgConfigHome),
             _ => None,
         }
     }
@@ -176,8 +207,8 @@ pub fn resolve_root_base_path(
     app_id: u32,
 ) -> Result<PathBuf> {
     match root_type {
-        // Root 0: SteamCloudDocuments
-        RootType::SteamCloudDocuments => Ok(steam_path
+        // Root 0: API 默认路径 (userdata/.../remote/)
+        RootType::SteamCloudDocumentsApi => Ok(steam_path
             .join("userdata")
             .join(user_id)
             .join(app_id.to_string())
@@ -193,19 +224,33 @@ pub fn resolve_root_base_path(
                 let home = std::env::var("USERPROFILE")?;
                 Ok(PathBuf::from(home).join("Documents"))
             }
-            #[cfg(target_os = "macos")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Documents"))
-            }
-            #[cfg(target_os = "linux")]
+            #[cfg(not(target_os = "windows"))]
             {
                 let home = std::env::var("HOME")?;
                 Ok(PathBuf::from(home).join("Documents"))
             }
         }
 
-        // Root 3: WinAppDataRoaming
+        // Root 3: WinAppDataLocal
+        RootType::WinAppDataLocal => {
+            #[cfg(target_os = "windows")]
+            {
+                let localappdata = std::env::var("LOCALAPPDATA")?;
+                Ok(PathBuf::from(localappdata))
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home))
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join(".local").join("share"))
+            }
+        }
+
+        // Root 4: WinAppDataRoaming
         RootType::WinAppDataRoaming => {
             #[cfg(target_os = "windows")]
             {
@@ -226,37 +271,19 @@ pub fn resolve_root_base_path(
             }
         }
 
-        // Root 4: WinAppDataLocal / MacHome
-        RootType::WinAppDataLocal => {
-            #[cfg(target_os = "windows")]
-            {
-                let localappdata = std::env::var("LOCALAPPDATA")?;
-                Ok(PathBuf::from(localappdata))
-            }
-            #[cfg(target_os = "macos")]
-            {
-                // Root 4 在 macOS 上映射到 ~/ (MacHome)
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                // Linux: XDG_DATA_HOME 或 ~/.local/share
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join(".local").join("share"))
-            }
+        // Root 5: 未知
+        RootType::Root5 => Err(anyhow!("Root {} 未知，无法解析路径", root_type.to_u32())),
+
+        // Root 6: MacHome
+        RootType::MacHome => {
+            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
+            Ok(PathBuf::from(home))
         }
 
-        // Root 5, 6: 未知，返回错误
-        RootType::Root5 | RootType::Root6 => {
-            Err(anyhow!("Root {} 未知，无法解析路径", root_type.to_u32()))
-        }
-
-        // Root 7: MacAppSupport / LinuxXdgConfigHome
+        // Root 7: MacAppSupport
         RootType::MacAppSupport => {
             #[cfg(target_os = "windows")]
             {
-                // Windows 上 Root 7 行为未知，回退到 AppData
                 let appdata = std::env::var("APPDATA")?;
                 Ok(PathBuf::from(appdata))
             }
@@ -269,44 +296,23 @@ pub fn resolve_root_base_path(
             }
             #[cfg(target_os = "linux")]
             {
-                // Linux: XDG_CONFIG_HOME 或 ~/.config
                 let home = std::env::var("HOME")?;
                 Ok(PathBuf::from(home).join(".config"))
             }
         }
 
-        // Root 8: LinuxXdgDataHome
-        RootType::LinuxXdgDataHome => {
-            #[cfg(target_os = "linux")]
+        // Root 8: MacDocuments
+        RootType::MacDocuments => {
+            #[cfg(target_os = "windows")]
             {
-                if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
-                    Ok(PathBuf::from(xdg))
-                } else {
-                    let home = std::env::var("HOME")?;
-                    Ok(PathBuf::from(home).join(".local").join("share"))
-                }
+                let home = std::env::var("USERPROFILE")?;
+                Ok(PathBuf::from(home).join("Documents"))
             }
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(target_os = "windows"))]
             {
-                #[cfg(target_os = "windows")]
-                {
-                    let localappdata = std::env::var("LOCALAPPDATA")?;
-                    Ok(PathBuf::from(localappdata))
-                }
-                #[cfg(target_os = "macos")]
-                {
-                    let home = std::env::var("HOME")?;
-                    Ok(PathBuf::from(home)
-                        .join("Library")
-                        .join("Application Support"))
-                }
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join("Documents"))
             }
-        }
-
-        // Root 13: LinuxHome
-        RootType::LinuxHome => {
-            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
-            Ok(PathBuf::from(home))
         }
 
         // Root 9: WinSavedGames
@@ -323,9 +329,29 @@ pub fn resolve_root_base_path(
             }
         }
 
-        // Root 10, 11: 未知，返回错误
-        RootType::Root10 | RootType::Root11 => {
+        // Root 10, 13, 17: 未知
+        RootType::Root10 | RootType::Root13 | RootType::Root17 => {
             Err(anyhow!("Root {} 未知，无法解析路径", root_type.to_u32()))
+        }
+
+        // Root 11: SteamCloudDocuments (UFS Auto-Cloud)
+        // 路径中包含 Steam 用户名和游戏名，此处暂不解析
+        RootType::SteamCloudDocuments => {
+            #[cfg(target_os = "macos")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join("Documents").join("Steam Cloud"))
+            }
+            #[cfg(target_os = "linux")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home).join(".SteamCloud"))
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let home = std::env::var("USERPROFILE")?;
+                Ok(PathBuf::from(home).join("Documents").join("Steam Cloud"))
+            }
         }
 
         // Root 12: WinAppDataLocalLow
@@ -345,6 +371,68 @@ pub fn resolve_root_base_path(
                 let home = std::env::var("HOME")?;
                 Ok(PathBuf::from(home).join(".local").join("share"))
             }
+        }
+
+        // Root 14: LinuxHome
+        RootType::LinuxHome => {
+            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
+            Ok(PathBuf::from(home))
+        }
+
+        // Root 15: LinuxXdgDataHome
+        RootType::LinuxXdgDataHome => {
+            #[cfg(target_os = "linux")]
+            {
+                if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
+                    Ok(PathBuf::from(xdg))
+                } else {
+                    let home = std::env::var("HOME")?;
+                    Ok(PathBuf::from(home).join(".local").join("share"))
+                }
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let localappdata = std::env::var("LOCALAPPDATA")?;
+                Ok(PathBuf::from(localappdata))
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home)
+                    .join("Library")
+                    .join("Application Support"))
+            }
+        }
+
+        // Root 16: LinuxXdgConfigHome
+        RootType::LinuxXdgConfigHome => {
+            #[cfg(target_os = "linux")]
+            {
+                if let Ok(xdg) = std::env::var("XDG_CONFIG_HOME") {
+                    Ok(PathBuf::from(xdg))
+                } else {
+                    let home = std::env::var("HOME")?;
+                    Ok(PathBuf::from(home).join(".config"))
+                }
+            }
+            #[cfg(target_os = "windows")]
+            {
+                let appdata = std::env::var("APPDATA")?;
+                Ok(PathBuf::from(appdata))
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let home = std::env::var("HOME")?;
+                Ok(PathBuf::from(home)
+                    .join("Library")
+                    .join("Application Support"))
+            }
+        }
+
+        // Root 18: WindowsHome
+        RootType::WindowsHome => {
+            let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))?;
+            Ok(PathBuf::from(home))
         }
     }
 }
@@ -647,20 +735,25 @@ pub fn parse_cdp_root_description(root_description: &str) -> (Option<&str>, &str
 // 数字 ID 来源于 remotecache.vdf，名称来源于 Steamworks 文档和 appinfo.vdf
 pub fn get_root_type_name(root: u32) -> &'static str {
     match root {
-        0 => "SteamCloudDocuments",
+        0 => "SteamCloudDocuments(API)",
         1 => "GameInstall",
         2 => "WinMyDocuments",
-        3 => "WinAppDataRoaming",
-        4 => "WinAppDataLocal",
-        5 => "Root5", // 未在官方文档中
-        6 => "Root6", // 未在官方文档中
+        3 => "WinAppDataLocal",
+        4 => "WinAppDataRoaming",
+        5 => "Root5",
+        6 => "MacHome",
         7 => "MacAppSupport",
-        8 => "LinuxXdgDataHome",
-        13 => "LinuxHome",
+        8 => "MacDocuments",
         9 => "WinSavedGames",
-        10 => "Root10", // 未在官方文档中
-        11 => "Root11", // 未在官方文档中
+        10 => "Root10",
+        11 => "SteamCloudDocuments",
         12 => "WinAppDataLocalLow",
+        13 => "Root13",
+        14 => "LinuxHome",
+        15 => "LinuxXdgDataHome",
+        16 => "LinuxXdgConfigHome",
+        17 => "Root17",
+        18 => "WindowsHome",
         _ => "Unknown",
     }
 }
@@ -670,26 +763,28 @@ pub fn root_name_to_type(name: &str) -> Option<RootType> {
     match name.to_lowercase().as_str() {
         // All platforms
         "app install directory" | "gameinstall" | "1" => Some(RootType::GameInstall),
-        "steamclouddocuments" | "0" => Some(RootType::SteamCloudDocuments),
-        // Windows only
+        "steamclouddocuments" | "11" => Some(RootType::SteamCloudDocuments),
+        "0" => Some(RootType::SteamCloudDocumentsApi),
+        // Windows
         "winmydocuments" | "2" => Some(RootType::WinMyDocuments),
-        "winappdatalocal" | "4" => Some(RootType::WinAppDataLocal),
+        "winappdatalocal" | "3" => Some(RootType::WinAppDataLocal),
+        "winappdataroaming" | "4" => Some(RootType::WinAppDataRoaming),
         "winappdatalocallow" | "12" => Some(RootType::WinAppDataLocalLow),
-        "winappdataroaming" | "3" => Some(RootType::WinAppDataRoaming),
         "winsavedgames" | "9" => Some(RootType::WinSavedGames),
-        // macOS only
-        "machome" => Some(RootType::WinAppDataLocal),
+        "windowshome" | "18" => Some(RootType::WindowsHome),
+        // macOS
+        "machome" | "6" => Some(RootType::MacHome),
         "macappsupport" | "7" => Some(RootType::MacAppSupport),
-        "macdocuments" => Some(RootType::WinMyDocuments),
-        // Linux only
-        "linuxhome" | "13" => Some(RootType::LinuxHome),
-        "linuxxdgdatahome" | "8" => Some(RootType::LinuxXdgDataHome),
-        "linuxxdgconfighome" => Some(RootType::MacAppSupport),
-        // 未知 Root
+        "macdocuments" | "8" => Some(RootType::MacDocuments),
+        // Linux
+        "linuxhome" | "14" => Some(RootType::LinuxHome),
+        "linuxxdgdatahome" | "15" => Some(RootType::LinuxXdgDataHome),
+        "linuxxdgconfighome" | "16" => Some(RootType::LinuxXdgConfigHome),
+        // 未知
         "5" => Some(RootType::Root5),
-        "6" => Some(RootType::Root6),
         "10" => Some(RootType::Root10),
-        "11" => Some(RootType::Root11),
+        "13" => Some(RootType::Root13),
+        "17" => Some(RootType::Root17),
         _ => None,
     }
 }
