@@ -800,7 +800,9 @@ pub fn collect_local_save_paths_from_ufs(
         }
     }
 
-    let paths: Vec<(String, PathBuf)> = path_map.into_values().collect();
+    let mut sorted_entries: Vec<(u32, (String, PathBuf))> = path_map.into_iter().collect();
+    sorted_entries.sort_by_key(|(root_num, _)| *root_num);
+    let paths: Vec<(String, PathBuf)> = sorted_entries.into_iter().map(|(_, v)| v).collect();
 
     if !paths.is_empty() {
         tracing::debug!("检测到 {} 个本地存档根目录", paths.len());
