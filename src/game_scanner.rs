@@ -394,6 +394,15 @@ pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Sca
         );
     }
 
+    // 填充游戏名称缓存，供路径解析使用
+    for game in &games {
+        if let Some(ref name) = game.game_name
+            && !name.is_empty()
+        {
+            crate::path_resolver::set_game_name_cache(game.app_id, name.clone());
+        }
+    }
+
     // 排序：已安装 -> CDP顺序 -> 名称
     games.sort_by(|a, b| {
         if a.is_installed != b.is_installed {

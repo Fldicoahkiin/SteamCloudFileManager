@@ -13,6 +13,27 @@ static GAME_INSTALL_DIR_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, PathBuf>>>
 static ROOT_OVERRIDES_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, Vec<RootOverrideConfig>>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
+// SteamCloudDocuments 路径缓存
+static STEAM_CLOUD_DOCS_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, PathBuf>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+// 游戏名称缓存，从 game_scanner/CDP 获取
+static GAME_NAME_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, String>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub fn set_game_name_cache(app_id: u32, name: String) {
+    if let Ok(mut cache) = GAME_NAME_CACHE.lock() {
+        cache.insert(app_id, name);
+    }
+}
+
+fn get_game_name_cached(app_id: u32) -> Option<String> {
+    if let Ok(cache) = GAME_NAME_CACHE.lock() {
+        return cache.get(&app_id).cloned();
+    }
+    None
+}
+
 // 设置某个 app 的 rootoverrides 缓存
 pub fn set_root_overrides_cache(app_id: u32, overrides: Vec<RootOverrideConfig>) {
     if let Ok(mut cache) = ROOT_OVERRIDES_CACHE.lock() {
@@ -335,24 +356,8 @@ pub fn resolve_root_base_path(
         }
 
         // Root 11: SteamCloudDocuments (UFS Auto-Cloud)
-        // 路径中包含 Steam 用户名和游戏名，此处暂不解析
-        RootType::SteamCloudDocuments => {
-            #[cfg(target_os = "macos")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join("Documents").join("Steam Cloud"))
-            }
-            #[cfg(target_os = "linux")]
-            {
-                let home = std::env::var("HOME")?;
-                Ok(PathBuf::from(home).join(".SteamCloud"))
-            }
-            #[cfg(target_os = "windows")]
-            {
-                let home = std::env::var("USERPROFILE")?;
-                Ok(PathBuf::from(home).join("Documents").join("Steam Cloud"))
-            }
-        }
+        // 完整路径: [base]/[Steam用户名]/[游戏名]/
+        RootType::SteamCloudDocuments => get_steam_cloud_docs_dir(steam_path, app_id),
 
         // Root 12: WinAppDataLocalLow
         RootType::WinAppDataLocalLow => {
@@ -577,6 +582,101 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
     let error_msg = format!("未找到游戏 {} 的安装目录，请确认游戏已安装", app_id);
     tracing::warn!("{}", error_msg);
     Err(anyhow!(error_msg))
+}
+
+// 获取 SteamCloudDocuments 的完整路径
+// 路径结构: [base]/[Steam用户名]/[游戏名]/
+// 需要从 loginusers.vdf 获取用户名，从 appmanifest 获取游戏名
+fn get_steam_cloud_docs_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
+    // 检查缓存
+    if let Ok(cache) = STEAM_CLOUD_DOCS_CACHE.lock()
+        && let Some(path) = cache.get(&app_id)
+    {
+        return Ok(path.clone());
+    }
+
+    // 平台对应的 SteamCloudDocuments 基础目录
+    #[cfg(target_os = "macos")]
+    let base_dir = {
+        let home = std::env::var("HOME")?;
+        PathBuf::from(home).join("Documents").join("Steam Cloud")
+    };
+    #[cfg(target_os = "linux")]
+    let base_dir = {
+        let home = std::env::var("HOME")?;
+        PathBuf::from(home).join(".SteamCloud")
+    };
+    #[cfg(target_os = "windows")]
+    let base_dir = {
+        let home = std::env::var("USERPROFILE")?;
+        PathBuf::from(home).join("Documents").join("Steam Cloud")
+    };
+
+    if !base_dir.exists() {
+        return Ok(base_dir);
+    }
+
+    // 从 appmanifest 获取游戏名，失败则从缓存获取
+    let game_name =
+        get_game_name_from_manifest(steam_path, app_id).or_else(|| get_game_name_cached(app_id));
+
+    // 从 loginusers.vdf 获取 Steam 用户名
+    let persona_name =
+        crate::user_manager::find_user_id_from_loginusers(steam_path).and_then(|(_, name)| name);
+
+    // 优先用精确路径 [base]/[用户名]/[游戏名]/
+    if let Some(ref persona) = persona_name
+        && let Some(ref gname) = game_name
+    {
+        let full_path = base_dir.join(persona).join(gname);
+        if full_path.exists() {
+            tracing::debug!("SteamCloudDocuments 精确匹配: {}", full_path.display());
+            if let Ok(mut cache) = STEAM_CLOUD_DOCS_CACHE.lock() {
+                cache.insert(app_id, full_path.clone());
+            }
+            return Ok(full_path);
+        }
+    }
+
+    // 回退：扫描 base_dir 下的子目录，尝试匹配游戏名
+    if let Some(ref gname) = game_name
+        && let Ok(entries) = std::fs::read_dir(&base_dir)
+    {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let candidate = entry.path().join(gname);
+                if candidate.exists() {
+                    tracing::debug!("SteamCloudDocuments 目录扫描匹配: {}", candidate.display());
+                    if let Ok(mut cache) = STEAM_CLOUD_DOCS_CACHE.lock() {
+                        cache.insert(app_id, candidate.clone());
+                    }
+                    return Ok(candidate);
+                }
+            }
+        }
+    }
+
+    // 无法匹配完整路径，返回基础目录
+    Ok(base_dir)
+}
+
+// 从 appmanifest 获取游戏显示名称
+fn get_game_name_from_manifest(steam_path: &Path, app_id: u32) -> Option<String> {
+    let libraries = crate::game_scanner::discover_library_steamapps(steam_path);
+
+    for steamapps in libraries.iter() {
+        let manifest_path = steamapps.join(format!("appmanifest_{}.acf", app_id));
+        if let Ok(content) = std::fs::read_to_string(&manifest_path) {
+            for line in content.lines() {
+                if line.contains("\"name\"")
+                    && let Some(name) = line.split('"').nth(3)
+                {
+                    return Some(name.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 // 收集本地存档路径（使用根基础路径）
