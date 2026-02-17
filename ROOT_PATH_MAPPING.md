@@ -7,10 +7,32 @@
 
 ## 为什么需要这个映射表
 
-| 配置位置                      | 使用的标识 | 示例              |
-| ----------------------------- | ---------- | ----------------- |
-| Steamworks 后台 / appinfo.vdf | 字符串名称 | `WinAppDataLocal` |
-| 本地 remotecache.vdf          | 数字 ID    | `4`               |
+### 标识符差异对比
+
+**1. Steamworks 配置 (appinfo.vdf)**
+使用**字符串名称**定义根路径：
+
+```vdf
+"savefiles"
+{
+    "0"
+    {
+        "root"      "WinAppDataLocal"  // <--- 字符串标识
+        "path"      "MyGame/Saves"
+    }
+}
+```
+
+**2. 本地同步记录 (remotecache.vdf)**
+使用**数字 ID** 记录文件位置：
+
+```vdf
+"MyGame/Saves/save.dat"
+{
+    "root"      "3"                    // <--- 数字标识
+    "size"      "1024"
+}
+```
 
 本工具的"跳转到本地文件"功能需要将 remotecache.vdf 中的数字 Root ID 转换为实际的文件系统路径。官方未公开它们的对应关系，本文档通过实际游戏验证建立这个映射。
 
@@ -22,57 +44,58 @@
 
 ### 官方公开的 Root 名称
 
-| Root 名称               | 平台    | 路径                               |
-| ----------------------- | ------- | ---------------------------------- |
-| `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\` |
-| `SteamCloudDocuments`   | All     | 平台特定路径（见下方说明）         |
-| `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`      |
-| `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`     |
-| `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`  |
-| `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`   |
-| `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`       |
-| `WindowsHome`           | Windows | `%USERPROFILE%\`                   |
-| `MacHome`               | macOS   | `~/`                               |
-| `MacAppSupport`         | macOS   | `~/Library/Application Support/`   |
-| `MacDocuments`          | macOS   | `~/Documents/`                     |
-| `LinuxHome`             | Linux   | `~/`                               |
-| `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                  |
-| `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                |
-| `AndroidExternalData`   | Android | `Android/data/<package>/files/`    |
+| Root 名称               | 平台    | 路径                                        |
+| ----------------------- | ------- | ------------------------------------------- |
+| `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\`          |
+| `SteamCloudDocuments`   | All     | [见下方说明](#steamclouddocuments-路径说明) |
+| `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`               |
+| `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`              |
+| `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`           |
+| `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`            |
+| `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`                |
+| `WindowsHome`           | Windows | `%USERPROFILE%\`                            |
+| `MacHome`               | macOS   | `~/`                                        |
+| `MacAppSupport`         | macOS   | `~/Library/Application Support/`            |
+| `MacDocuments`          | macOS   | `~/Documents/`                              |
+| `LinuxHome`             | Linux   | `~/`                                        |
+| `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                           |
+| `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                         |
+| `AndroidExternalData`   | Android | `Android/data/<package>/files/`             |
 
 ### 数字 Root ID 映射
 
 > **注意**：数字 Root ID 与字符串名称的对应关系**官方未公开**，以下通过自定义 UFS 注入测试验证。
 
-| Root ID | Root 名称 (Steamworks) | 典型路径示例 (Win / Mac / Linux) |
-| :-----: | --------------------------- | ----------------------------------- |
-|  **0**  | `SteamCloudDocuments` (API) | `{Steam}/userdata/{UID}/{AppID}/remote/` |
-| **1** | `GameInstall` | `{SteamInstall}/steamapps/common/{Game}/` |
-| **2** | `WinMyDocuments` | Win: `%USERPROFILE%\Documents\` |
-| **3** | `WinAppDataLocal` | Win: `%LOCALAPPDATA%\` |
-| **4** | `WinAppDataRoaming` | Win: `%APPDATA%\` |
-| **5** | （未知） | - |
-| **6** | `MacHome` | Mac: `~/` |
-| **7** | `MacAppSupport` | Mac: `~/Library/Application Support/` |
-| **8** | `MacDocuments` | Mac: `~/Documents/` |
-| **9** | `WinSavedGames` | Win: `%USERPROFILE%\Saved Games\` |
-| **10** | （未知） | - |
-| **11** | `SteamCloudDocuments` | Win: `%USERPROFILE%\Documents\Steam Cloud\` <br> Mac: `~/Documents/Steam Cloud/` |
-| **12** | `WinAppDataLocalLow` | Win: `%LOCALAPPDATA%Low\` |
-| **13** | （未知） | - |
-| **14** | `LinuxHome` | Linux: `~/` |
-| **15** | `LinuxXdgDataHome` | Linux: `$XDG_DATA_HOME/` (默认 `~/.local/share/`) |
-| **16** | `LinuxXdgConfigHome` | Linux: `$XDG_CONFIG_HOME/` (默认 `~/.config/`) |
-| **17** | （未知） | - |
-| **18** | `WindowsHome` | Win: `%USERPROFILE%\` |
-| **?** | `AndroidExternalData` | Android: `Android/data/<package>/files/` |
+| Root ID | Root 名称 (Steamworks)      | 路径示例                                    |
+| :-----: | --------------------------- | ------------------------------------------- |
+|  **0**  | `SteamCloudDocuments` (API) | `{Steam}/userdata/{UID}/{AppID}/remote/`    |
+|  **1**  | `GameInstall`               | `{SteamInstall}/steamapps/common/{Game}/`   |
+|  **2**  | `WinMyDocuments`            | Win: `%USERPROFILE%\Documents\`             |
+|  **3**  | `WinAppDataLocal`           | Win: `%LOCALAPPDATA%\`                      |
+|  **4**  | `WinAppDataRoaming`         | Win: `%APPDATA%\`                           |
+|  **5**  | （未知）                    | -                                           |
+|  **6**  | `MacHome`                   | Mac: `~/`                                   |
+|  **7**  | `MacAppSupport`             | Mac: `~/Library/Application Support/`       |
+|  **8**  | `MacDocuments`              | Mac: `~/Documents/`                         |
+|  **9**  | `WinSavedGames`             | Win: `%USERPROFILE%\Saved Games\`           |
+| **10**  | （未知）                    | -                                           |
+| **11**  | `SteamCloudDocuments`       | [见下方说明](#steamclouddocuments-路径说明) |
+| **12**  | `WinAppDataLocalLow`        | Win: `%LOCALAPPDATA%Low\`                   |
+| **13**  | （未知）                    | -                                           |
+| **14**  | `LinuxHome`                 | Linux: `~/`                                 |
+| **15**  | `LinuxXdgDataHome`          | Linux: `$XDG_DATA_HOME/`                    |
+| **16**  | `LinuxXdgConfigHome`        | Linux: `$XDG_CONFIG_HOME/`                  |
+| **17**  | （未知）                    | -                                           |
+| **18**  | `WindowsHome`               | Win: `%USERPROFILE%\`                       |
+|  **?**  | `AndroidExternalData`       | Android: `Android/data/<package>/files/`    |
 
 ### 跨平台映射说明
 
 **Root ID 在不同系统上的表现**：
-*   **Root ID 代表逻辑位置**：例如 Root 2 始终代表 "Windows 我的文档"。
-*   **平台特异性**：某些 Root ID 仅在特定平台有效（如 `Win...` 在 Windows，`Mac...` 在 macOS）。
-*   **跨平台同步**：如果游戏在 Windows 上使用了 Root 2 (`WinMyDocuments`) 存储存档，而在 macOS 上希望同步到 `~/Documents` (Root 8)，开发者需要在 Steamworks 的 **Root Overrides** 中配置映射规则（例如：将 Windows 下的 Root 2 映射为 macOS 下的 Root 8）。若未配置 Override，Steam 在不支持该 Root 的平台上可能会忽略这些文件或尝试使用默认回退路径。
+
+- **Root ID 代表逻辑位置**：例如 Root 2 始终代表 "Windows 我的文档"。
+- **平台特异性**：某些 Root ID 仅在特定平台有效（如 `Win...` 在 Windows，`Mac...` 在 macOS）。
+- **跨平台同步**：如果游戏在 Windows 上使用了 Root 2 (`WinMyDocuments`) 存储存档，而在 macOS 上希望同步到 `~/Documents` (Root 8)，开发者需要在 Steamworks 的 **Root Overrides** 中配置映射规则（例如：将 Windows 下的 Root 2 映射为 macOS 下的 Root 8）。若未配置 Override，Steam 在不支持该 Root 的平台上可能会忽略这些文件或尝试使用默认回退路径。
 
 ### Windows 环境变量
 
