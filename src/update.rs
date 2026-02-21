@@ -130,7 +130,7 @@ impl UpdateManager {
     }
 
     // 检查更新
-    pub fn check_update(&mut self) -> Result<()> {
+    pub fn check_update(&mut self, i18n: &crate::i18n::I18n) -> Result<()> {
         self.status = UpdateStatus::Checking;
         tracing::debug!("检查更新...");
 
@@ -153,7 +153,7 @@ impl UpdateManager {
                 Ok(())
             }
             Err(e) => {
-                let err_msg = format!("检查更新失败: {}", e);
+                let err_msg = i18n.check_update_failed(&e.to_string());
                 tracing::error!("{}", err_msg);
                 self.status = UpdateStatus::Error(err_msg.clone());
                 Err(anyhow!(err_msg))
@@ -261,7 +261,7 @@ impl UpdateManager {
             .call()
             .map_err(|e| {
                 tracing::error!("HTTP 请求失败: {}", e);
-                format!("下载失败: {}", e)
+                format!("Download failed: {}", e)
             })?;
 
         let mut file = fs::File::create(&download_path).map_err(|e| e.to_string())?;
@@ -281,7 +281,7 @@ impl UpdateManager {
                     use std::io::Write;
                     file.write_all(&buffer[..n]).map_err(|e| {
                         tracing::error!("写入文件失败: {}", e);
-                        format!("写入文件失败: {}", e)
+                        format!("Write file failed: {}", e)
                     })?;
 
                     downloaded += n as u64;
@@ -301,7 +301,7 @@ impl UpdateManager {
                 }
                 Err(e) => {
                     tracing::error!("读取数据失败: {}", e);
-                    return Err(format!("读取数据失败: {}", e));
+                    return Err(format!("Read data failed: {}", e));
                 }
             }
         }

@@ -181,30 +181,26 @@ impl FileComparison {
         }
     }
 
-    pub fn status_display(&self) -> String {
+    pub fn status_display(&self, i18n: &crate::i18n::I18n) -> String {
         match self.status {
-            SyncStatus::Synced => format!("{} 已同步", crate::icons::CHECK),
-            SyncStatus::LocalNewer => {
-                format!("{} 本地较新", crate::icons::ARROW_UP)
-            }
-            SyncStatus::CloudNewer => {
-                format!("{} 云端较新", crate::icons::ARROW_DOWN)
-            }
-            SyncStatus::Conflict => format!("{} 冲突", crate::icons::WARNING),
-            SyncStatus::LocalOnly => format!("{} 仅本地", crate::icons::FILE),
-            SyncStatus::CloudOnly => format!("{} 仅云端", crate::icons::CLOUD),
-            SyncStatus::Unknown => format!("{} 检测中", crate::icons::QUESTION),
+            SyncStatus::Synced => i18n.sync_status_synced(),
+            SyncStatus::LocalNewer => i18n.sync_status_local_newer(),
+            SyncStatus::CloudNewer => i18n.sync_status_cloud_newer(),
+            SyncStatus::Conflict => i18n.sync_status_conflict(),
+            SyncStatus::LocalOnly => i18n.sync_status_local_only(),
+            SyncStatus::CloudOnly => i18n.sync_status_cloud_only(),
+            SyncStatus::Unknown => i18n.sync_status_unknown(),
         }
     }
 
-    pub fn hash_status_display(&self) -> String {
+    pub fn hash_status_display(&self, i18n: &crate::i18n::I18n) -> String {
         match self.hash_status {
-            HashStatus::Pending => format!("{} 等待", crate::icons::HOURGLASS),
-            HashStatus::Skipped => format!("{} 已跳过", crate::icons::CHECK),
-            HashStatus::Checking => format!("{} 检测中", crate::icons::SPINNER),
-            HashStatus::Match => format!("{} 一致", crate::icons::CHECK),
-            HashStatus::Mismatch => format!("{} 不一致", crate::icons::ERROR),
-            HashStatus::Error => format!("{} 错误", crate::icons::WARNING),
+            HashStatus::Pending => i18n.hash_status_pending(),
+            HashStatus::Skipped => i18n.hash_status_skipped(),
+            HashStatus::Checking => i18n.hash_status_checking(),
+            HashStatus::Match => i18n.hash_status_match(),
+            HashStatus::Mismatch => i18n.hash_status_mismatch(),
+            HashStatus::Error => i18n.hash_status_error(),
         }
     }
 }
@@ -569,7 +565,7 @@ fn check_file_hash(task: &HashCheckTask) -> HashCheckResult {
         match calculate_file_hash(path) {
             Ok(hash) => result.local_hash = Some(hash),
             Err(e) => {
-                result.error = Some(format!("本地文件 hash 计算失败: {}", e));
+                result.error = Some(format!("Local file hash error: {}", e));
                 return result;
             }
         }
@@ -580,7 +576,7 @@ fn check_file_hash(task: &HashCheckTask) -> HashCheckResult {
         match download_and_hash(url) {
             Ok(hash) => result.cloud_hash = Some(hash),
             Err(e) => {
-                result.error = Some(format!("云端文件 hash 计算失败: {}", e));
+                result.error = Some(format!("Cloud file hash error: {}", e));
             }
         }
     }
@@ -602,13 +598,13 @@ fn download_and_hash(url: &str) -> Result<String, String> {
     let resp = ureq::get(url)
         .header("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
         .call()
-        .map_err(|e| format!("下载失败: {}", e))?;
+        .map_err(|e| format!("Download failed: {}", e))?;
 
     let mut data = Vec::new();
     resp.into_body()
         .into_reader()
         .read_to_end(&mut data)
-        .map_err(|e| format!("读取失败: {}", e))?;
+        .map_err(|e| format!("Read failed: {}", e))?;
 
     let mut hasher = Sha1::new();
     hasher.update(&data);

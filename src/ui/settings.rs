@@ -365,7 +365,7 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
             ui.add_sized(
                 [w, 24.0],
                 egui::TextEdit::singleline(&mut state.steam_path_input)
-                    .hint_text("Steam 安装路径")
+                    .hint_text(i18n.steam_path_hint_text())
                     .interactive(false),
             );
         });
@@ -654,7 +654,7 @@ fn draw_about_content(
             .add_enabled(!checking, egui::Button::new(button_text))
             .clicked()
         {
-            let _ = update_manager.check_update();
+            let _ = update_manager.check_update(i18n);
         }
 
         // 更新状态显示

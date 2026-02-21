@@ -74,7 +74,7 @@ impl AppHandlers {
         connection.reset();
         file_list.clear();
         misc.quota_info = None;
-        misc.status_message = "已断开连接".to_string();
+        misc.status_message = misc.i18n.disconnected().to_string();
     }
 
     pub fn refresh_files(
@@ -294,7 +294,8 @@ impl AppHandlers {
         use crate::file_manager::FileOperationResult;
 
         let file_ops = crate::file_manager::FileOperations::new(self.steam_manager.clone());
-        let result = file_ops.forget_by_indices(&file_list.files, &file_list.selected_files);
+        let result =
+            file_ops.forget_by_indices(&file_list.files, &file_list.selected_files, &misc.i18n);
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
@@ -323,6 +324,7 @@ impl AppHandlers {
             &file_list.files,
             &file_list.selected_files,
             &file_list.local_save_paths,
+            &misc.i18n,
         );
 
         match result {
@@ -352,6 +354,7 @@ impl AppHandlers {
             &file_list.files,
             &file_list.selected_files,
             &file_list.local_save_paths,
+            &misc.i18n,
         );
 
         match result {
@@ -948,6 +951,7 @@ impl AppHandlers {
         &self,
         result: Result<std::path::PathBuf, String>,
         update_manager: &mut crate::update::UpdateManager,
+        i18n: &crate::i18n::I18n,
     ) {
         match result {
             Ok(download_path) => {
@@ -955,12 +959,12 @@ impl AppHandlers {
 
                 // 三平台统一使用自动安装
                 if let Err(e) = update_manager.install_downloaded_update(&download_path) {
-                    update_manager.set_error(format!("安装失败: {}\n\n请手动下载更新", e));
+                    update_manager.set_error(i18n.error_install_failed(&e.to_string()));
                 }
             }
             Err(err) => {
                 tracing::error!("下载失败: {}", err);
-                update_manager.set_error(format!("下载失败: {}\n\n请手动下载更新", err));
+                update_manager.set_error(i18n.error_download_failed(&err));
             }
         }
     }

@@ -118,51 +118,26 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Optio
                 }
 
                 // 文件信息
-                let file_info = match i18n.language() {
-                    crate::i18n::Language::Chinese => format!(
-                        "{} 个文件 | {}",
-                        game.file_count,
-                        crate::file_manager::format_size(game.total_size)
-                    ),
-                    crate::i18n::Language::English => format!(
-                        "{} file{} | {}",
-                        game.file_count,
-                        if game.file_count != 1 { "s" } else { "" },
-                        crate::file_manager::format_size(game.total_size)
-                    ),
-                };
+                let file_info = i18n.game_file_info(
+                    game.file_count,
+                    &crate::file_manager::format_size(game.total_size),
+                );
                 ui.label(file_info);
 
                 // 安装目录
                 if let Some(dir) = &game.install_dir {
-                    let label = match i18n.language() {
-                        crate::i18n::Language::Chinese => format!("安装目录: {}", dir),
-                        crate::i18n::Language::English => format!("Install dir: {}", dir),
-                    };
-                    ui.label(label);
+                    ui.label(i18n.install_dir_label(dir));
                 }
 
                 // 标签
                 if !game.categories.is_empty() {
-                    let label = match i18n.language() {
-                        crate::i18n::Language::Chinese => {
-                            format!("标签: {}", game.categories.join(", "))
-                        }
-                        crate::i18n::Language::English => {
-                            format!("Tags: {}", game.categories.join(", "))
-                        }
-                    };
-                    ui.label(label);
+                    ui.label(i18n.tags_label(&game.categories.join(", ")));
                 }
 
                 // 游戏时间
                 if let Some(playtime) = game.playtime {
                     let hours = playtime as f64 / 60.0;
-                    let label = match i18n.language() {
-                        crate::i18n::Language::Chinese => format!("游戏时间: {:.2} 小时", hours),
-                        crate::i18n::Language::English => format!("Playtime: {:.2} hours", hours),
-                    };
-                    ui.label(label);
+                    ui.label(i18n.playtime_label(hours));
                 }
 
                 // 最后运行时间
@@ -173,25 +148,13 @@ fn draw_game_item(ui: &mut egui::Ui, game: &CloudGameInfo, i18n: &I18n) -> Optio
                     use std::time::{Duration, UNIX_EPOCH};
                     let dt = UNIX_EPOCH + Duration::from_secs(last_played as u64);
                     let local: DateTime<Local> = dt.into();
-                    let label = match i18n.language() {
-                        crate::i18n::Language::Chinese => {
-                            format!("最后运行: {}", local.format("%Y-%m-%d %H:%M"))
-                        }
-                        crate::i18n::Language::English => {
-                            format!("Last played: {}", local.format("%Y-%m-%d %H:%M"))
-                        }
-                    };
-                    ui.label(label);
+                    ui.label(i18n.last_played_label(&local.format("%Y-%m-%d %H:%M").to_string()));
                 }
             });
 
             // 选择按钮
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let button_text = match i18n.language() {
-                    crate::i18n::Language::Chinese => "选择",
-                    crate::i18n::Language::English => "Select",
-                };
-                if ui.button(button_text).clicked() {
+                if ui.button(i18n.select_button()).clicked() {
                     clicked = true;
                 }
             });

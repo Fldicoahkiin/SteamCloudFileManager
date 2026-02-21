@@ -436,7 +436,7 @@ fn render_detail_panel(
 
         ui.horizontal(|ui| {
             ui.label(i18n.status_label());
-            ui.label(comparison.status_display());
+            ui.label(comparison.status_display(i18n));
 
             let time_diff_minutes = comparison.time_diff_secs / 60;
             if time_diff_minutes != 0 {
@@ -452,11 +452,11 @@ fn render_detail_panel(
         // 显示大小差异
         if comparison.size_diff_bytes != 0 {
             ui.horizontal(|ui| {
-                ui.label("大小差异:");
+                ui.label(i18n.size_diff_label());
                 let size_text = if comparison.size_diff_bytes > 0 {
-                    format!("本地大 {} bytes", comparison.size_diff_bytes)
+                    i18n.local_larger_bytes(comparison.size_diff_bytes)
                 } else {
-                    format!("云端大 {} bytes", -comparison.size_diff_bytes)
+                    i18n.cloud_larger_bytes(-comparison.size_diff_bytes)
                 };
                 ui.label(size_text);
             });
@@ -466,30 +466,30 @@ fn render_detail_panel(
         let flags = &comparison.diff_flags;
         if flags.exists_diff || flags.persisted_diff || flags.size_diff || flags.time_diff {
             ui.horizontal(|ui| {
-                ui.label("差异项:");
+                ui.label(i18n.diff_items_label());
                 if flags.exists_diff {
-                    ui.colored_label(crate::ui::theme::error_color(ui.ctx()), "存在");
+                    ui.colored_label(crate::ui::theme::error_color(ui.ctx()), i18n.diff_exists());
                 }
                 if flags.persisted_diff {
-                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), "同步");
+                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), i18n.diff_sync());
                 }
                 if flags.size_diff {
-                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), "大小");
+                    ui.colored_label(crate::ui::theme::warning_color(ui.ctx()), i18n.diff_size());
                 }
                 if flags.time_diff {
-                    ui.colored_label(crate::ui::theme::info_color(ui.ctx()), "时间");
+                    ui.colored_label(crate::ui::theme::info_color(ui.ctx()), i18n.diff_time());
                 }
             });
         }
 
         // 显示 hash 信息
         ui.horizontal(|ui| {
-            ui.label("Hash 状态:");
-            ui.label(comparison.hash_status_display());
+            ui.label(i18n.hash_status_label());
+            ui.label(comparison.hash_status_display(i18n));
             // 重新检测按钮
             if ui
                 .small_button(icons::REFRESH)
-                .on_hover_text("重新检测 Hash")
+                .on_hover_text(i18n.retry_hash_check())
                 .clicked()
             {
                 retry_filename = Some(comparison.filename.clone());
@@ -499,21 +499,27 @@ fn render_detail_panel(
         // 分别显示本地和云端 hash
         if let Some(ref local) = comparison.local {
             ui.horizontal(|ui| {
-                ui.label("本地 Hash:");
+                ui.label(i18n.local_hash_label());
                 if let Some(ref hash) = local.hash {
                     ui.monospace(hash);
                 } else {
-                    ui.colored_label(crate::ui::theme::muted_color(ui.ctx()), "未计算");
+                    ui.colored_label(
+                        crate::ui::theme::muted_color(ui.ctx()),
+                        i18n.not_calculated(),
+                    );
                 }
             });
         }
         if let Some(ref cloud) = comparison.cloud {
             ui.horizontal(|ui| {
-                ui.label("云端 Hash:");
+                ui.label(i18n.cloud_hash_label());
                 if let Some(ref hash) = cloud.hash {
                     ui.monospace(hash);
                 } else {
-                    ui.colored_label(crate::ui::theme::muted_color(ui.ctx()), "未计算");
+                    ui.colored_label(
+                        crate::ui::theme::muted_color(ui.ctx()),
+                        i18n.not_calculated(),
+                    );
                 }
             });
         }

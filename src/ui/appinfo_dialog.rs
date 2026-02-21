@@ -78,6 +78,7 @@ pub struct AppInfoDialog {
 
     // 状态
     pub inject_status: Option<String>,
+    pub inject_status_is_success: bool,
     pub game_config: Option<UfsGameConfig>,
     pub active_tab: usize,
 }
@@ -129,6 +130,7 @@ impl AppInfoDialog {
             temp_use_path_transform: false,
             temp_path_transform_find: String::new(),
             inject_status: None,
+            inject_status_is_success: false,
             game_config,
             active_tab: 0,
         }
@@ -834,16 +836,10 @@ pub fn draw_appinfo_dialog(
                     // 显示注入状态
                     if let Some(status) = &dialog.inject_status {
                         ui.add_space(4.0);
-                        let color = if status.contains("成功")
-                            || status.contains("Success")
-                            || status.contains("Saved")
-                            || status.contains("Cleared")
-                        {
+                        let color = if dialog.inject_status_is_success {
                             egui::Color32::GREEN
-                        } else if status.contains("error") || status.contains("Error") {
-                            egui::Color32::RED
                         } else {
-                            egui::Color32::YELLOW
+                            egui::Color32::RED
                         };
                         ui.label(egui::RichText::new(status).color(color));
                     }

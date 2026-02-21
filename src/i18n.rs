@@ -2323,4 +2323,542 @@ impl I18n {
             Language::English => format!("Clear error: {}", error),
         }
     }
+
+    // ========== 错误弹窗消息 ==========
+
+    pub fn error_get_appinfo(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("无法获取 appinfo: {}", error),
+            Language::English => format!("Failed to get appinfo: {}", error),
+        }
+    }
+
+    pub fn error_vdf_parser_init(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("VDF 解析器初始化失败: {}", error),
+            Language::English => format!("VDF parser init failed: {}", error),
+        }
+    }
+
+    pub fn error_load_timeout(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "加载超时，请重试",
+            Language::English => "Loading timed out, please retry",
+        }
+    }
+
+    pub fn disconnected(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "已断开连接",
+            Language::English => "Disconnected",
+        }
+    }
+
+    pub fn error_install_failed(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("安装失败: {}\n\n请手动下载更新", error),
+            Language::English => format!("Install failed: {}\n\nPlease download manually", error),
+        }
+    }
+
+    pub fn error_download_failed(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("下载失败: {}\n\n请手动下载更新", error),
+            Language::English => format!("Download failed: {}\n\nPlease download manually", error),
+        }
+    }
+
+    // ========== 文件操作结果消息 ==========
+
+    pub fn error_select_files_to_forget(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "请选择要移出云端的文件",
+            Language::English => "Please select files to forget",
+        }
+    }
+
+    pub fn error_local_only_no_forget(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("所选 {} 个文件仅存在于本地，云端无记录，无需移出", count),
+            Language::English => format!(
+                "Selected {} file{} only exist locally, no cloud record to forget",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn forgotten_files(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("已移出云端 {} 个文件", count),
+            Language::English => format!(
+                "Removed {} file{} from cloud",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn ufs_forget_failed(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!(
+                "{} 个自动云同步文件无法通过 API 移出，请尝试使用「删除」功能",
+                count
+            ),
+            Language::English => format!(
+                "{} auto-cloud file{} cannot be removed via API, try \"Delete\" instead",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn forget_failed_files(&self, count: usize, names: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 个文件移出失败: {}", count, names),
+            Language::English => format!(
+                "{} file{} failed to forget: {}",
+                count,
+                if count != 1 { "s" } else { "" },
+                names
+            ),
+        }
+    }
+
+    pub fn skipped_local_only_files(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("跳过 {} 个本地独有文件", count),
+            Language::English => format!(
+                "Skipped {} local-only file{}",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn no_files_forgotten(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "没有文件被移出云端",
+            Language::English => "No files were removed from cloud",
+        }
+    }
+
+    pub fn error_select_files_to_delete(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "请选择要删除的文件",
+            Language::English => "Please select files to delete",
+        }
+    }
+
+    pub fn deleted_files(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("已删除 {} 个文件", count),
+            Language::English => format!(
+                "Deleted {} file{}",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn ufs_cloud_sync_hint(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => {
+                "自动云同步文件的云端副本将在 Steam 同步后自动删除，请稍后刷新确认"
+            }
+            Language::English => {
+                "Cloud copies of auto-sync files will be removed after Steam syncs, please refresh later"
+            }
+        }
+    }
+
+    pub fn ufs_delete_failed(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!(
+                "{} 个自动云同步文件无法删除（游戏未安装且 API 不支持，请安装游戏后重试）",
+                count
+            ),
+            Language::English => format!(
+                "{} auto-cloud file{} cannot be deleted (game not installed, please install and retry)",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn delete_failed_files(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 个文件删除失败", count),
+            Language::English => format!(
+                "{} file{} failed to delete",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn no_files_deleted(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "没有文件被删除",
+            Language::English => "No files were deleted",
+        }
+    }
+
+    pub fn error_select_files_to_sync(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "请选择要同步的文件",
+            Language::English => "Please select files to sync",
+        }
+    }
+
+    pub fn synced_files_to_cloud(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("已同步 {} 个文件到云端", count),
+            Language::English => format!(
+                "Synced {} file{} to cloud",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn all_files_in_cloud(&self, count: usize) -> String {
+        match self.lang {
+            Language::Chinese => format!("所有 {} 个文件已在云端，无需同步", count),
+            Language::English => format!(
+                "All {} file{} already in cloud, no sync needed",
+                count,
+                if count != 1 { "s" } else { "" }
+            ),
+        }
+    }
+
+    pub fn no_files_synced(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "没有文件被同步",
+            Language::English => "No files were synced",
+        }
+    }
+
+    pub fn partial_sync_failed(&self, names: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("部分文件同步失败: {}", names),
+            Language::English => format!("Some files failed to sync: {}", names),
+        }
+    }
+
+    // ========== 同步状态显示 ==========
+
+    pub fn sync_status_synced(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 已同步", crate::icons::CHECK),
+            Language::English => format!("{} Synced", crate::icons::CHECK),
+        }
+    }
+
+    pub fn sync_status_local_newer(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 本地较新", crate::icons::ARROW_UP),
+            Language::English => format!("{} Local Newer", crate::icons::ARROW_UP),
+        }
+    }
+
+    pub fn sync_status_cloud_newer(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 云端较新", crate::icons::ARROW_DOWN),
+            Language::English => format!("{} Cloud Newer", crate::icons::ARROW_DOWN),
+        }
+    }
+
+    pub fn sync_status_conflict(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 冲突", crate::icons::WARNING),
+            Language::English => format!("{} Conflict", crate::icons::WARNING),
+        }
+    }
+
+    pub fn sync_status_local_only(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 仅本地", crate::icons::FILE),
+            Language::English => format!("{} Local Only", crate::icons::FILE),
+        }
+    }
+
+    pub fn sync_status_cloud_only(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 仅云端", crate::icons::CLOUD),
+            Language::English => format!("{} Cloud Only", crate::icons::CLOUD),
+        }
+    }
+
+    pub fn sync_status_unknown(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 检测中", crate::icons::QUESTION),
+            Language::English => format!("{} Checking", crate::icons::QUESTION),
+        }
+    }
+
+    // ========== Hash 状态显示 ==========
+
+    pub fn hash_status_pending(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 等待", crate::icons::HOURGLASS),
+            Language::English => format!("{} Pending", crate::icons::HOURGLASS),
+        }
+    }
+
+    pub fn hash_status_skipped(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 已跳过", crate::icons::CHECK),
+            Language::English => format!("{} Skipped", crate::icons::CHECK),
+        }
+    }
+
+    pub fn hash_status_checking(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 检测中", crate::icons::SPINNER),
+            Language::English => format!("{} Checking", crate::icons::SPINNER),
+        }
+    }
+
+    pub fn hash_status_match(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 一致", crate::icons::CHECK),
+            Language::English => format!("{} Match", crate::icons::CHECK),
+        }
+    }
+
+    pub fn hash_status_mismatch(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 不一致", crate::icons::ERROR),
+            Language::English => format!("{} Mismatch", crate::icons::ERROR),
+        }
+    }
+
+    pub fn hash_status_error(&self) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 错误", crate::icons::WARNING),
+            Language::English => format!("{} Error", crate::icons::WARNING),
+        }
+    }
+
+    // ========== 文件对比对话框详细文本 ==========
+
+    pub fn size_diff_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "大小差异:",
+            Language::English => "Size diff:",
+        }
+    }
+
+    pub fn local_larger_bytes(&self, bytes: i64) -> String {
+        match self.lang {
+            Language::Chinese => format!("本地大 {} bytes", bytes),
+            Language::English => format!("Local larger by {} bytes", bytes),
+        }
+    }
+
+    pub fn cloud_larger_bytes(&self, bytes: i64) -> String {
+        match self.lang {
+            Language::Chinese => format!("云端大 {} bytes", bytes),
+            Language::English => format!("Cloud larger by {} bytes", bytes),
+        }
+    }
+
+    pub fn diff_items_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "差异项:",
+            Language::English => "Differences:",
+        }
+    }
+
+    pub fn diff_exists(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "存在",
+            Language::English => "Exists",
+        }
+    }
+
+    pub fn diff_sync(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "同步",
+            Language::English => "Sync",
+        }
+    }
+
+    pub fn diff_size(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "大小",
+            Language::English => "Size",
+        }
+    }
+
+    pub fn diff_time(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "时间",
+            Language::English => "Time",
+        }
+    }
+
+    pub fn hash_status_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Hash 状态:",
+            Language::English => "Hash Status:",
+        }
+    }
+
+    pub fn retry_hash_check(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "重新检测 Hash",
+            Language::English => "Retry Hash Check",
+        }
+    }
+
+    pub fn local_hash_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "本地 Hash:",
+            Language::English => "Local Hash:",
+        }
+    }
+
+    pub fn cloud_hash_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云端 Hash:",
+            Language::English => "Cloud Hash:",
+        }
+    }
+
+    pub fn not_calculated(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "未计算",
+            Language::English => "Not calculated",
+        }
+    }
+
+    // ========== Symlink 对话框 ==========
+
+    pub fn error_delete_config(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("删除配置失败: {}", error),
+            Language::English => format!("Failed to delete config: {}", error),
+        }
+    }
+
+    pub fn remote_dir_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Remote 目录:",
+            Language::English => "Remote Dir:",
+        }
+    }
+
+    pub fn copy_path(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "复制路径",
+            Language::English => "Copy Path",
+        }
+    }
+
+    pub fn symlink_conflict_label(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "冲突",
+            Language::English => "Conflict",
+        }
+    }
+
+    // ========== Settings 对话框 ==========
+
+    pub fn steam_path_hint_text(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "Steam 安装路径",
+            Language::English => "Steam Install Path",
+        }
+    }
+
+    // ========== 状态面板 ==========
+
+    pub fn cloud_status_not_ready(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "云存储状态: 未就绪",
+            Language::English => "Cloud Status: Not Ready",
+        }
+    }
+
+    // ========== 游戏选择器详情 ==========
+
+    pub fn game_file_info(&self, count: usize, size: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("{} 个文件 | {}", count, size),
+            Language::English => format!(
+                "{} file{} | {}",
+                count,
+                if count != 1 { "s" } else { "" },
+                size
+            ),
+        }
+    }
+
+    pub fn install_dir_label(&self, dir: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("安装目录: {}", dir),
+            Language::English => format!("Install dir: {}", dir),
+        }
+    }
+
+    pub fn tags_label(&self, tags: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("标签: {}", tags),
+            Language::English => format!("Tags: {}", tags),
+        }
+    }
+
+    pub fn playtime_label(&self, hours: f64) -> String {
+        match self.lang {
+            Language::Chinese => format!("游戏时间: {:.2} 小时", hours),
+            Language::English => format!("Playtime: {:.2} hours", hours),
+        }
+    }
+
+    pub fn last_played_label(&self, time: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("最后运行: {}", time),
+            Language::English => format!("Last played: {}", time),
+        }
+    }
+
+    pub fn select_button(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "选择",
+            Language::English => "Select",
+        }
+    }
+
+    pub fn check_update_failed(&self, error: &str) -> String {
+        match self.lang {
+            Language::Chinese => format!("检查更新失败: {}", error),
+            Language::English => format!("Check update failed: {}", error),
+        }
+    }
+
+    // ========== 主题名称 ==========
+
+    pub fn theme_light(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "浅色",
+            Language::English => "Light",
+        }
+    }
+
+    pub fn theme_dark(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "深色",
+            Language::English => "Dark",
+        }
+    }
+
+    pub fn theme_system(&self) -> &'static str {
+        match self.lang {
+            Language::Chinese => "跟随系统",
+            Language::English => "System",
+        }
+    }
 }

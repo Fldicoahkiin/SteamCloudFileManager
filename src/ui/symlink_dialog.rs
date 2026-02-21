@@ -111,7 +111,7 @@ impl SymlinkDialog {
             && let Some(manager) = &self.manager
         {
             if let Err(e) = manager.remove_config(&id) {
-                message = Some((format!("删除配置失败: {}", e), true));
+                message = Some((i18n.error_delete_config(&e.to_string()), true));
             } else {
                 need_refresh = true;
                 message = Some((i18n.symlink_config_deleted().to_string(), false));
@@ -352,7 +352,7 @@ impl SymlinkDialog {
 
                 // Remote 目录路径
                 ui.horizontal(|ui| {
-                    ui.label(RichText::new("Remote 目录:").strong());
+                    ui.label(RichText::new(i18n.remote_dir_label()).strong());
                     ui.label(
                         RichText::new(remote_dir.to_string_lossy())
                             .size(11.0)
@@ -360,7 +360,7 @@ impl SymlinkDialog {
                     );
                     if ui
                         .small_button(icons::COPY)
-                        .on_hover_text("复制路径")
+                        .on_hover_text(i18n.copy_path())
                         .clicked()
                     {
                         ctx.copy_text(remote_dir.to_string_lossy().to_string());
@@ -457,9 +457,11 @@ impl SymlinkDialog {
                                                 }
                                                 LinkStatus::Conflict => {
                                                     ui.label(
-                                                        RichText::new("冲突").size(10.0).color(
-                                                            crate::ui::theme::error_color(ctx),
-                                                        ),
+                                                        RichText::new(
+                                                            i18n.symlink_conflict_label(),
+                                                        )
+                                                        .size(10.0)
+                                                        .color(crate::ui::theme::error_color(ctx)),
                                                     );
                                                 }
                                             }

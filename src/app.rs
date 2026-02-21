@@ -178,12 +178,13 @@ impl SteamCloudApp {
                         Some(crate::ui::AppInfoDialog::new(app_id, config));
                 }
                 Err(e) => {
-                    self.dialogs.show_error(&format!("无法获取 appinfo: {}", e));
+                    self.dialogs
+                        .show_error(&self.misc.i18n.error_get_appinfo(&e.to_string()));
                 }
             },
             Err(e) => {
                 self.dialogs
-                    .show_error(&format!("VDF 解析器初始化失败: {}", e));
+                    .show_error(&self.misc.i18n.error_vdf_parser_init(&e.to_string()));
             }
         }
     }
@@ -209,7 +210,7 @@ impl SteamCloudApp {
             }
             Err(e) => {
                 self.dialogs
-                    .show_error(&format!("VDF 解析器初始化失败: {}", e));
+                    .show_error(&self.misc.i18n.error_vdf_parser_init(&e.to_string()));
             }
         }
     }
@@ -247,6 +248,7 @@ impl SteamCloudApp {
 
             if game_config.savefiles.is_empty() && game_config.root_overrides.is_empty() {
                 dialog.inject_status = Some(self.misc.i18n.ufs_inject_empty().to_string());
+                dialog.inject_status_is_success = false;
                 return;
             }
 
@@ -257,17 +259,20 @@ impl SteamCloudApp {
                             game_config.savefiles.len(),
                             game_config.root_overrides.len(),
                         ));
+                        dialog.inject_status_is_success = true;
                         // 刷新配置显示
                         self.refresh_appinfo_config();
                     }
                     Err(e) => {
                         dialog.inject_status =
                             Some(self.misc.i18n.ufs_inject_error(&e.to_string()));
+                        dialog.inject_status_is_success = false;
                     }
                 },
                 Err(e) => {
                     dialog.inject_status =
                         Some(self.misc.i18n.ufs_writer_init_error(&e.to_string()));
+                    dialog.inject_status_is_success = false;
                 }
             }
         }
@@ -284,11 +289,13 @@ impl SteamCloudApp {
                         game_config.savefiles.len(),
                         game_config.root_overrides.len(),
                     ));
+                    dialog.inject_status_is_success = true;
                     dialog.game_config = Some(game_config);
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
                     dialog.inject_status = Some(self.misc.i18n.ufs_save_error(&e.to_string()));
+                    dialog.inject_status_is_success = false;
                 }
             }
         }
@@ -301,11 +308,13 @@ impl SteamCloudApp {
             match crate::config::remove_ufs_game_config(app_id) {
                 Ok(_) => {
                     dialog.inject_status = Some(self.misc.i18n.ufs_clear_success().to_string());
+                    dialog.inject_status_is_success = true;
                     dialog.game_config = None;
                     dialog.refresh_saved_configs();
                 }
                 Err(e) => {
                     dialog.inject_status = Some(self.misc.i18n.ufs_clear_error(&e.to_string()));
+                    dialog.inject_status_is_success = false;
                 }
             }
         }
@@ -446,8 +455,11 @@ impl SteamCloudApp {
 
         // 更新下载结果
         if let Some(result) = self.async_handlers.poll_update_download() {
-            self.handlers
-                .handle_update_download_result(result, &mut self.update_manager);
+            self.handlers.handle_update_download_result(
+                result,
+                &mut self.update_manager,
+                &self.misc.i18n,
+            );
         }
 
         // 备份进度
@@ -513,7 +525,7 @@ impl SteamCloudApp {
                 self.file_list.is_refreshing = false;
                 self.connection.remote_ready = true;
                 self.async_handlers.loader_rx = None;
-                self.misc.status_message = "加载超时，请重试".to_string();
+                self.misc.status_message = self.misc.i18n.error_load_timeout().to_string();
             }
         }
     }

@@ -137,7 +137,7 @@ where
     if let Err(e) = close_result {
         let error_msg = e.to_string();
         if error_msg.contains("MANUAL_OPERATION_REQUIRED") {
-            let _ = tx.send(RestartStatus::Error("自动关闭失败".to_string()));
+            let _ = tx.send(RestartStatus::Error("Auto close failed".to_string()));
         } else {
             let _ = tx.send(RestartStatus::Error(error_msg));
         }

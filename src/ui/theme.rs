@@ -20,17 +20,10 @@ impl ThemeMode {
 
     // 获取显示名称
     pub fn display_name(&self, i18n: &crate::i18n::I18n) -> &'static str {
-        match i18n.language() {
-            crate::i18n::Language::Chinese => match self {
-                ThemeMode::Light => "浅色",
-                ThemeMode::Dark => "深色",
-                ThemeMode::System => "跟随系统",
-            },
-            crate::i18n::Language::English => match self {
-                ThemeMode::Light => "Light",
-                ThemeMode::Dark => "Dark",
-                ThemeMode::System => "System",
-            },
+        match self {
+            ThemeMode::Light => i18n.theme_light(),
+            ThemeMode::Dark => i18n.theme_dark(),
+            ThemeMode::System => i18n.theme_system(),
         }
     }
 }

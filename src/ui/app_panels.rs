@@ -437,11 +437,7 @@ fn draw_complete_status_panel(
             draw_cloud_status(ui, state.account_enabled, state.app_enabled, i18n);
         } else {
             ui.horizontal(|ui| {
-                let text = match i18n.language() {
-                    crate::i18n::Language::Chinese => "云存储状态: 未就绪",
-                    crate::i18n::Language::English => "Cloud Status: Not Ready",
-                };
-                ui.label(text);
+                ui.label(i18n.cloud_status_not_ready());
             });
         }
     }

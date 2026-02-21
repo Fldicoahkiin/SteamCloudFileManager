@@ -572,9 +572,10 @@ impl FileOperations {
         &self,
         files: &[CloudFile],
         selected_files: &[usize],
+        i18n: &crate::i18n::I18n,
     ) -> FileOperationResult {
         if selected_files.is_empty() {
-            return FileOperationResult::Error("请选择要移出云端的文件".to_string());
+            return FileOperationResult::Error(i18n.error_select_files_to_forget().to_string());
         }
 
         // 分类文件
@@ -600,12 +601,11 @@ impl FileOperations {
         let has_any_cloud = !api_cloud_files.is_empty() || !ufs_cloud_files.is_empty();
         if !has_any_cloud {
             if skipped_local_only > 0 {
-                return FileOperationResult::Error(format!(
-                    "所选 {} 个文件仅存在于本地，云端无记录，无需移出",
-                    skipped_local_only
-                ));
+                return FileOperationResult::Error(
+                    i18n.error_local_only_no_forget(skipped_local_only),
+                );
             }
-            return FileOperationResult::Error("请选择要移出云端的文件".to_string());
+            return FileOperationResult::Error(i18n.error_select_files_to_forget().to_string());
         }
 
         let mut total_forgotten = 0;
@@ -644,27 +644,20 @@ impl FileOperations {
         let mut messages = Vec::new();
 
         if total_forgotten > 0 {
-            messages.push(format!("已移出云端 {} 个文件", total_forgotten));
+            messages.push(i18n.forgotten_files(total_forgotten));
         }
         if ufs_api_failed > 0 {
-            messages.push(format!(
-                "{} 个自动云同步文件无法通过 API 移出，请尝试使用「删除」功能",
-                ufs_api_failed
-            ));
+            messages.push(i18n.ufs_forget_failed(ufs_api_failed));
         }
         if !all_failed.is_empty() {
-            messages.push(format!(
-                "{} 个文件移出失败: {}",
-                all_failed.len(),
-                all_failed.join(", ")
-            ));
+            messages.push(i18n.forget_failed_files(all_failed.len(), &all_failed.join(", ")));
         }
         if skipped_local_only > 0 {
-            messages.push(format!("跳过 {} 个本地独有文件", skipped_local_only));
+            messages.push(i18n.skipped_local_only_files(skipped_local_only));
         }
 
         if messages.is_empty() {
-            return FileOperationResult::Error("没有文件被移出云端".to_string());
+            return FileOperationResult::Error(i18n.no_files_forgotten().to_string());
         }
 
         let msg = messages.join("，");
@@ -683,9 +676,10 @@ impl FileOperations {
         files: &[CloudFile],
         selected_files: &[usize],
         local_save_paths: &[(String, PathBuf)],
+        i18n: &crate::i18n::I18n,
     ) -> FileOperationResult {
         if selected_files.is_empty() {
-            return FileOperationResult::Error("请选择要删除的文件".to_string());
+            return FileOperationResult::Error(i18n.error_select_files_to_delete().to_string());
         }
 
         // 按 root 类型分类文件
@@ -934,26 +928,21 @@ impl FileOperations {
         let mut messages = Vec::new();
 
         if total_deleted > 0 {
-            messages.push(format!("已删除 {} 个文件", total_deleted));
+            messages.push(i18n.deleted_files(total_deleted));
         }
         // 通过删除本地文件触发云端同步删除，提醒等待
         if ufs_local_deleted > 0 {
-            messages.push(
-                "自动云同步文件的云端副本将在 Steam 同步后自动删除，请稍后刷新确认".to_string(),
-            );
+            messages.push(i18n.ufs_cloud_sync_hint().to_string());
         }
         if !ufs_failed.is_empty() {
-            messages.push(format!(
-                "{} 个自动云同步文件无法删除（游戏未安装且 API 不支持，请安装游戏后重试）",
-                ufs_failed.len()
-            ));
+            messages.push(i18n.ufs_delete_failed(ufs_failed.len()));
         }
         if !all_failed.is_empty() {
-            messages.push(format!("{} 个文件删除失败", all_failed.len()));
+            messages.push(i18n.delete_failed_files(all_failed.len()));
         }
 
         if messages.is_empty() {
-            return FileOperationResult::Error("没有文件被删除".to_string());
+            return FileOperationResult::Error(i18n.no_files_deleted().to_string());
         }
 
         let msg = messages.join("，");
@@ -972,9 +961,10 @@ impl FileOperations {
         files: &[CloudFile],
         selected_files: &[usize],
         local_save_paths: &[(String, PathBuf)],
+        i18n: &crate::i18n::I18n,
     ) -> FileOperationResult {
         if selected_files.is_empty() {
-            return FileOperationResult::Error("请选择要同步的文件".to_string());
+            return FileOperationResult::Error(i18n.error_select_files_to_sync().to_string());
         }
 
         let mut synced_count = 0;
@@ -1037,10 +1027,7 @@ impl FileOperations {
         }
 
         if !failed_files.is_empty() {
-            return FileOperationResult::Error(format!(
-                "部分文件同步失败: {}",
-                failed_files.join(", ")
-            ));
+            return FileOperationResult::Error(i18n.partial_sync_failed(&failed_files.join(", ")));
         }
 
         if synced_count > 0 {
@@ -1049,11 +1036,11 @@ impl FileOperations {
             {
                 tracing::warn!("触发云同步失败: {}", e);
             }
-            FileOperationResult::SuccessWithRefresh(format!("已同步 {} 个文件到云端", synced_count))
+            FileOperationResult::SuccessWithRefresh(i18n.synced_files_to_cloud(synced_count))
         } else if skipped_count > 0 {
-            FileOperationResult::Error(format!("所有 {} 个文件已在云端，无需同步", skipped_count))
+            FileOperationResult::Error(i18n.all_files_in_cloud(skipped_count))
         } else {
-            FileOperationResult::Error("没有文件被同步".to_string())
+            FileOperationResult::Error(i18n.no_files_synced().to_string())
         }
     }
 }
