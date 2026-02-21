@@ -656,8 +656,11 @@ fn get_steam_cloud_docs_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
         }
     }
 
-    // 无法匹配完整路径，返回基础目录
-    Ok(base_dir)
+    // 无法匹配游戏目录，返回错误避免误扫整个基础目录
+    Err(anyhow!(
+        "无法确定游戏 {} 的 SteamCloudDocuments 目录",
+        app_id
+    ))
 }
 
 // 从 appmanifest 获取游戏显示名称
