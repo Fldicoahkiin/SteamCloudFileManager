@@ -278,7 +278,7 @@ impl SteamCloudApp {
         if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
             let game_config = dialog.build_game_config();
 
-            match crate::config::save_ufs_game_config(game_config.clone()) {
+            match crate::config::save_ufs_game_config(&game_config) {
                 Ok(_) => {
                     dialog.inject_status = Some(self.misc.i18n.ufs_save_success(
                         game_config.savefiles.len(),

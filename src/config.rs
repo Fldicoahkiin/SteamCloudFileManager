@@ -24,10 +24,6 @@ pub struct AppConfig {
     // 软链接配置
     #[serde(default)]
     pub symlinks: Vec<SymlinkConfigEntry>,
-
-    // UFS 游戏配置（新版合并存储）
-    #[serde(default)]
-    pub ufs_configs: Vec<UfsGameConfig>,
 }
 
 // 软链接配置项
@@ -85,18 +81,13 @@ pub struct RootOverrideEntry {
                                // - 不勾选: 生成 addpath 字段，不生成 pathtransforms
 }
 
-// 游戏 UFS 完整配置（合并存储）
+// 游戏 UFS 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UfsGameConfig {
-    pub id: String,
     pub app_id: u32,
     pub savefiles: Vec<SaveFileEntry>,
     #[serde(default)]
     pub root_overrides: Vec<RootOverrideEntry>,
-    #[serde(default)]
-    pub created_at: i64,
-    #[serde(default)]
-    pub note: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -397,57 +388,43 @@ pub fn remove_symlink_config(id: &str) -> Result<()> {
 
 // ============== UFS 游戏配置管理函数 ==============
 
-// 获取所有 UFS 游戏配置
-pub fn get_ufs_game_configs() -> Vec<UfsGameConfig> {
-    get_config().ufs_configs
+// 获取 UFS 配置目录
+pub fn get_ufs_config_dir() -> Result<PathBuf> {
+    let dir = get_config_dir()?.join("ufs_configs");
+    if !dir.exists() {
+        std::fs::create_dir_all(&dir)?;
+    }
+    Ok(dir)
 }
 
 // 获取指定游戏的 UFS 配置
 pub fn get_ufs_game_config(app_id: u32) -> Option<UfsGameConfig> {
-    get_ufs_game_configs()
-        .into_iter()
-        .find(|c| c.app_id == app_id)
+    let dir = get_ufs_config_dir().ok()?;
+    let path = dir.join(format!("{}.json", app_id));
+    if !path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(&path).ok()?;
+    serde_json::from_str(&content).ok()
 }
 
 // 保存或更新 UFS 游戏配置
-pub fn save_ufs_game_config(entry: UfsGameConfig) -> Result<()> {
-    let config = CONFIG
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
-    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
-
-    // 查找是否已存在该游戏的配置
-    if let Some(existing) = config
-        .ufs_configs
-        .iter_mut()
-        .find(|c| c.app_id == entry.app_id)
-    {
-        // 更新现有配置
-        *existing = entry;
-    } else {
-        // 添加新配置
-        config.ufs_configs.push(entry);
-    }
-
-    // 保存到文件
-    let config_path = get_config_path()?;
-    let content = toml::to_string_pretty(&*config)?;
-    std::fs::write(&config_path, content)?;
-    tracing::info!("已保存 UFS 游戏配置");
+pub fn save_ufs_game_config(entry: &UfsGameConfig) -> Result<()> {
+    let dir = get_ufs_config_dir()?;
+    let path = dir.join(format!("{}.json", entry.app_id));
+    let content = serde_json::to_string_pretty(entry)?;
+    std::fs::write(&path, content)?;
+    tracing::info!("已保存 UFS 配置: {}", path.display());
     Ok(())
 }
 
 // 删除 UFS 游戏配置
 pub fn remove_ufs_game_config(app_id: u32) -> Result<()> {
-    let config = CONFIG
-        .get()
-        .ok_or_else(|| anyhow::anyhow!("配置未初始化"))?;
-    let mut config = config.lock().map_err(|_| anyhow::anyhow!("配置锁定失败"))?;
-    config.ufs_configs.retain(|c| c.app_id != app_id);
-
-    // 保存到文件
-    let config_path = get_config_path()?;
-    let content = toml::to_string_pretty(&*config)?;
-    std::fs::write(&config_path, content)?;
+    let dir = get_ufs_config_dir()?;
+    let path = dir.join(format!("{}.json", app_id));
+    if path.exists() {
+        std::fs::remove_file(&path)?;
+        tracing::info!("已删除 UFS 配置: {}", path.display());
+    }
     Ok(())
 }

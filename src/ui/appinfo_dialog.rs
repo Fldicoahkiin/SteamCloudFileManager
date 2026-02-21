@@ -160,20 +160,9 @@ impl AppInfoDialog {
     // 构建当前编辑的 UfsGameConfig
     pub fn build_game_config(&self) -> UfsGameConfig {
         UfsGameConfig {
-            id: self
-                .game_config
-                .as_ref()
-                .map(|c| c.id.clone())
-                .unwrap_or_else(|| uuid::Uuid::new_v4().to_string()),
             app_id: self.app_id,
             savefiles: self.editing_savefiles.clone(),
             root_overrides: self.editing_overrides.clone(),
-            created_at: self
-                .game_config
-                .as_ref()
-                .map(|c| c.created_at)
-                .unwrap_or_else(|| chrono::Utc::now().timestamp()),
-            note: String::new(),
         }
     }
 
