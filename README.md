@@ -606,7 +606,10 @@ src/
 ├── config.rs               # 配置管理（设置持久化）
 ├── update.rs               # 自动更新
 ├── logger.rs               # 日志系统
-├── i18n.rs                 # 国际化
+├── i18n/                   # 国际化
+│   ├── mod.rs              # 语言枚举与分发逻辑
+│   ├── en.rs               # English
+│   └── zh.rs               # 简体中文
 ├── icons.rs                # 图标系统（Phosphor Icons）
 ├── version.rs              # 版本信息
 │

@@ -604,7 +604,10 @@ src/
 ├── config.rs               # Configuration management (settings persistence)
 ├── update.rs               # Auto update
 ├── logger.rs               # Logging system
-├── i18n.rs                 # Internationalization
+├── i18n/                   # Internationalization
+│   ├── mod.rs              # Language enum and dispatch
+│   ├── en.rs               # English
+│   └── zh.rs               # 简体中文 (Chinese Simplified)
 ├── icons.rs                # Icon system (Phosphor Icons)
 ├── version.rs              # Version info
 │

@@ -8,71 +8,115 @@
 
 ### 概述
 
-本项目使用 Rust 原生的 i18n 实现，所有翻译都在 `src/i18n.rs` 文件中管理。
+本项目使用 Rust 原生的 i18n 实现，翻译按语言拆分为独立文件，便于维护和添加新语言。
+
+### 文件结构
+
+```
+src/i18n/
+├── mod.rs    # Language 枚举、I18n 结构体、语言分发逻辑
+├── en.rs     # English 翻译
+└── zh.rs     # 简体中文翻译
+```
+
+- `mod.rs` 定义 `Language` 枚举和 `I18n` 结构体，每个翻译方法通过 `match self.lang` 分发到对应的语言模块。
+- 每个语言文件导出与 `I18n` 方法同名的函数，返回对应语言的翻译文本。
 
 ### 当前支持的语言
 
-- 简体中文 (Chinese Simplified) - 默认
 - English
+- 简体中文 (Chinese Simplified)
 
 ### 如何添加新语言
 
-#### 1. 添加语言枚举
+以添加日语 (Japanese) 为例：
 
-在 `src/i18n.rs` 中的 `Language` 枚举添加新语言：
+#### 1. 在 `mod.rs` 中添加语言枚举
 
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Language {
     #[default]
-    Chinese,
     English,
+    Chinese,
     Japanese,  // 新增
 }
 ```
 
-#### 2. 更新 `all()` 方法
+#### 2. 更新 `mod.rs` 中的 `Language` 方法
 
 ```rust
-impl Language {
-    pub const fn all() -> &'static [Language] {
-        &[Language::Chinese, Language::English, Language::Japanese]
-    }
+pub const fn all() -> &'static [Language] {
+    &[Language::English, Language::Chinese, Language::Japanese]
+}
 
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            Language::Chinese => "简体中文",
-            Language::English => "English",
-            Language::Japanese => "日本語",  // 新增
-        }
+pub fn display_name(&self) -> &'static str {
+    match self {
+        Language::English => "English",
+        Language::Chinese => "简体中文",
+        Language::Japanese => "日本語",
+    }
+}
+
+pub fn from_config(value: &str) -> Self {
+    match value {
+        "en" => Language::English,
+        "zh" => Language::Chinese,
+        "ja" => Language::Japanese,
+        "auto" => Self::detect_system_language(),
+        _ => Language::English,
+    }
+}
+
+pub fn to_config(self) -> &'static str {
+    match self {
+        Language::Chinese => "zh",
+        Language::English => "en",
+        Language::Japanese => "ja",
     }
 }
 ```
 
-#### 3. 添加翻译
+#### 3. 创建新的语言文件 `src/i18n/ja.rs`
 
-为 `I18n` 结构体中的每个方法添加新语言的翻译：
+参考 `en.rs` 或 `zh.rs`，实现所有同名函数：
+
+```rust
+// 日本語翻訳
+
+use crate::icons;
+
+pub fn app_title() -> &'static str {
+    "Steam クラウドセーブマネージャー"
+}
+
+pub fn refresh() -> &'static str {
+    "更新"
+}
+
+// ... 所有其他翻译函数
+```
+
+#### 4. 在 `mod.rs` 中注册模块并更新分发
+
+```rust
+mod en;
+mod ja;  // 新增
+mod zh;
+```
+
+在每个 `I18n` 方法的 `match` 中添加新语言分支：
 
 ```rust
 pub fn app_title(&self) -> &'static str {
     match self.lang {
-        Language::Chinese => "Steam 云管理器",
-        Language::English => "Steam Cloud Manager",
-        Language::Japanese => "Steam クラウドマネージャー",  // 新增
+        Language::English => en::app_title(),
+        Language::Chinese => zh::app_title(),
+        Language::Japanese => ja::app_title(),
     }
 }
 ```
 
-### 翻译函数分类
-
-| 分类        | 说明           | 示例                                             |
-| ----------- | -------------- | ------------------------------------------------ |
-| UI 通用文本 | 按钮、标签等   | `refresh()`, `confirm()`, `cancel()`             |
-| 连接面板    | Steam 连接相关 | `connect()`, `disconnect()`, `steam_running()`   |
-| 文件操作    | 文件管理相关   | `download()`, `upload()`, `delete()`, `forget()` |
-| 窗口标题    | 各窗口标题     | `about_title()`, `error_title()`                 |
-| 状态消息    | 操作状态提示   | `loading()`, `success()`, `failed()`             |
-| 错误消息    | 错误提示       | `error_enter_app_id()`, `download_failed()`      |
+> **提示**：可以使用编辑器的全局替换功能批量添加新语言分支。
 
 ### 翻译注意事项
 
@@ -103,71 +147,115 @@ pub fn app_title(&self) -> &'static str {
 
 ### Overview
 
-This project uses a native Rust i18n implementation. All translations are managed in the `src/i18n.rs` file.
+This project uses a native Rust i18n implementation. Translations are split into separate files per language for easy maintenance and extensibility.
+
+### File Structure
+
+```
+src/i18n/
+├── mod.rs    # Language enum, I18n struct, dispatch logic
+├── en.rs     # English translations
+└── zh.rs     # Chinese Simplified translations
+```
+
+- `mod.rs` defines the `Language` enum and `I18n` struct. Each translation method dispatches to the corresponding language module via `match self.lang`.
+- Each language file exports functions with the same names as `I18n` methods, returning translated text.
 
 ### Currently Supported Languages
 
-- Chinese Simplified - Default
 - English
+- 简体中文 (Chinese Simplified)
 
 ### How to Add a New Language
 
-#### 1. Add Language Enum
+Using Japanese as an example:
 
-Add new language to the `Language` enum in `src/i18n.rs`:
+#### 1. Add Language Enum in `mod.rs`
 
 ```rust
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum Language {
     #[default]
-    Chinese,
     English,
+    Chinese,
     Japanese,  // New
 }
 ```
 
-#### 2. Update `all()` Method
+#### 2. Update `Language` Methods in `mod.rs`
 
 ```rust
-impl Language {
-    pub const fn all() -> &'static [Language] {
-        &[Language::Chinese, Language::English, Language::Japanese]
-    }
+pub const fn all() -> &'static [Language] {
+    &[Language::English, Language::Chinese, Language::Japanese]
+}
 
-    pub fn display_name(&self) -> &'static str {
-        match self {
-            Language::Chinese => "简体中文",
-            Language::English => "English",
-            Language::Japanese => "日本語",  // New
-        }
+pub fn display_name(&self) -> &'static str {
+    match self {
+        Language::English => "English",
+        Language::Chinese => "简体中文",
+        Language::Japanese => "日本語",
+    }
+}
+
+pub fn from_config(value: &str) -> Self {
+    match value {
+        "en" => Language::English,
+        "zh" => Language::Chinese,
+        "ja" => Language::Japanese,
+        "auto" => Self::detect_system_language(),
+        _ => Language::English,
+    }
+}
+
+pub fn to_config(self) -> &'static str {
+    match self {
+        Language::Chinese => "zh",
+        Language::English => "en",
+        Language::Japanese => "ja",
     }
 }
 ```
 
-#### 3. Add Translations
+#### 3. Create New Language File `src/i18n/ja.rs`
 
-Add translations for each method in the `I18n` struct:
+Use `en.rs` or `zh.rs` as a reference, implementing all functions with the same names:
+
+```rust
+// Japanese translations
+
+use crate::icons;
+
+pub fn app_title() -> &'static str {
+    "Steam クラウドセーブマネージャー"
+}
+
+pub fn refresh() -> &'static str {
+    "更新"
+}
+
+// ... all other translation functions
+```
+
+#### 4. Register Module and Update Dispatch in `mod.rs`
+
+```rust
+mod en;
+mod ja;  // New
+mod zh;
+```
+
+Add the new language branch to every `I18n` method's `match`:
 
 ```rust
 pub fn app_title(&self) -> &'static str {
     match self.lang {
-        Language::Chinese => "Steam 云管理器",
-        Language::English => "Steam Cloud Manager",
-        Language::Japanese => "Steam クラウドマネージャー",  // New
+        Language::English => en::app_title(),
+        Language::Chinese => zh::app_title(),
+        Language::Japanese => ja::app_title(),
     }
 }
 ```
 
-### Translation Function Categories
-
-| Category         | Description      | Examples                                         |
-| ---------------- | ---------------- | ------------------------------------------------ |
-| UI Common        | Buttons, labels  | `refresh()`, `confirm()`, `cancel()`             |
-| Connection Panel | Steam connection | `connect()`, `disconnect()`, `steam_running()`   |
-| File Operations  | File management  | `download()`, `upload()`, `delete()`, `forget()` |
-| Window Titles    | Window titles    | `about_title()`, `error_title()`                 |
-| Status Messages  | Operation status | `loading()`, `success()`, `failed()`             |
-| Error Messages   | Error prompts    | `error_enter_app_id()`, `download_failed()`      |
+> **Tip**: Use your editor's global find-and-replace to batch-add new language branches.
 
 ### Translation Notes
 
