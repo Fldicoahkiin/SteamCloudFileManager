@@ -815,6 +815,15 @@ impl VdfParser {
                 0x01 => {
                     let value = Self::read_null_string(cursor);
                     lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    if key == "quota" {
+                        if let Ok(v) = value.parse::<u64>() {
+                            config.quota = v;
+                        }
+                    } else if key == "maxnumfiles"
+                        && let Ok(v) = value.parse::<u32>()
+                    {
+                        config.maxnumfiles = v;
+                    }
                 }
                 0x02 => {
                     let value = cursor.read_i32::<LittleEndian>().unwrap_or(0);
@@ -828,6 +837,11 @@ impl VdfParser {
                 0x07 => {
                     let value = cursor.read_u64::<LittleEndian>().unwrap_or(0);
                     lines.push(format!("{}\"{}\" \"{}\"", indent_str, key, value));
+                    if key == "quota" {
+                        config.quota = value;
+                    } else if key == "maxnumfiles" {
+                        config.maxnumfiles = value as u32;
+                    }
                 }
                 _ => {
                     tracing::debug!("未知 VDF 类型: 0x{:02x}, key={}", type_byte, key);
