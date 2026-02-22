@@ -541,11 +541,18 @@ Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位
 - [x] 软链接同步支持（实验性）
 - [x] UFS 配置管理（实验性）- 类 Steamworks 后台的 Auto-Cloud 配置编辑
 - [ ] 自动备份计划
+- [ ] 开机自启动（随系统启动，托盘后台运行）
+- [ ] 启动时自动注入 UFS 配置（无需手动操作即可识别本地存档路径）
+- [ ] UFS 配置管理页面（独立的可视化界面，替代当前弹窗式编辑）
+- [ ] 云存档版本历史（查看和回滚历史版本）
 
 ### 包管理器支持
 
 - [x] AUR (Arch User Repository) - `yay -S steam-cloud-file-manager-bin`
 - [x] Homebrew (macOS) - `brew tap Fldicoahkiin/tap && brew install steam-cloud-file-manager`
+- [ ] Winget (Windows) - `winget install steam-cloud-file-manager`
+- [ ] Scoop (Windows) - `scoop install steam-cloud-file-manager`
+- [ ] Chocolatey (Windows) - `choco install steam-cloud-file-manager`
 - [ ] APT 仓库 (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
 - [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
 - [ ] Flatpak - `flatpak install steam-cloud-file-manager`

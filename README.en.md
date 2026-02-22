@@ -539,11 +539,18 @@ Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage
 - [x] Symlink sync support (experimental)
 - [x] UFS config management (experimental) - Steamworks-like Auto-Cloud configuration editing
 - [ ] Automatic backup schedule
+- [ ] Launch on startup (system tray background service)
+- [ ] Auto-inject UFS config on startup (auto-detect local save paths without manual operation)
+- [ ] UFS config management page (dedicated visual interface, replacing current popup editor)
+- [ ] Cloud save version history (view and rollback to previous versions)
 
 ### Package Manager Support
 
 - [x] AUR (Arch User Repository) - `yay -S steam-cloud-file-manager-bin`
 - [x] Homebrew (macOS) - `brew tap Fldicoahkiin/tap && brew install steam-cloud-file-manager`
+- [ ] Winget (Windows) - `winget install steam-cloud-file-manager`
+- [ ] Scoop (Windows) - `scoop install steam-cloud-file-manager`
+- [ ] Chocolatey (Windows) - `choco install steam-cloud-file-manager`
 - [ ] APT Repository (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
 - [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
 - [ ] Flatpak - `flatpak install steam-cloud-file-manager`
