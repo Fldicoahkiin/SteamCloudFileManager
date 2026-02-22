@@ -50,6 +50,7 @@ pub struct FileListState {
     pub comparison_map: HashMap<String, FileComparisonInfo>, // 文件名 -> 对比详情
     pub hash_checker: AsyncHashChecker,               // 异步 hash 检测器
     pub hash_checked_app_id: Option<u32>, // 已完成 Hash 检测的 app_id (缓存，避免重复检测)
+    pub open_folder_error: Option<String>, // 打开文件夹失败时的路径
 }
 
 impl FileListState {
@@ -62,6 +63,7 @@ impl FileListState {
         self.comparison_map.clear();
         self.hash_checker.cancel();
         self.hash_checked_app_id = None;
+        self.open_folder_error = None;
     }
 
     // 更新同步状态

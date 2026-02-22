@@ -252,6 +252,7 @@ pub struct FileTreeRenderParams<'a> {
     pub state: &'a mut TreeViewState<'a>,
     pub i18n: &'a I18n,
     pub sync_status_map: &'a HashMap<String, SyncStatus>, // 文件名 -> 同步状态
+    pub open_folder_error: &'a mut Option<String>,        // 打开文件夹失败时记录路径
 }
 
 // 渲染完整的文件树
@@ -264,6 +265,7 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
         state,
         i18n,
         sync_status_map,
+        open_folder_error,
     } = params;
     // 本地存档路径
     if !local_save_paths.is_empty() {
@@ -275,8 +277,9 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
                     .button(button_text)
                     .on_hover_text(path.display().to_string())
                     .clicked()
+                    && let Err(err_path) = crate::file_manager::open_folder(path)
                 {
-                    crate::file_manager::open_folder(path);
+                    *open_folder_error = Some(err_path);
                 }
             }
         });

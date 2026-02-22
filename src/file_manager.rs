@@ -35,13 +35,18 @@ impl FileService {
             return Err(anyhow!("未设置 App ID"));
         }
 
-        // VDF
-        let vdf_files = self.get_files_from_vdf(app_id)?;
-        if !vdf_files.is_empty() {
-            tracing::info!("获取到 {} 个云文件", vdf_files.len());
-            return Ok(vdf_files);
-        } else {
-            tracing::debug!("VDF 返回空列表，尝试其他方式");
+        // VDF (错误时回退到 Steam API，不直接传播)
+        match self.get_files_from_vdf(app_id) {
+            Ok(vdf_files) if !vdf_files.is_empty() => {
+                tracing::info!("获取到 {} 个云文件", vdf_files.len());
+                return Ok(vdf_files);
+            }
+            Ok(_) => {
+                tracing::debug!("VDF 返回空列表，尝试其他方式");
+            }
+            Err(e) => {
+                tracing::warn!("VDF 解析失败 ({}), 回退到其他方式", e);
+            }
         }
 
         // Steam API
@@ -336,9 +341,9 @@ fn log_file_details(files: &[CloudFile], app_id: u32, parser: Option<&VdfParser>
         let size_str = format_size(f.size);
         let exists_str = if f.exists { "✓" } else { "✗" };
         let synced_str = if f.is_persisted {
-            "已同步"
+            "云端有"
         } else {
-            "未同步"
+            "云端无"
         };
 
         // 显示原始数据：VDF root 数字 + CDP 文件夹名称 + 本地路径
@@ -1201,8 +1206,11 @@ impl UploadQueue {
     }
 }
 
-// 打开文件夹
-pub fn open_folder(path: &std::path::Path) {
+// 打开文件夹，返回 Err 说明路径不存在
+pub fn open_folder(path: &std::path::Path) -> Result<(), String> {
+    if !path.exists() {
+        return Err(format!("{}", path.display()));
+    }
     #[cfg(target_os = "windows")]
     {
         let _ = std::process::Command::new("explorer").arg(path).spawn();
@@ -1215,6 +1223,7 @@ pub fn open_folder(path: &std::path::Path) {
     {
         let _ = std::process::Command::new("xdg-open").arg(path).spawn();
     }
+    Ok(())
 }
 
 // 上传重试配置

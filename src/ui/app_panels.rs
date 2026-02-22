@@ -548,6 +548,7 @@ pub fn render_center_panel(
                 state: &mut state,
                 i18n: &misc.i18n,
                 sync_status_map: &file_list.sync_status_map,
+                open_folder_error: &mut file_list.open_folder_error,
             },
         );
     } else {

@@ -698,6 +698,10 @@ pub fn local_save_path_not_found() -> &'static str {
     "Not found (files may only exist in cloud)"
 }
 
+pub fn folder_not_exist(path: &str) -> String {
+    format!("Path does not exist:\n{}", path)
+}
+
 pub fn search_files_placeholder() -> &'static str {
     "Search files or folders..."
 }

@@ -1317,6 +1317,13 @@ impl I18n {
         }
     }
 
+    pub fn folder_not_exist(&self, path: &str) -> String {
+        match self.lang {
+            Language::English => en::folder_not_exist(path),
+            Language::Chinese => zh::folder_not_exist(path),
+        }
+    }
+
     pub fn search_files_placeholder(&self) -> &'static str {
         match self.lang {
             Language::English => en::search_files_placeholder(),

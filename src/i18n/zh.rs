@@ -681,6 +681,10 @@ pub fn local_save_path_not_found() -> &'static str {
     "未找到（可能所有文件都仅在云端）"
 }
 
+pub fn folder_not_exist(path: &str) -> String {
+    format!("路径不存在:\n{}", path)
+}
+
 pub fn search_files_placeholder() -> &'static str {
     "搜索文件或文件夹..."
 }

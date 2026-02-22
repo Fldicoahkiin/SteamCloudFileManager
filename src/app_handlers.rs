@@ -110,32 +110,38 @@ impl AppHandlers {
         std::thread::spawn(move || {
             let file_service = crate::file_manager::FileService::with_steam_manager(steam_manager);
 
-            let files = if is_system_app_id(app_id) {
-                file_service
-                    .get_files_from_cdp_only(app_id)
-                    .unwrap_or_else(|e| {
-                        tracing::error!("CDP 获取失败: {}", e);
-                        Vec::new()
-                    })
-            } else {
-                match file_service.get_cloud_files(app_id) {
-                    Ok(files) => {
-                        if app_id > 0 {
-                            file_service
-                                .merge_cdp_files(files, app_id)
-                                .unwrap_or_else(|_| Vec::new())
-                        } else {
-                            files
+            let result: Result<Vec<crate::steam_api::CloudFile>, String> =
+                if is_system_app_id(app_id) {
+                    file_service
+                        .get_files_from_cdp_only(app_id)
+                        .map_err(|e| e.to_string())
+                } else {
+                    match file_service.get_cloud_files(app_id) {
+                        Ok(files) => {
+                            if app_id > 0 {
+                                file_service
+                                    .merge_cdp_files(files, app_id)
+                                    .map_err(|e| e.to_string())
+                            } else {
+                                Ok(files)
+                            }
+                        }
+                        Err(e) => {
+                            // VDF + Steam API 都失败了，尝试仅通过 CDP 获取
+                            tracing::warn!("VDF+API 均失败 ({}), 尝试仅 CDP", e);
+                            match file_service.get_files_from_cdp_only(app_id) {
+                                Ok(files) if !files.is_empty() => Ok(files),
+                                Ok(_) => Err(e.to_string()),
+                                Err(cdp_err) => {
+                                    tracing::warn!("CDP 获取也失败: {}", cdp_err);
+                                    Err(e.to_string())
+                                }
+                            }
                         }
                     }
-                    Err(e) => {
-                        tracing::error!("Steam API 获取失败: {}", e);
-                        Vec::new()
-                    }
-                }
-            };
+                };
 
-            let _ = tx.send(Ok(files));
+            let _ = tx.send(result);
         });
 
         Ok(())

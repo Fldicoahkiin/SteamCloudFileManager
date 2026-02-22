@@ -632,6 +632,12 @@ impl eframe::App for SteamCloudApp {
             crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list, &self.misc);
         });
 
+        // 打开文件夹失败时弹窗
+        if let Some(path) = self.file_list.open_folder_error.take() {
+            self.dialogs
+                .show_error(&self.misc.i18n.folder_not_exist(&path));
+        }
+
         if self.dialogs.show_error
             && crate::ui::draw_error_window(
                 ctx,
