@@ -77,13 +77,18 @@ impl UpdateManager {
         }
     }
 
-    // 创建 HTTP agent，支持代理
-    fn create_agent() -> ureq::Agent {
+    // 创建 HTTP agent，支持代理和超时
+    // global_timeout: API 请求传 Some(30s)，大文件下载传 None
+    fn create_agent(global_timeout: Option<std::time::Duration>) -> ureq::Agent {
+        use std::time::Duration;
         use ureq::config::Config;
 
-        let mut config_builder = Config::builder();
+        let mut config_builder = Config::builder().timeout_connect(Some(Duration::from_secs(15)));
 
-        // 从环境变量读取代理设置
+        if let Some(timeout) = global_timeout {
+            config_builder = config_builder.timeout_global(Some(timeout));
+        }
+
         if let Ok(proxy_url) = std::env::var("HTTPS_PROXY")
             .or_else(|_| std::env::var("https_proxy"))
             .or_else(|_| std::env::var("HTTP_PROXY"))
@@ -164,7 +169,7 @@ impl UpdateManager {
     // 获取最新 Release 信息
     fn fetch_latest_release(&self) -> Result<ReleaseInfo> {
         Self::request_with_retry(|| {
-            let agent = Self::create_agent();
+            let agent = Self::create_agent(Some(std::time::Duration::from_secs(30)));
             let response = agent
                 .get(GITHUB_API_RELEASES)
                 .header("User-Agent", USER_AGENT)
@@ -226,16 +231,14 @@ impl UpdateManager {
         result_rx
     }
 
-    // 后台下载
+    // 后台下载（失败自动重试）
     fn download_in_background(
         release: &ReleaseInfo,
         progress_tx: Sender<f32>,
     ) -> Result<PathBuf, String> {
-        // 根据平台选择对应的资源文件
         let asset = Self::select_asset_for_platform(&release.assets).map_err(|e| e.to_string())?;
         tracing::debug!("选择资源文件: {}", asset.name);
 
-        // 下载文件
         let update_dir = Self::get_update_dir().map_err(|e| e.to_string())?;
         let download_path = update_dir.join(&asset.name);
 
@@ -245,72 +248,92 @@ impl UpdateManager {
             asset.size as f64 / 1024.0 / 1024.0
         );
 
-        // 如果文件已存在，先删除
-        if download_path.exists() {
-            tracing::debug!("删除已存在的旧文件");
-            fs::remove_file(&download_path).map_err(|e| e.to_string())?;
+        let _ = progress_tx.send(0.0);
+        let mut last_error = String::from("未知错误");
+
+        for attempt in 1..=MAX_RETRIES {
+            if attempt > 1 {
+                tracing::warn!("下载重试 ({}/{})", attempt, MAX_RETRIES);
+                std::thread::sleep(std::time::Duration::from_millis(
+                    RETRY_DELAY_MS * attempt as u64,
+                ));
+            }
+
+            match Self::do_download(
+                &asset.browser_download_url,
+                &download_path,
+                asset.size,
+                &progress_tx,
+            ) {
+                Ok(()) => {
+                    tracing::info!("下载完成: {}", download_path.display());
+                    return Ok(download_path);
+                }
+                Err(e) => {
+                    tracing::error!("下载失败 (尝试 {}/{}): {}", attempt, MAX_RETRIES, e);
+                    last_error = e;
+                    // 清理不完整的文件，下次重头开始
+                    if download_path.exists() {
+                        let _ = fs::remove_file(&download_path);
+                    }
+                }
+            }
         }
 
-        // 发送初始进度
-        let _ = progress_tx.send(0.0);
+        Err(format!("下载失败: {}", last_error))
+    }
 
-        let agent = Self::create_agent();
+    // 执行一次完整下载
+    fn do_download(
+        url: &str,
+        download_path: &std::path::Path,
+        total_size: u64,
+        progress_tx: &Sender<f32>,
+    ) -> Result<(), String> {
+        use std::io::Write;
+
+        let agent = Self::create_agent(None);
         let response = agent
-            .get(&asset.browser_download_url)
+            .get(url)
             .header("User-Agent", USER_AGENT)
             .call()
-            .map_err(|e| {
-                tracing::error!("HTTP 请求失败: {}", e);
-                format!("Download failed: {}", e)
-            })?;
+            .map_err(|e| format!("HTTP 请求失败: {}", e))?;
 
-        let mut file = fs::File::create(&download_path).map_err(|e| e.to_string())?;
+        let mut file =
+            fs::File::create(download_path).map_err(|e| format!("创建文件失败: {}", e))?;
         let mut body = response.into_body();
         let mut reader = body.as_reader();
-
-        // 分块下载并报告进度
-        let total_size = asset.size;
         let mut downloaded: u64 = 0;
         let mut buffer = vec![0u8; DOWNLOAD_CHUNK_SIZE];
         let mut last_progress_percent = 0;
 
         loop {
             match reader.read(&mut buffer) {
-                Ok(0) => break, // EOF
+                Ok(0) => break,
                 Ok(n) => {
-                    use std::io::Write;
-                    file.write_all(&buffer[..n]).map_err(|e| {
-                        tracing::error!("写入文件失败: {}", e);
-                        format!("Write file failed: {}", e)
-                    })?;
+                    file.write_all(&buffer[..n])
+                        .map_err(|e| format!("写入文件失败: {}", e))?;
 
                     downloaded += n as u64;
-                    let progress = if total_size > 0 {
-                        (downloaded as f32 / total_size as f32).min(1.0)
-                    } else {
-                        0.0
-                    };
-
-                    // 每 1% 发送一次进度更新
-                    let progress_percent = (progress * 100.0) as i32;
-                    if progress_percent > last_progress_percent {
-                        last_progress_percent = progress_percent;
-                        let _ = progress_tx.send(progress);
-                        tracing::debug!("下载进度: {:.1}%", progress * 100.0);
+                    if total_size > 0 {
+                        let percent = (downloaded as f32 / total_size as f32 * 100.0) as i32;
+                        if percent > last_progress_percent {
+                            last_progress_percent = percent;
+                            let _ = progress_tx.send(downloaded as f32 / total_size as f32);
+                        }
                     }
                 }
-                Err(e) => {
-                    tracing::error!("读取数据失败: {}", e);
-                    return Err(format!("Read data failed: {}", e));
-                }
+                Err(e) => return Err(format!("读取数据失败: {}", e)),
             }
         }
 
-        // 发送完成进度
-        let _ = progress_tx.send(1.0);
+        // 验证完整性
+        if total_size > 0 && downloaded < total_size {
+            return Err(format!("下载不完整: {}/{} bytes", downloaded, total_size));
+        }
 
-        tracing::info!("下载完成: {}", download_path.display());
-        Ok(download_path)
+        let _ = progress_tx.send(1.0);
+        Ok(())
     }
 
     // 安装已下载的更新
