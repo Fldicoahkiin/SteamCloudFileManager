@@ -169,9 +169,53 @@ impl CdpClient {
     pub fn navigate(&mut self, url: &str) -> Result<()> {
         self.send_command("Page.navigate", serde_json::json!({ "url": url }))?;
 
-        // 等待页面加载完成
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(15);
+
+        // 等待导航开始
+        std::thread::sleep(std::time::Duration::from_millis(500));
+
+        // 轮询 document.readyState 直到 complete 或超时
+        loop {
+            if start.elapsed() > timeout {
+                tracing::warn!("CDP 页面加载超时 ({}s)", timeout.as_secs());
+                break;
+            }
+
+            match self.evaluate("document.readyState") {
+                Ok(value) if value.as_str() == Some("complete") => {
+                    tracing::debug!("CDP 页面加载完成 ({:.1}s)", start.elapsed().as_secs_f64());
+                    break;
+                }
+                Ok(_) => {
+                    std::thread::sleep(std::time::Duration::from_millis(300));
+                }
+                Err(_) => {
+                    // 导航中 JS 上下文可能暂时不可用
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+            }
+        }
+
         Ok(())
+    }
+
+    // 等待指定 CSS 选择器的元素出现
+    fn wait_for_element(&mut self, selector: &str, timeout_secs: u64) -> bool {
+        let script = format!("document.querySelector('{}') !== null", selector);
+        let start = std::time::Instant::now();
+        let timeout = std::time::Duration::from_secs(timeout_secs);
+
+        while start.elapsed() < timeout {
+            if let Ok(value) = self.evaluate(&script)
+                && value.as_bool() == Some(true)
+            {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(500));
+        }
+
+        false
     }
 
     // 执行 JavaScript 并获取结果
@@ -198,11 +242,23 @@ impl CdpClient {
 
     pub fn fetch_game_list(&mut self) -> Result<Vec<CloudGameInfo>> {
         tracing::info!("正在读取 Steam 云存储页面...");
-        // 不要自己导航，假设 steam://openurl 已经打开了页面
-        // self.navigate("https://store.steampowered.com/account/remotestorage")?;
 
-        // 等待页面加载完成
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        // 检查当前页面是否为游戏列表页
+        let is_game_list_page = self
+            .evaluate("window.location.href")
+            .ok()
+            .and_then(|v| v.as_str().map(String::from))
+            .is_some_and(|url| url.contains("remotestorage") && !url.contains("remotestorageapp"));
+
+        if is_game_list_page {
+            // 已在正确页面，等待数据表格加载
+            self.wait_for_element(".accountTable", 10);
+        } else {
+            // 当前页面不是游戏列表页，导航到正确页面
+            tracing::debug!("CDP 当前页面不是游戏列表页，导航到正确页面");
+            self.navigate("https://store.steampowered.com/account/remotestorage")?;
+            self.wait_for_element(".accountTable", 10);
+        }
 
         let script = r#"
             (function() {
@@ -311,6 +367,9 @@ impl CdpClient {
 
             self.navigate(&url)?;
 
+            // 等待数据表格出现
+            self.wait_for_element(".accountTable", 8);
+
             let script = r#"
                 (function() {
                     const rows = Array.from(document.querySelectorAll('.accountTable tr'));
@@ -335,7 +394,21 @@ impl CdpClient {
                 })()
             "#;
 
-            let value = self.evaluate(script)?;
+            let mut value = self.evaluate(script)?;
+
+            // 首页结果为空时重试
+            if page == 1 && value.as_array().is_some_and(|a| a.is_empty()) {
+                tracing::debug!("CDP 首次查询返回空结果，等待后重试");
+                if let Ok(page_info) =
+                    self.evaluate("document.title + ' | ' + window.location.href")
+                {
+                    tracing::debug!("CDP 当前页面: {:?}", page_info);
+                }
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                if let Ok(retry_value) = self.evaluate(script) {
+                    value = retry_value;
+                }
+            }
 
             if let Some(arr) = value.as_array() {
                 if arr.is_empty() {
