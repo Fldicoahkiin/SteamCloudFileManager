@@ -509,11 +509,12 @@ Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage
 
 | Root ID | Steamworks Root Name    | Windows Path Example              |
 | ------- | ----------------------- | --------------------------------- |
-| 0       | `SteamCloudDocuments`   | `userdata/{uid}/{appid}/remote/`  |
+| 0       | `Default`               | `userdata/{uid}/{appid}/remote/`  |
 | 1       | `App Install Directory` | `steamapps/common/GameName/`      |
 | 2       | `WinMyDocuments`        | `%USERPROFILE%\Documents\`        |
-| 4       | `WinAppDataLocal`       | `%LOCALAPPDATA%\`                 |
+| 3       | `WinAppDataLocal`       | `%LOCALAPPDATA%\`                 |
 | 9       | `WinSavedGames`         | `%USERPROFILE%\Saved Games\`      |
+| 11      | `SteamCloudDocuments`   | `Documents\Steam Cloud\`          |
 | 12      | `WinAppDataLocalLow`    | `%USERPROFILE%\AppData\LocalLow\` |
 
 **Details**:
