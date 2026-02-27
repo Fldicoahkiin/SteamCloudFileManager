@@ -44,50 +44,49 @@
 
 ### 官方公开的 Root 名称
 
-| Root 名称               | 平台    | 路径                                        |
-| ----------------------- | ------- | ------------------------------------------- |
-| `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\`          |
-| `SteamCloudDocuments`   | All     | [见下方说明](#steamclouddocuments-路径说明) |
-| `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`               |
-| `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`              |
-| `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`           |
-| `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`            |
-| `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`                |
-| `WindowsHome`           | Windows | `%USERPROFILE%\`                            |
-| `MacHome`               | macOS   | `~/`                                        |
-| `MacAppSupport`         | macOS   | `~/Library/Application Support/`            |
-| `MacDocuments`          | macOS   | `~/Documents/`                              |
-| `LinuxHome`             | Linux   | `~/`                                        |
-| `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                           |
-| `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                         |
-| `AndroidExternalData`   | Android | `Android/data/<package>/files/`             |
+| Root 名称               | 平台    | 路径                                                |
+| ----------------------- | ------- | --------------------------------------------------- |
+| `App Install Directory` | All     | `[Steam]\steamapps\common\[Game]\`                  |
+| `SteamCloudDocuments`   | All     | [见下方说明](#steamclouddocuments-root-11-路径说明) |
+| `WinMyDocuments`        | Windows | `%USERPROFILE%\My Documents\`                       |
+| `WinAppDataLocal`       | Windows | `%USERPROFILE%\AppData\Local\`                      |
+| `WinAppDataLocalLow`    | Windows | `%USERPROFILE%\AppData\LocalLow\`                   |
+| `WinAppDataRoaming`     | Windows | `%USERPROFILE%\AppData\Roaming\`                    |
+| `WinSavedGames`         | Windows | `%USERPROFILE%\Saved Games\`                        |
+| `WindowsHome`           | Windows | `%USERPROFILE%\`                                    |
+| `MacHome`               | macOS   | `~/`                                                |
+| `MacAppSupport`         | macOS   | `~/Library/Application Support/`                    |
+| `MacDocuments`          | macOS   | `~/Documents/`                                      |
+| `LinuxHome`             | Linux   | `~/`                                                |
+| `LinuxXdgDataHome`      | Linux   | `$XDG_DATA_HOME/`                                   |
+| `LinuxXdgConfigHome`    | Linux   | `$XDG_CONFIG_HOME/`                                 |
+| `AndroidExternalData`   | Android | `Android/data/<package>/files/`                     |
 
 ### 数字 Root ID 映射
 
-> **注意**：数字 Root ID 与字符串名称的对应关系**官方未公开**，以下通过自定义 UFS 注入测试验证。
+> **数据来源**：数字 Root ID 与字符串名称的完整对应关系来自 Steam SDK 内部枚举 [`ERemoteStorageFileRoot`](https://github.com/emily33901/SteamStructs/blob/master/ERemoteStorageFileRoot.h)（[OpenSteamworks 镜像](https://github.com/fire64/opensteamworks/blob/master/ERemoteStorageFileRoot.h)），路径映射则通过实际游戏测试和 `cloud_log.txt` 分析确认。
 
-| Root ID | Root 名称 (Steamworks)      | 路径示例                                    |
-| :-----: | --------------------------- | ------------------------------------------- |
-|  **0**  | `SteamCloudDocuments` (API) | `{Steam}/userdata/{UID}/{AppID}/remote/`    |
-|  **1**  | `GameInstall`               | `{SteamInstall}/steamapps/common/{Game}/`   |
-|  **2**  | `WinMyDocuments`            | Win: `%USERPROFILE%\Documents\`             |
-|  **3**  | `WinAppDataLocal`           | Win: `%LOCALAPPDATA%\`                      |
-|  **4**  | `WinAppDataRoaming`         | Win: `%APPDATA%\`                           |
-|  **5**  | （未知）                    | -                                           |
-|  **6**  | `MacHome`                   | Mac: `~/`                                   |
-|  **7**  | `MacAppSupport`             | Mac: `~/Library/Application Support/`       |
-|  **8**  | `MacDocuments`              | Mac: `~/Documents/`                         |
-|  **9**  | `WinSavedGames`             | Win: `%USERPROFILE%\Saved Games\`           |
-| **10**  | （未知）                    | -                                           |
-| **11**  | `SteamCloudDocuments`       | [见下方说明](#steamclouddocuments-路径说明) |
-| **12**  | `WinAppDataLocalLow`        | Win: `%LOCALAPPDATA%Low\`                   |
-| **13**  | （未知）                    | -                                           |
-| **14**  | `LinuxHome`                 | Linux: `~/`                                 |
-| **15**  | `LinuxXdgDataHome`          | Linux: `$XDG_DATA_HOME/`                    |
-| **16**  | `LinuxXdgConfigHome`        | Linux: `$XDG_CONFIG_HOME/`                  |
-| **17**  | （未知）                    | -                                           |
-| **18**  | `WindowsHome`               | Win: `%USERPROFILE%\`                       |
-|  **?**  | `AndroidExternalData`       | Android: `Android/data/<package>/files/`    |
+| Root ID | SDK 枚举名                                        | Root 名称                 | 路径示例                                            |
+| :-----: | ------------------------------------------------- | ------------------------- | --------------------------------------------------- |
+|  **0**  | `k_ERemoteStorageFileRootDefault`                 | `Default`                 | `{Steam}/userdata/{UID}/{AppID}/remote/`            |
+|  **1**  | `k_ERemoteStorageFileRootGameInstall`             | `GameInstall`             | `{SteamInstall}/steamapps/common/{Game}/`           |
+|  **2**  | `k_ERemoteStorageFileRootWinMyDocuments`          | `WinMyDocuments`          | Win: `%USERPROFILE%\Documents\`                     |
+|  **3**  | `k_ERemoteStorageFileRootWinAppDataLocal`         | `WinAppDataLocal`         | Win: `%LOCALAPPDATA%\`                              |
+|  **4**  | `k_ERemoteStorageFileRootWinAppDataRoaming`       | `WinAppDataRoaming`       | Win: `%APPDATA%\`                                   |
+|  **5**  | `k_ERemoteStorageFileRootSteamUserBaseStorage`    | `SteamUserBaseStorage`    | _(用途待验证)_                                      |
+|  **6**  | `k_ERemoteStorageFileRootMacHome`                 | `MacHome`                 | Mac: `~/`                                           |
+|  **7**  | `k_ERemoteStorageFileRootMacAppSupport`           | `MacAppSupport`           | Mac: `~/Library/Application Support/`               |
+|  **8**  | `k_ERemoteStorageFileRootMacDocuments`            | `MacDocuments`            | Mac: `~/Documents/`                                 |
+|  **9**  | `k_ERemoteStorageFileRootWinSavedGames`           | `WinSavedGames`           | Win: `%USERPROFILE%\Saved Games\`                   |
+| **10**  | `k_ERemoteStorageFileRootWinProgramData`          | `WinProgramData`          | Win: `%PROGRAMDATA%\`                               |
+| **11**  | `k_ERemoteStorageFileRootSteamCloudDocuments`     | `SteamCloudDocuments`     | [见下方说明](#steamclouddocuments-root-11-路径说明) |
+| **12**  | `k_ERemoteStorageFileRootWinAppDataLocalLow`      | `WinAppDataLocalLow`      | Win: `%LOCALAPPDATA%Low\`                           |
+| **13**  | `k_ERemoteStorageFileRootMacCaches`               | `MacCaches`               | Mac: `~/Library/Caches/`                            |
+| **14**  | `k_ERemoteStorageFileRootLinuxHome`               | `LinuxHome`               | Linux: `~/`                                         |
+| **15**  | `k_ERemoteStorageFileRootLinuxXdgDataHome`        | `LinuxXdgDataHome`        | Linux: `$XDG_DATA_HOME/`                            |
+| **16**  | `k_ERemoteStorageFileRootLinuxXdgConfigHome`      | `LinuxXdgConfigHome`      | Linux: `$XDG_CONFIG_HOME/`                          |
+| **17**  | `k_ERemoteStorageFileRootAndroidSteamPackageRoot` | `AndroidSteamPackageRoot` | Android: _(待验证)_                                 |
+| **18**  | _(枚举中未定义，可能为后续新增)_                  | `WindowsHome`             | Win: `%USERPROFILE%\`                               |
 
 ### 跨平台映射说明
 
@@ -113,21 +112,17 @@
 | `$XDG_CONFIG_HOME` | `~/.config`      |
 | `$XDG_DATA_HOME`   | `~/.local/share` |
 
-### SteamCloudDocuments 路径说明
+### SteamCloudDocuments (Root 11) 路径说明
 
-Root 0 对应 ISteamRemoteStorage API 的工作目录：`{Steam}/userdata/{UID}/{AppID}/remote/`
+`SteamCloudDocuments` 是 Auto-Cloud 专用的 Root 类型，用于将存档存放在用户文档目录。实际路径取决于平台：
 
-当作为 UFS Auto-Cloud 的 `SteamCloudDocuments` root 使用时（Root 11），实际路径取决于平台：
-
-| 平台    | 实际路径                                                      |
+| 平台    | `SteamCloudDocuments` (Root 11) 实际路径                      |
 | ------- | ------------------------------------------------------------- |
 | macOS   | `~/Documents/Steam Cloud/[Steam用户名]/[游戏名]/`             |
 | Linux   | `~/.SteamCloud/[Steam用户名]/[游戏名]/`                       |
 | Windows | `%USERPROFILE%\Documents\Steam Cloud\[Steam用户名]\[游戏名]\` |
 
-> **已验证**：macOS 和 Windows 的 `cloud_log.txt` 均显示 Steam 将 `SteamCloudDocuments` 解析到
-> `Documents/Steam Cloud/[用户名]/[游戏名]/`，而**不是** `userdata/.../remote/`。
-> 这意味着 Root 0 的 API 路径和 SteamCloudDocuments(Root 11) 的 Auto-Cloud 路径是两个完全不同的位置。
+> **已验证**：macOS 和 Windows 的 `cloud_log.txt` 均证实 Root 11 使用上述平台相关路径。
 
 ---
 

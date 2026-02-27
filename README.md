@@ -511,11 +511,12 @@ Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位
 
 | Root ID | Steamworks 根名称       | Windows 路径示例                  |
 | ------- | ----------------------- | --------------------------------- |
-| 0       | `SteamCloudDocuments`   | `userdata/{uid}/{appid}/remote/`  |
+| 0       | `Default`               | `userdata/{uid}/{appid}/remote/`  |
 | 1       | `App Install Directory` | `steamapps/common/GameName/`      |
 | 2       | `WinMyDocuments`        | `%USERPROFILE%\Documents\`        |
-| 4       | `WinAppDataLocal`       | `%LOCALAPPDATA%\`                 |
+| 3       | `WinAppDataLocal`       | `%LOCALAPPDATA%\`                 |
 | 9       | `WinSavedGames`         | `%USERPROFILE%\Saved Games\`      |
+| 11      | `SteamCloudDocuments`   | `Documents\Steam Cloud\`          |
 | 12      | `WinAppDataLocalLow`    | `%USERPROFILE%\AppData\LocalLow\` |
 
 **详细说明**：
