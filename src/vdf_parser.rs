@@ -283,10 +283,8 @@ impl VdfParser {
                     "localtime" => {
                         e.timestamp = val.parse::<i64>().unwrap_or(0);
                     }
-                    "remotetime" | "time" => {
-                        if e.timestamp == 0 {
-                            e.timestamp = val.parse::<i64>().unwrap_or(0);
-                        }
+                    "remotetime" | "time" if e.timestamp == 0 => {
+                        e.timestamp = val.parse::<i64>().unwrap_or(0);
                     }
                     "sha" => {
                         e.sha = val.to_string();

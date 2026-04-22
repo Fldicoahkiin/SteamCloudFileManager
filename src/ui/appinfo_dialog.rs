@@ -353,11 +353,11 @@ pub fn draw_appinfo_dialog(
                                                         .editing_savefiles
                                                         .push(dialog.temp_savefile.clone());
                                                 }
-                                                EditMode::EditSavefile(idx) => {
-                                                    if idx < dialog.editing_savefiles.len() {
-                                                        dialog.editing_savefiles[idx] =
-                                                            dialog.temp_savefile.clone();
-                                                    }
+                                                EditMode::EditSavefile(idx)
+                                                    if idx < dialog.editing_savefiles.len() =>
+                                                {
+                                                    dialog.editing_savefiles[idx] =
+                                                        dialog.temp_savefile.clone();
                                                 }
                                                 _ => {}
                                             }
@@ -638,10 +638,10 @@ pub fn draw_appinfo_dialog(
                                         EditMode::AddOverride => {
                                             dialog.editing_overrides.push(override_entry);
                                         }
-                                        EditMode::EditOverride(idx) => {
-                                            if idx < dialog.editing_overrides.len() {
-                                                dialog.editing_overrides[idx] = override_entry;
-                                            }
+                                        EditMode::EditOverride(idx)
+                                            if idx < dialog.editing_overrides.len() =>
+                                        {
+                                            dialog.editing_overrides[idx] = override_entry;
                                         }
                                         _ => {}
                                     }

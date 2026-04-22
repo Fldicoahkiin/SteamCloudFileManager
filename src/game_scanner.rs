@@ -335,7 +335,7 @@ pub fn scan_cloud_games(steam_path: &Path, user_id: &str) -> Result<Vec<CloudGam
         tracing::debug!("云存档: {}", summary.join(", "));
     }
 
-    games.sort_by(|a, b| b.last_played.unwrap_or(0).cmp(&a.last_played.unwrap_or(0)));
+    games.sort_by_key(|b| std::cmp::Reverse(b.last_played.unwrap_or(0)));
     tracing::info!("VDF 扫描完成，发现 {} 个有云存档的游戏", games.len());
     Ok(games)
 }
