@@ -89,7 +89,7 @@ static CURRENT_MODE: std::sync::OnceLock<std::sync::RwLock<ThemeMode>> = std::sy
 
 // 判断当前是否为深色模式
 pub fn is_dark_mode(ctx: &egui::Context) -> bool {
-    ctx.style().visuals.dark_mode
+    ctx.global_style().visuals.dark_mode
 }
 
 // 应用主题到 egui Context

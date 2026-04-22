@@ -532,9 +532,9 @@ impl SteamCloudApp {
 }
 
 impl eframe::App for SteamCloudApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // 动态更新窗口标题
-        ctx.send_viewport_cmd(egui::ViewportCommand::Title(
+        ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(
             self.misc.i18n.app_title().to_string(),
         ));
 
@@ -545,8 +545,8 @@ impl eframe::App for SteamCloudApp {
         self.poll_async_results();
 
         // 渲染顶部面板
-        let top_event = egui::TopBottomPanel::top("top_panel")
-            .show(ctx, |ui| {
+        let top_event = egui::Panel::top("top_panel")
+            .show_inside(ui, |ui| {
                 crate::ui::render_top_panel(
                     ui,
                     &mut self.dialogs,
@@ -567,14 +567,14 @@ impl eframe::App for SteamCloudApp {
             crate::ui::TopPanelEvent::Refresh => self.open_cloud_url(),
             crate::ui::TopPanelEvent::Restart => {
                 self.handlers
-                    .start_restart_steam(ctx, &mut self.async_handlers);
+                    .start_restart_steam(ui.ctx(), &mut self.async_handlers);
             }
             crate::ui::TopPanelEvent::None => {}
         }
 
         // 渲染底部面板
-        let bottom_event = egui::TopBottomPanel::bottom("bottom_panel")
-            .show(ctx, |ui| {
+        let bottom_event = egui::Panel::bottom("bottom_panel")
+            .show_inside(ui, |ui| {
                 crate::ui::render_bottom_panel(
                     ui,
                     &self.connection,
@@ -624,9 +624,10 @@ impl eframe::App for SteamCloudApp {
         }
 
         // 渲染中心面板
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default().show_inside(ui, |ui| {
             if self.connection.is_connected && self.connection.remote_ready {
-                self.handle_file_drop(ctx, ui);
+                let ctx = ui.ctx().clone();
+                self.handle_file_drop(&ctx, ui);
             }
 
             crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list, &self.misc);
@@ -640,7 +641,7 @@ impl eframe::App for SteamCloudApp {
 
         if self.dialogs.show_error
             && crate::ui::draw_error_window(
-                ctx,
+                ui.ctx(),
                 &mut self.dialogs.show_error,
                 &self.dialogs.error_message,
                 &self.misc.i18n,
@@ -651,7 +652,7 @@ impl eframe::App for SteamCloudApp {
 
         // AppInfo 对话框
         if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
-            match crate::ui::draw_appinfo_dialog(ctx, dialog, &self.misc.i18n) {
+            match crate::ui::draw_appinfo_dialog(ui.ctx(), dialog, &self.misc.i18n) {
                 crate::ui::AppInfoDialogAction::Close => {
                     self.dialogs.appinfo_dialog = None;
                 }
@@ -669,7 +670,7 @@ impl eframe::App for SteamCloudApp {
                         self.disconnect_from_steam();
                     }
                     self.handlers
-                        .start_restart_steam(ctx, &mut self.async_handlers);
+                        .start_restart_steam(ui.ctx(), &mut self.async_handlers);
                 }
 
                 crate::ui::AppInfoDialogAction::RefreshConfig => {
@@ -682,7 +683,7 @@ impl eframe::App for SteamCloudApp {
         // Symlink 管理对话框
         let mut close_symlink_dialog = false;
         if let Some(ref mut dialog) = self.dialogs.symlink_dialog {
-            let _action = dialog.draw(ctx, &self.misc.i18n);
+            let _action = dialog.draw(ui.ctx(), &self.misc.i18n);
             if !dialog.show {
                 close_symlink_dialog = true;
             }
@@ -693,7 +694,7 @@ impl eframe::App for SteamCloudApp {
 
         if self.game_library.show_game_selector {
             let (selected_app_id, refresh_clicked) = crate::ui::draw_game_selector_window(
-                ctx,
+                ui.ctx(),
                 &mut self.game_library.show_game_selector,
                 &self.game_library.cloud_games,
                 self.game_library.is_scanning_games,
@@ -715,7 +716,7 @@ impl eframe::App for SteamCloudApp {
         // 绘制引导对话框
         let mut close_dialog = false;
         if let Some(dialog) = &mut self.dialogs.guide_dialog {
-            let action = dialog.draw(ctx, &self.misc.i18n);
+            let action = dialog.draw(ui.ctx(), &self.misc.i18n);
             match action {
                 crate::ui::GuideDialogAction::Confirm => {
                     tracing::info!("用户确认引导对话框");
@@ -744,7 +745,7 @@ impl eframe::App for SteamCloudApp {
             }
 
             let selected_user_id = crate::ui::draw_user_selector_window(
-                ctx,
+                ui.ctx(),
                 &mut self.game_library.show_user_selector,
                 &self.game_library.all_users,
                 &self.misc.i18n,
@@ -767,7 +768,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传预览对话框
         if let Some(preview) = &mut self.dialogs.upload_preview {
-            match preview.draw(ctx, &self.misc.i18n) {
+            match preview.draw(ui.ctx(), &self.misc.i18n) {
                 crate::ui::UploadAction::Confirm => {
                     // 开始上传
                     if let Some(preview) = self.dialogs.upload_preview.take() {
@@ -783,7 +784,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传进度对话框
         if let Some(progress) = &mut self.dialogs.upload_progress {
-            progress.draw(ctx, &self.misc.i18n);
+            progress.draw(ui.ctx(), &self.misc.i18n);
             if !progress.show {
                 self.dialogs.upload_progress = None;
             }
@@ -791,7 +792,7 @@ impl eframe::App for SteamCloudApp {
 
         // 上传完成对话框
         if let Some(complete) = &mut self.dialogs.upload_complete
-            && complete.draw(ctx, &self.misc.i18n)
+            && complete.draw(ui.ctx(), &self.misc.i18n)
         {
             self.dialogs.upload_complete = None;
             self.refresh_files();
@@ -799,7 +800,11 @@ impl eframe::App for SteamCloudApp {
 
         // 文件对比对话框（只读信息展示）
         if let crate::ui::ConflictDialogEvent::RetryHashCheck(filename) =
-            crate::ui::draw_conflict_dialog(ctx, &mut self.dialogs.conflict_dialog, &self.misc.i18n)
+            crate::ui::draw_conflict_dialog(
+                ui.ctx(),
+                &mut self.dialogs.conflict_dialog,
+                &self.misc.i18n,
+            )
         {
             let app_id = self.connection.app_id_input.parse::<u32>().unwrap_or(0);
             self.handlers.retry_hash_check(
@@ -813,7 +818,7 @@ impl eframe::App for SteamCloudApp {
         let was_showing_settings = self.dialogs.show_settings;
         if self.dialogs.show_settings
             && let Some(release) = crate::ui::draw_settings_window(
-                ctx,
+                ui.ctx(),
                 &mut self.dialogs.show_settings,
                 &mut self.dialogs.settings_state,
                 &mut self.update_manager,
@@ -858,7 +863,7 @@ impl eframe::App for SteamCloudApp {
 
         // 绘制备份预览对话框
         if let Some(ref mut preview) = self.dialogs.backup_preview {
-            let action = preview.draw(ctx, &self.misc.i18n);
+            let action = preview.draw(ui.ctx(), &self.misc.i18n);
             match action {
                 crate::ui::BackupAction::StartBackup => {
                     // 开始备份
@@ -890,7 +895,7 @@ impl eframe::App for SteamCloudApp {
 
         // 绘制备份进度对话框
         if let Some(ref mut progress_dialog) = self.dialogs.backup_progress {
-            match progress_dialog.draw(ctx, &self.misc.i18n) {
+            match progress_dialog.draw(ui.ctx(), &self.misc.i18n) {
                 crate::ui::ProgressAction::Cancel => {
                     self.async_handlers.cancel_backup();
                 }
@@ -905,7 +910,7 @@ impl eframe::App for SteamCloudApp {
 
         // 绘制下载进度对话框
         if let Some(ref mut progress_dialog) = self.dialogs.download_progress {
-            match progress_dialog.draw(ctx, &self.misc.i18n) {
+            match progress_dialog.draw(ui.ctx(), &self.misc.i18n) {
                 crate::ui::ProgressAction::Cancel => {
                     self.async_handlers.cancel_download();
                 }
@@ -918,6 +923,7 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_millis(100));
     }
 }

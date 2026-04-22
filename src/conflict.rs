@@ -590,7 +590,7 @@ fn calculate_file_hash(path: &PathBuf) -> Result<String, String> {
     let mut hasher = Sha1::new();
     hasher.update(&data);
     let hash = hasher.finalize();
-    Ok(format!("{:x}", hash))
+    Ok(hash.iter().map(|b| format!("{:02x}", b)).collect())
 }
 
 // 下载文件并计算 hash
@@ -609,5 +609,5 @@ fn download_and_hash(url: &str) -> Result<String, String> {
     let mut hasher = Sha1::new();
     hasher.update(&data);
     let hash = hasher.finalize();
-    Ok(format!("{:x}", hash))
+    Ok(hash.iter().map(|b| format!("{:02x}", b)).collect())
 }

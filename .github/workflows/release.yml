@@ -39,7 +39,7 @@ jobs:
                       use_bundle: true
                       asset_name: SteamCloudFileManager-macos-aarch64
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
             - uses: dtolnay/rust-toolchain@stable
@@ -346,7 +346,7 @@ jobs:
                   find . -maxdepth 4 -type f -print || true
                   exit 1
             - name: Upload artifact
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: ${{ matrix.asset_name }}
                   path: |
@@ -362,10 +362,10 @@ jobs:
         needs: build-release
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v6
               with:
                   fetch-depth: 0
-            - uses: actions/download-artifact@v4
+            - uses: actions/download-artifact@v8
               with:
                   path: artifacts
             - name: Get previous tag
@@ -438,7 +438,7 @@ jobs:
 
                   echo "EOF" >> $GITHUB_OUTPUT
             - name: Create Release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   files: ${{ steps.prepare_files.outputs.files }}
                   body_path: release-notes.md

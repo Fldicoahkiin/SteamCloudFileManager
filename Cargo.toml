@@ -13,7 +13,7 @@ name = "SteamCloudFileManager"
 path = "src/main.rs"
 
 [build-dependencies]
-chrono = "0.4.43"
+chrono = "0.4.44"
 
 # macOS bundle configuration (cargo-bundle)
 [package.metadata.bundle]
@@ -110,20 +110,20 @@ files = [
 
 [dependencies]
 # UI Framework
-eframe = "0.33.3"
-egui = "0.33.3"
-egui_extras = { version = "0.33.3", features = [ "all_loaders" ] }
-egui-phosphor = "0.11.0"
+eframe = "0.34.1"
+egui = "0.34.1"
+egui_extras = { version = "0.34.1", features = [ "all_loaders" ] }
+egui-phosphor = "0.12.0"
 
 # Steam API
-steamworks = "0.12.2"
-steamworks-sys = "0.12.2"
+steamworks = "0.13.0"
+steamworks-sys = "0.13.0"
 
 # Utilities
-anyhow = "1.0.101"
+anyhow = "1.0.102"
 byteorder = "1.5.0"
-image = "0.25.9"
-open = "5.3.3"
+image = "0.25.10"
+open = "5.3.4"
 regex = "1.12.3"
 rfd = "0.17.2"
 walkdir = "2.5.0"
@@ -131,23 +131,23 @@ walkdir = "2.5.0"
 # Serialization
 serde = { version = "1.0.228", features = [ "derive" ] }
 serde_json = "1.0.149"
-toml = "1.0.1"
+toml = "1.1.2"
 
 # Date and Time
-chrono = { version = "0.4.42", features = [ "serde" ] }
+chrono = { version = "0.4.44", features = [ "serde" ] }
 
 # UUID and Directories
-uuid = { version = "1.20.0", features = [ "v4" ] }
+uuid = { version = "1.23.1", features = [ "v4" ] }
 dirs = "6.0.0"
 
 # Logging
 tracing = "0.1.44"
-tracing-subscriber = { version = "0.3.22", features = [ "env-filter" ] }
+tracing-subscriber = { version = "0.3.23", features = [ "env-filter" ] }
 
 # Network
-tungstenite = { version = "0.28.0", features = [ "native-tls" ] }
-ureq = "3.2.0"
-sha1 = "0.10.6"
+tungstenite = { version = "0.29.0", features = [ "native-tls" ] }
+ureq = "3.3.0"
+sha1 = "0.11.0"
 
 # Auto Update (https://crates.io/crates/self_update)
 self_update = { version = "0.42.0", default-features = false, features = [
@@ -175,4 +175,4 @@ winapi = { version = "0.3.9", features = [
 winres = "0.1.12"
 
 [dev-dependencies]
-tempfile = "3.25.0"
+tempfile = "3.27.0"
