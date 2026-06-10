@@ -13,7 +13,7 @@ name = "SteamCloudFileManager"
 path = "src/main.rs"
 
 [build-dependencies]
-chrono = "0.4.44"
+chrono = "0.4.45"
 
 # macOS bundle configuration (cargo-bundle)
 [package.metadata.bundle]
@@ -110,34 +110,34 @@ files = [
 
 [dependencies]
 # UI Framework
-eframe = "0.34.1"
-egui = "0.34.1"
-egui_extras = { version = "0.34.1", features = [ "all_loaders" ] }
+eframe = "0.34.3"
+egui = "0.34.3"
+egui_extras = { version = "0.34.3", features = [ "all_loaders" ] }
 egui-phosphor = "0.12.0"
 
 # Steam API
-steamworks = "0.13.0"
+steamworks = "0.13.1"
 steamworks-sys = "0.13.0"
 
 # Utilities
 anyhow = "1.0.102"
 byteorder = "1.5.0"
 image = "0.25.10"
-open = "5.3.4"
-regex = "1.12.3"
+open = "5.3.5"
+regex = "1.12.4"
 rfd = "0.17.2"
 walkdir = "2.5.0"
 
 # Serialization
 serde = { version = "1.0.228", features = [ "derive" ] }
-serde_json = "1.0.149"
+serde_json = "1.0.150"
 toml = "1.1.2"
 
 # Date and Time
-chrono = { version = "0.4.44", features = [ "serde" ] }
+chrono = { version = "0.4.45", features = [ "serde" ] }
 
 # UUID and Directories
-uuid = { version = "1.23.1", features = [ "v4" ] }
+uuid = { version = "1.23.3", features = [ "v4" ] }
 dirs = "6.0.0"
 
 # Logging
@@ -150,11 +150,13 @@ ureq = "3.3.0"
 sha1 = "0.11.0"
 
 # Auto Update (https://crates.io/crates/self_update)
-self_update = { version = "0.42.0", default-features = false, features = [
+self_update = { version = "0.44.0", default-features = false, features = [
 	"archive-tar",
 	"archive-zip",
 	"compression-flate2",
 	"compression-zip-deflate",
+	"ureq",
+	"default-tls",
 ] }
 
 [target.'cfg(windows)'.dependencies]
