@@ -650,6 +650,17 @@ impl eframe::App for SteamCloudApp {
             self.dialogs.show_error = false;
         }
 
+        if self.dialogs.show_result
+            && crate::ui::draw_result_window(
+                ui.ctx(),
+                &mut self.dialogs.show_result,
+                &self.dialogs.result_message,
+                &self.misc.i18n,
+            )
+        {
+            self.dialogs.show_result = false;
+        }
+
         // AppInfo 对话框
         if let Some(ref mut dialog) = self.dialogs.appinfo_dialog {
             match crate::ui::draw_appinfo_dialog(ui.ctx(), dialog, &self.misc.i18n) {

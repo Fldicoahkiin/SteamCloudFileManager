@@ -455,6 +455,13 @@ impl I18n {
         }
     }
 
+    pub fn operation_result_title(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::operation_result_title(),
+            Language::Chinese => zh::operation_result_title(),
+        }
+    }
+
     // ========== About 窗口内容 ==========
 
     pub fn author(&self) -> &'static str {
@@ -2397,10 +2404,17 @@ impl I18n {
         }
     }
 
-    pub fn delete_failed_files(&self, count: usize) -> String {
+    pub fn ufs_delete_failed_no_local_copy(&self, count: usize) -> String {
         match self.lang {
-            Language::English => en::delete_failed_files(count),
-            Language::Chinese => zh::delete_failed_files(count),
+            Language::English => en::ufs_delete_failed_no_local_copy(count),
+            Language::Chinese => zh::ufs_delete_failed_no_local_copy(count),
+        }
+    }
+
+    pub fn delete_failed_files(&self, count: usize, names: &str) -> String {
+        match self.lang {
+            Language::English => en::delete_failed_files(count, names),
+            Language::Chinese => zh::delete_failed_files(count, names),
         }
     }
 

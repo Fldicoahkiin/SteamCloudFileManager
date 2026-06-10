@@ -20,6 +20,7 @@ pub fn draw_game_selector_window(
         .open(show)
         .resizable(true)
         .default_size([600.0, 500.0])
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
             if is_scanning && games.is_empty() {
                 // 扫描中且没有游戏，显示居中的加载提示
@@ -177,6 +178,7 @@ pub fn draw_user_selector_window(
         .open(show)
         .resizable(true)
         .default_size([400.0, 300.0])
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
             ui.heading(i18n.steam_users(users.len()));
             ui.add_space(10.0);
@@ -239,8 +241,44 @@ pub fn draw_error_window(
         .open(show)
         .collapsible(false)
         .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
-            ui.label(error_message);
+            egui::ScrollArea::vertical()
+                .max_height(400.0)
+                .show(ui, |ui| {
+                    ui.label(error_message);
+                });
+            ui.add_space(12.0);
+            if ui.button(i18n.ok()).clicked() {
+                confirmed = true;
+            }
+        });
+
+    confirmed
+}
+
+// 绘制结果窗口（用于展示操作成功或部分成功的详细信息）
+pub fn draw_result_window(
+    ctx: &egui::Context,
+    show: &mut bool,
+    message: &str,
+    i18n: &I18n,
+) -> bool {
+    let mut confirmed = false;
+
+    egui::Window::new(i18n.operation_result_title())
+        .open(show)
+        .collapsible(false)
+        .resizable(true)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .default_size([500.0, 300.0])
+        .show(ctx, |ui| {
+            egui::ScrollArea::vertical()
+                .max_height(400.0)
+                .show(ui, |ui| {
+                    ui.label(message);
+                });
+            ui.add_space(12.0);
             if ui.button(i18n.ok()).clicked() {
                 confirmed = true;
             }

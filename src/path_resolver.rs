@@ -622,6 +622,11 @@ fn get_game_install_dir(steam_path: &Path, app_id: u32) -> Result<PathBuf> {
     Err(anyhow!(error_msg))
 }
 
+// 判断游戏是否已安装（依据 appmanifest 是否存在）
+pub fn is_game_installed(steam_path: &Path, app_id: u32) -> bool {
+    get_game_install_dir(steam_path, app_id).is_ok()
+}
+
 // 获取 SteamCloudDocuments 的完整路径
 // 路径结构: [base]/[Steam用户名]/[游戏名]/
 // 需要从 loginusers.vdf 获取用户名，从 appmanifest 获取游戏名

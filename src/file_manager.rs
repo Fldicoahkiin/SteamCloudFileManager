@@ -480,7 +480,12 @@ impl FileOperations {
         manager.write_file(filename, data)
     }
 
-    pub fn batch_operation<F>(&self, filenames: &[String], operation: F) -> (usize, Vec<String>)
+    pub fn batch_operation<F>(
+        &self,
+        filenames: &[String],
+        operation: F,
+        false_reason: &str,
+    ) -> (usize, Vec<String>)
     where
         F: Fn(&str) -> anyhow::Result<bool>,
     {
@@ -491,19 +496,19 @@ impl FileOperations {
             match operation(filename) {
                 Ok(true) => success_count += 1,
                 Ok(false) => {
-                    // Steam API 返回 false：自动云同步文件 (root != 0) 不支持 API 操作；
-                    // root=0 的文件返回 false 则表示文件不存在
-                    tracing::debug!(
-                        "Steam API 返回 false (自动云同步文件或文件不存在): {}",
-                        filename
-                    );
-                    failed_files.push(filename.to_string());
+                    tracing::debug!("{}: {}", false_reason, filename);
+                    failed_files.push(format!("{} ({})", filename, false_reason));
                 }
                 Err(e) => failed_files.push(format!("{} (错误: {})", filename, e)),
             }
         }
 
         (success_count, failed_files)
+    }
+
+    // 从 batch_operation 返回的带原因失败条目中提取纯文件名
+    fn extract_filename(entry: &str) -> &str {
+        entry.split(" (").next().unwrap_or(entry)
     }
 
     // 准备下载任务（用于异步下载）
@@ -537,8 +542,11 @@ impl FileOperations {
         // 确保云同步已启用（未安装的游戏可能被禁用）
         self.ensure_cloud_enabled();
 
-        let (success_count, failed_files) =
-            self.batch_operation(filenames, |filename| self.forget_file(filename));
+        let (success_count, failed_files) = self.batch_operation(
+            filenames,
+            |filename| self.forget_file(filename),
+            "Steam API 返回 false（文件不存在或自动云同步文件不支持 API 移出）",
+        );
 
         if success_count > 0 {
             tracing::info!("移出云端完成，触发云同步...");
@@ -557,8 +565,11 @@ impl FileOperations {
         // 确保云同步已启用（未安装的游戏可能被禁用）
         self.ensure_cloud_enabled();
 
-        let (success_count, failed_files) =
-            self.batch_operation(filenames, |filename| self.delete_file(filename));
+        let (success_count, failed_files) = self.batch_operation(
+            filenames,
+            |filename| self.delete_file(filename),
+            "Steam API 返回 false（文件不存在或自动云同步文件不支持 API 删除）",
+        );
 
         if success_count > 0 {
             tracing::info!("删除完成，触发云同步...");
@@ -720,10 +731,13 @@ impl FileOperations {
             let (deleted_cloud, failed_cloud) = self.forget_files(&api_cloud_files);
             total_deleted += deleted_local.max(deleted_cloud);
             // 只收集两个操作都失败的文件
-            let failed_local_set: std::collections::HashSet<_> = failed_local.iter().collect();
+            let failed_local_names: std::collections::HashSet<_> = failed_local
+                .iter()
+                .map(|s| Self::extract_filename(s))
+                .collect();
             let both_failed: Vec<String> = failed_cloud
                 .into_iter()
-                .filter(|f| failed_local_set.contains(f))
+                .filter(|f| failed_local_names.contains(Self::extract_filename(f)))
                 .collect();
             all_failed.extend(both_failed);
         }
@@ -832,6 +846,8 @@ impl FileOperations {
         // 无本地副本的 UFS 文件：尝试 API 删除（FileDelete + FileForget）
         let mut ufs_api_success = 0;
         let mut ufs_failed = Vec::new();
+        // 区分"游戏未安装"与"已安装但本地无存档副本"（从未运行过游戏），失败提示不同
+        let mut ufs_game_installed = false;
         if !ufs_no_local.is_empty() {
             tracing::info!(
                 "尝试通过 API 删除 {} 个无本地副本的自动云同步文件",
@@ -854,9 +870,13 @@ impl FileOperations {
             }
 
             // API 也失败的文件
+            let delete_failed_names: std::collections::HashSet<_> = delete_failed
+                .iter()
+                .map(|s| Self::extract_filename(s))
+                .collect();
             let api_success_names: std::collections::HashSet<_> = ufs_no_local
                 .iter()
-                .filter(|name| !delete_failed.contains(name))
+                .filter(|name| !delete_failed_names.contains(name.as_str()))
                 .cloned()
                 .collect();
             for name in &ufs_no_local {
@@ -866,10 +886,20 @@ impl FileOperations {
             }
 
             if !ufs_failed.is_empty() {
-                tracing::warn!(
-                    "API 也无法删除 {} 个自动云同步文件（游戏未安装，请安装游戏后重试）",
-                    ufs_failed.len()
-                );
+                ufs_game_installed = steam_info.as_ref().is_some_and(|(steam_path, _)| {
+                    crate::path_resolver::is_game_installed(steam_path, app_id)
+                });
+                if ufs_game_installed {
+                    tracing::warn!(
+                        "API 也无法删除 {} 个自动云同步文件（游戏已安装但本地无存档副本，需启动一次游戏同步云存档后重试）",
+                        ufs_failed.len()
+                    );
+                } else {
+                    tracing::warn!(
+                        "API 也无法删除 {} 个自动云同步文件（游戏未安装，请安装并启动一次游戏后重试）",
+                        ufs_failed.len()
+                    );
+                }
             }
         }
 
@@ -898,14 +928,14 @@ impl FileOperations {
                         }
                         Err(e) => {
                             tracing::error!("删除本地文件失败: {} - {}", path.display(), e);
-                            all_failed.push(file.name.clone());
+                            all_failed.push(format!("{} (删除本地文件失败: {})", file.name, e));
                         }
                     }
                 } else {
                     total_deleted += 1;
                 }
             } else {
-                all_failed.push(file.name.clone());
+                all_failed.push(format!("{} (无法解析本地路径)", file.name));
             }
         }
 
@@ -914,7 +944,11 @@ impl FileOperations {
             - ufs_no_local.len()
             - all_failed
                 .iter()
-                .filter(|f| ufs_files.iter().any(|u| &u.name == *f))
+                .filter(|f| {
+                    ufs_files
+                        .iter()
+                        .any(|u| u.name == Self::extract_filename(f))
+                })
                 .count();
         if ufs_local_deleted > 0 || ufs_api_success > 0 {
             tracing::info!(
@@ -940,10 +974,14 @@ impl FileOperations {
             messages.push(i18n.ufs_cloud_sync_hint().to_string());
         }
         if !ufs_failed.is_empty() {
-            messages.push(i18n.ufs_delete_failed(ufs_failed.len()));
+            messages.push(if ufs_game_installed {
+                i18n.ufs_delete_failed_no_local_copy(ufs_failed.len())
+            } else {
+                i18n.ufs_delete_failed(ufs_failed.len())
+            });
         }
         if !all_failed.is_empty() {
-            messages.push(i18n.delete_failed_files(all_failed.len()));
+            messages.push(i18n.delete_failed_files(all_failed.len(), &all_failed.join(", ")));
         }
 
         if messages.is_empty() {
@@ -1014,19 +1052,21 @@ impl FileOperations {
                                 }
                                 Err(e) => {
                                     tracing::error!("同步失败: {} - {}", file.name, e);
-                                    failed_files.push(file.name.clone());
+                                    failed_files
+                                        .push(format!("{} (写入云端失败: {})", file.name, e));
                                 }
                             },
                             Err(e) => {
                                 tracing::error!("读取文件失败: {} - {}", path.display(), e);
-                                failed_files.push(file.name.clone());
+                                failed_files
+                                    .push(format!("{} (读取本地文件失败: {})", file.name, e));
                             }
                         }
                     } else {
-                        failed_files.push(file.name.clone());
+                        failed_files.push(format!("{} (本地文件不存在)", file.name));
                     }
                 } else {
-                    failed_files.push(file.name.clone());
+                    failed_files.push(format!("{} (无法解析本地路径)", file.name));
                 }
             }
         }

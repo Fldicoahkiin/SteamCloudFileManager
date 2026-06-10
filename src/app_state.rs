@@ -104,6 +104,8 @@ pub struct GameLibraryState {
 pub struct DialogState {
     pub show_error: bool,
     pub error_message: String,
+    pub show_result: bool,
+    pub result_message: String,
     pub show_settings: bool,
     pub settings_state: crate::ui::SettingsWindowState,
     pub show_debug_warning: bool,
@@ -125,6 +127,8 @@ impl Default for DialogState {
         Self {
             show_error: false,
             error_message: String::new(),
+            show_result: false,
+            result_message: String::new(),
             show_settings: false,
             settings_state: crate::ui::SettingsWindowState::default(),
             show_debug_warning: !crate::cdp_client::CdpClient::is_cdp_running(),
@@ -147,6 +151,11 @@ impl DialogState {
     pub fn show_error(&mut self, message: &str) {
         self.error_message = message.to_string();
         self.show_error = true;
+    }
+
+    pub fn show_result(&mut self, message: &str) {
+        self.result_message = message.to_string();
+        self.show_result = true;
     }
 }
 

@@ -198,6 +198,10 @@ pub fn error_title() -> &'static str {
     "Error"
 }
 
+pub fn operation_result_title() -> &'static str {
+    "Operation Result"
+}
+
 pub fn author() -> &'static str {
     "Author:"
 }
@@ -1337,17 +1341,26 @@ pub fn ufs_cloud_sync_hint() -> &'static str {
 
 pub fn ufs_delete_failed(count: usize) -> String {
     format!(
-        "{} auto-cloud file{} cannot be deleted (game not installed, please install and retry)",
+        "{} auto-cloud file{} cannot be deleted (game not installed; install and launch it once, then retry)",
         count,
         if count != 1 { "s" } else { "" }
     )
 }
 
-pub fn delete_failed_files(count: usize) -> String {
+pub fn ufs_delete_failed_no_local_copy(count: usize) -> String {
     format!(
-        "{} file{} failed to delete",
+        "{} auto-cloud file{} cannot be deleted (game installed but no local save copies; launch the game once so Steam syncs saves locally, then retry)",
         count,
         if count != 1 { "s" } else { "" }
+    )
+}
+
+pub fn delete_failed_files(count: usize, names: &str) -> String {
+    format!(
+        "{} file{} failed to delete: {}",
+        count,
+        if count != 1 { "s" } else { "" },
+        names
     )
 }
 

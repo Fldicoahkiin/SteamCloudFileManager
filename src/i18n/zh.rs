@@ -194,6 +194,10 @@ pub fn error_title() -> &'static str {
     "错误"
 }
 
+pub fn operation_result_title() -> &'static str {
+    "操作结果"
+}
+
 pub fn author() -> &'static str {
     "作者:"
 }
@@ -1294,13 +1298,20 @@ pub fn ufs_cloud_sync_hint() -> &'static str {
 
 pub fn ufs_delete_failed(count: usize) -> String {
     format!(
-        "{} 个自动云同步文件无法删除（游戏未安装且 API 不支持，请安装游戏后重试）",
+        "{} 个自动云同步文件无法删除（游戏未安装且 API 不支持，请安装并启动一次游戏后重试）",
         count
     )
 }
 
-pub fn delete_failed_files(count: usize) -> String {
-    format!("{} 个文件删除失败", count)
+pub fn ufs_delete_failed_no_local_copy(count: usize) -> String {
+    format!(
+        "{} 个自动云同步文件无法删除（游戏已安装但本地无存档副本，请启动一次游戏让 Steam 将云存档同步到本地后重试）",
+        count
+    )
+}
+
+pub fn delete_failed_files(count: usize, names: &str) -> String {
+    format!("{} 个文件删除失败: {}", count, names)
 }
 
 pub fn no_files_deleted() -> &'static str {

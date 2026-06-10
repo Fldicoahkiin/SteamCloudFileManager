@@ -305,7 +305,7 @@ impl AppHandlers {
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
-                misc.status_message = msg;
+                dialogs.show_result(&msg);
                 true
             }
             FileOperationResult::Error(msg) => {
@@ -335,7 +335,7 @@ impl AppHandlers {
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
-                misc.status_message = msg;
+                dialogs.show_result(&msg);
                 true
             }
             FileOperationResult::Error(msg) => {
@@ -365,7 +365,7 @@ impl AppHandlers {
 
         match result {
             FileOperationResult::SuccessWithRefresh(msg) => {
-                misc.status_message = msg;
+                dialogs.show_result(&msg);
                 true
             }
             FileOperationResult::Error(msg) => {
