@@ -141,6 +141,7 @@ pub fn draw_settings_window(
         .collapsible(false)
         .default_size([window_width, WINDOW_HEIGHT])
         .min_size([window_width, WINDOW_HEIGHT])
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
             let content_height = ui.available_height().max(WINDOW_HEIGHT);
 

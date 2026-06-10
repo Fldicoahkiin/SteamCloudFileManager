@@ -204,6 +204,7 @@ pub fn draw_appinfo_dialog(
         .resizable(true)
         .default_width(600.0)
         .default_height(500.0)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
             // Tab 切换
             ui.horizontal(|ui| {

@@ -144,6 +144,7 @@ pub fn draw_conflict_dialog(
         .default_size([900.0, 600.0])
         .resizable(true)
         .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
         .show(ctx, |ui| {
             // 顶部过滤栏
             new_filter = render_filter_bar(ui, &stats, current_filter, i18n);

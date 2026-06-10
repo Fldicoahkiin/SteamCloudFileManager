@@ -321,6 +321,7 @@ impl SymlinkDialog {
             .collapsible(false)
             .min_width(600.0)
             .default_size([650.0, 500.0])
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 // 游戏信息
                 ui.horizontal(|ui| {
