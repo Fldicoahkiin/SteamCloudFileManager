@@ -279,9 +279,9 @@ jobs:
                   # 查找生成的 AppImage（cargo-appimage 生成在 target/appimage/ 目录）
                   APPIMAGE_FILE=$(find target/appimage -name "*.AppImage" | head -n 1)
                   if [ -n "$APPIMAGE_FILE" ]; then
-                    # 新格式: SteamCloudFileManager-{version}-linux-x86_64.AppImage
-                    mv "$APPIMAGE_FILE" SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.AppImage
-                    echo "构建成功: SteamCloudFileManager-${{ env.VERSION }}-linux-x86_64.AppImage"
+                    # 新格式: SteamCloudFileManager-{version}-x86_64.AppImage（AppImage 只用于 Linux，文件名不带 linux）
+                    mv "$APPIMAGE_FILE" SteamCloudFileManager-${{ env.VERSION }}-x86_64.AppImage
+                    echo "构建成功: SteamCloudFileManager-${{ env.VERSION }}-x86_64.AppImage"
                   else
                     echo "错误: 未找到 AppImage 文件"
                     echo "调试信息 - 查找所有 AppImage 文件："
@@ -434,7 +434,7 @@ jobs:
                   done
 
                   # 添加 AppImage 和 AUR tarball
-                  echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64.AppImage" >> $GITHUB_OUTPUT
+                  echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-x86_64.AppImage" >> $GITHUB_OUTPUT
                   echo "artifacts/SteamCloudFileManager-linux-x86_64/SteamCloudFileManager-${VERSION}-linux-x86_64-aur.tar.gz" >> $GITHUB_OUTPUT
 
                   echo "EOF" >> $GITHUB_OUTPUT
