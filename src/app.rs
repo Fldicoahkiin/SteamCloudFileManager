@@ -365,19 +365,18 @@ impl SteamCloudApp {
             let mut added_count = 0;
 
             for file in dropped_files {
-                if let Some(path) = &file.path {
-                    if path.is_file() {
-                        if let Err(e) = queue.add_file(path.to_path_buf()) {
-                            tracing::warn!("添加文件失败 {}: {}", path.display(), e);
-                        } else {
-                            added_count += 1;
-                        }
-                    } else if path.is_dir() {
-                        if let Err(e) = queue.add_folder(path) {
-                            tracing::warn!("添加文件夹失败 {}: {}", path.display(), e);
-                        } else {
-                            added_count += 1;
-                        }
+                let path = file.path();
+                if path.is_file() {
+                    if let Err(e) = queue.add_file(path.to_path_buf()) {
+                        tracing::warn!("添加文件失败 {}: {}", path.display(), e);
+                    } else {
+                        added_count += 1;
+                    }
+                } else if path.is_dir() {
+                    if let Err(e) = queue.add_folder(path) {
+                        tracing::warn!("添加文件夹失败 {}: {}", path.display(), e);
+                    } else {
+                        added_count += 1;
                     }
                 }
             }
@@ -546,7 +545,7 @@ impl eframe::App for SteamCloudApp {
 
         // 渲染顶部面板
         let top_event = egui::Panel::top("top_panel")
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 crate::ui::render_top_panel(
                     ui,
                     &mut self.dialogs,
@@ -574,7 +573,7 @@ impl eframe::App for SteamCloudApp {
 
         // 渲染底部面板
         let bottom_event = egui::Panel::bottom("bottom_panel")
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 crate::ui::render_bottom_panel(
                     ui,
                     &self.connection,
@@ -624,7 +623,7 @@ impl eframe::App for SteamCloudApp {
         }
 
         // 渲染中心面板
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             if self.connection.is_connected && self.connection.remote_ready {
                 let ctx = ui.ctx().clone();
                 self.handle_file_drop(&ctx, ui);
