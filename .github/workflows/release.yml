@@ -251,14 +251,15 @@ jobs:
                   # 确保项目已构建（不使用 --target，让二进制生成在 target/release/）
                   cargo build --release
 
-                  # 复制 Steam API 库到 target/release/（AppImage 需要）
+                  # cargo-appimage 的 auto_link 只收 ldd 能解析到的库，AppRun 也只在 AppDir 的 usr/lib、lib 等目录里找库；
+                  # 把 libsteam_api.so 装进系统库目录，让 auto_link 把它连同其他依赖一起收进 AppDir 的库目录
                   STEAM_LIB=$(find target/release/build/steamworks-sys-*/out -name "libsteam_api.so" 2>/dev/null | head -n 1)
-                  if [ -n "$STEAM_LIB" ]; then
-                    cp "$STEAM_LIB" target/release/
-                    echo "已复制 libsteam_api.so 到 target/release/"
-                  else
-                    echo "警告: 未找到 libsteam_api.so"
+                  if [ -z "$STEAM_LIB" ]; then
+                    echo "错误: 未找到 libsteam_api.so"
+                    exit 1
                   fi
+                  sudo install -m 644 "$STEAM_LIB" /usr/lib/x86_64-linux-gnu/
+                  sudo ldconfig
 
                   # 安装 cargo-appimage
                   cargo install cargo-appimage
