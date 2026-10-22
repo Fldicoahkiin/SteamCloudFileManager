@@ -56,7 +56,7 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
             let x = base_x + (level as f32 + 0.5) * INDENT_WIDTH;
             painter.line_segment(
                 [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-                egui::Stroke::new(1.0, line_color),
+                egui::Stroke::new(1.0_f32, line_color),
             );
         }
     }
@@ -70,13 +70,13 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
         // 最后一个节点
         painter.line_segment(
             [egui::pos2(x, rect.min.y), egui::pos2(x, y_mid)],
-            egui::Stroke::new(1.0, line_color),
+            egui::Stroke::new(1.0_f32, line_color),
         );
     } else {
         // 非最后节点
         painter.line_segment(
             [egui::pos2(x, rect.min.y), egui::pos2(x, rect.max.y)],
-            egui::Stroke::new(1.0, line_color),
+            egui::Stroke::new(1.0_f32, line_color),
         );
     }
 
@@ -84,7 +84,7 @@ fn draw_tree_lines(ui: &mut egui::Ui, depth: usize, is_last: bool, parent_is_las
     let h_end = base_x + depth as f32 * INDENT_WIDTH;
     painter.line_segment(
         [egui::pos2(x, y_mid), egui::pos2(h_end, y_mid)],
-        egui::Stroke::new(1.0, line_color),
+        egui::Stroke::new(1.0_f32, line_color),
     );
 
     depth as f32 * INDENT_WIDTH

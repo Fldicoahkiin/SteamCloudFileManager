@@ -428,10 +428,10 @@ fn generate_symlink_commands(target: &Path, link: &Path) -> Vec<String> {
     #[cfg(target_os = "macos")]
     {
         vec![
-            format!("# macOS 创建软链接"),
+            "# macOS 创建软链接".to_string(),
             format!("ln -s \"{}\" \"{}\"", target_str, link_str),
-            format!(""),
-            format!("# 删除软链接"),
+            String::new(),
+            "# 删除软链接".to_string(),
             format!("rm \"{}\"", link_str),
         ]
     }
@@ -439,10 +439,10 @@ fn generate_symlink_commands(target: &Path, link: &Path) -> Vec<String> {
     #[cfg(target_os = "linux")]
     {
         vec![
-            format!("# Linux 创建软链接"),
+            "# Linux 创建软链接".to_string(),
             format!("ln -s \"{}\" \"{}\"", target_str, link_str),
-            format!(""),
-            format!("# 删除软链接"),
+            String::new(),
+            "# 删除软链接".to_string(),
             format!("rm \"{}\"", link_str),
         ]
     }
@@ -450,25 +450,25 @@ fn generate_symlink_commands(target: &Path, link: &Path) -> Vec<String> {
     #[cfg(target_os = "windows")]
     {
         vec![
-            format!("# Windows PowerShell (需要管理员权限)"),
+            "# Windows PowerShell (需要管理员权限)".to_string(),
             format!(
                 "New-Item -ItemType SymbolicLink -Path \"{}\" -Target \"{}\"",
                 link_str, target_str
             ),
-            format!(""),
-            format!("# Windows CMD (需要管理员权限)"),
+            String::new(),
+            "# Windows CMD (需要管理员权限)".to_string(),
             format!("mklink /D \"{}\" \"{}\"", link_str, target_str),
-            format!(""),
-            format!("# Windows Junction (无需管理员权限，仅目录)"),
+            String::new(),
+            "# Windows Junction (无需管理员权限，仅目录)".to_string(),
             format!("mklink /J \"{}\" \"{}\"", link_str, target_str),
-            format!(""),
-            format!("# 删除软链接"),
+            String::new(),
+            "# 删除软链接".to_string(),
             format!("rmdir \"{}\"", link_str),
         ]
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
     {
-        vec![format!("# 不支持的平台")]
+        vec!["# 不支持的平台".to_string()]
     }
 }
