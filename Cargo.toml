@@ -24,7 +24,9 @@ copyright = "Copyright © 2026 Flacier. All rights reserved."
 category = "Utility"
 short_description = "Steam云文件管理器"
 long_description = "Steam Cloud File Manager - 管理和查看 Steam 云存档文件的实用工具。支持查看游戏云存档列表、文件详情、下载和上传云存档文件。"
-osx_minimum_system_version = "10.13"
+
+[package.metadata.bundle.osx]
+minimum_system_version = "10.13"
 
 # Debian package configuration (cargo-deb)
 [package.metadata.deb]
