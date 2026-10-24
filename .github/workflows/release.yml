@@ -43,7 +43,7 @@ jobs:
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0
-            - uses: dtolnay/rust-toolchain@stable
+            - uses: dtolnay/rust-toolchain@1.99.1
               with:
                   targets: ${{ matrix.target }}
             - uses: Swatinem/rust-cache@v2
@@ -61,7 +61,7 @@ jobs:
                   sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxcb-shape0-dev libxcb-xfixes0-dev
             - name: Install cargo-bundle
               if: matrix.use_bundle
-              run: cargo install cargo-bundle
+              run: cargo install cargo-bundle --locked --version 0.12.0
             - name: Build
               run: |
                   cargo build --release --target ${{ matrix.target }}
@@ -203,7 +203,7 @@ jobs:
             - name: Build .deb package
               if: matrix.build_deb
               run: |
-                  cargo install cargo-deb
+                  cargo install cargo-deb --locked --version 3.8.0
 
                   # 确保 libsteam_api.so 存在于 target/release/（cargo-deb 需要）
                   mkdir -p target/release
@@ -225,7 +225,7 @@ jobs:
             - name: Build .rpm package
               if: matrix.build_rpm
               run: |
-                  cargo install cargo-generate-rpm
+                  cargo install cargo-generate-rpm --locked --version 0.21.1
                   cargo build --release --target ${{ matrix.target }}
                   strip -s target/${{ matrix.target }}/release/SteamCloudFileManager
 
@@ -263,7 +263,7 @@ jobs:
                   sudo ldconfig
 
                   # 安装 cargo-appimage
-                  cargo install cargo-appimage
+                  cargo install cargo-appimage --locked --version 2.4.0
 
                   # 下载 appimagetool（cargo-appimage 需要）；新版 appimagetool 嵌入静态的 type2-runtime，产物不再依赖系统的 libfuse2
                   wget -q https://github.com/AppImage/appimagetool/releases/download/1.9.1/appimagetool-x86_64.AppImage
@@ -299,7 +299,7 @@ jobs:
 
                   # 安装 cargo-aur（已安装会跳过，这里检查后再安装避免重复）
                   if ! command -v cargo-aur >/dev/null 2>&1; then
-                    cargo install cargo-aur --locked
+                    cargo install cargo-aur --locked --version 1.7.1
                   else
                     echo "cargo-aur already installed"
                   fi
