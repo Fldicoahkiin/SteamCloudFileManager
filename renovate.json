@@ -1,4 +1,52 @@
 {
 	"$schema": "https://docs.renovatebot.com/renovate-schema.json",
-	"extends": ["config:recommended"]
+	"extends": ["config:recommended"],
+	"customManagers": [
+		{
+			"customType": "regex",
+			"description": "Cargo tools installed in workflows",
+			"managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+			"matchStrings": [
+				"cargo install (?<depName>[a-z0-9_-]+) --locked --version (?<currentValue>[0-9][^\\s]*)"
+			],
+			"datasourceTemplate": "crate"
+		},
+		{
+			"customType": "regex",
+			"description": "Rust toolchain used by CI",
+			"managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+			"matchStrings": [
+				"dtolnay/rust-toolchain@(?<currentValue>\\d+\\.\\d+\\.\\d+)"
+			],
+			"depNameTemplate": "rust",
+			"packageNameTemplate": "rust-lang/rust",
+			"datasourceTemplate": "github-releases"
+		},
+		{
+			"customType": "regex",
+			"description": "appimagetool used to build the AppImage",
+			"managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+			"matchStrings": [
+				"AppImage/appimagetool/releases/download/(?<currentValue>[^/]+)/"
+			],
+			"depNameTemplate": "AppImage/appimagetool",
+			"datasourceTemplate": "github-releases"
+		},
+		{
+			"customType": "regex",
+			"description": "fama formatter used by CI",
+			"managerFilePatterns": ["/^\\.github/workflows/[^/]+\\.ya?ml$/"],
+			"matchStrings": ["FAMA_VERSION: (?<currentValue>v[^\\s]+)"],
+			"depNameTemplate": "AkaraChen/fama",
+			"datasourceTemplate": "github-releases"
+		}
+	],
+	"packageRules": [
+		{
+			"description": "The rust-toolchain action ref is a Rust version, updated by the custom manager above",
+			"matchManagers": ["github-actions"],
+			"matchDepNames": ["dtolnay/rust-toolchain"],
+			"enabled": false
+		}
+	]
 }
