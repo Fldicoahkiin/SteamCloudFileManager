@@ -131,6 +131,16 @@ impl SteamCloudManager {
         Self::cleanup_app_id_file();
     }
 
+    // Steam 会话当前登录账号的 32 位 account id（即 userdata 下的目录名）
+    pub fn session_account_id(&self) -> Result<u32> {
+        let guard = self
+            .client
+            .lock()
+            .map_err(|_| anyhow!("Steam客户端锁不可用"))?;
+        let client = guard.as_ref().ok_or_else(|| anyhow!("Steam客户端未连接"))?;
+        Ok(client.user().steam_id().account_id().raw())
+    }
+
     pub fn is_connected(&self) -> bool {
         match self.client.lock() {
             Ok(guard) => guard.is_some(),

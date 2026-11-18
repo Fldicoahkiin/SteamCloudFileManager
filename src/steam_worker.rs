@@ -34,7 +34,7 @@ pub enum WorkerRequest {
 pub enum WorkerResponse {
     Ok,
     Error { message: String },
-    Connected { app_id: u32 },
+    Connected { app_id: u32, account_id: u32 },
     Files { files: Vec<WorkerCloudFile> },
     Quota { total: u64, available: u64 },
     FileData { data: Vec<u8> },
@@ -208,12 +208,32 @@ impl SteamWorkerManager {
         self.spawn_worker()?;
 
         // 发送连接请求
-        let connected_id = self.request(&WorkerRequest::Connect { app_id }, |r| match r {
-            WorkerResponse::Connected { app_id } => Ok(app_id),
-            other => Err(anyhow!("连接失败，意外响应: {:?}", other)),
-        })?;
+        let (connected_id, account_id) =
+            self.request(&WorkerRequest::Connect { app_id }, |r| match r {
+                WorkerResponse::Connected { app_id, account_id } => Ok((app_id, account_id)),
+                other => Err(anyhow!("连接失败，意外响应: {:?}", other)),
+            })?;
+
+        // 本地路径按 loginusers.vdf 推断的账号解析，云端操作作用于 Steam 会话账号；
+        // 两者不一致时，同步/删除会读写另一个账号的文件，所以拒绝连接
+        let local_user_id = crate::vdf_parser::VdfParser::new()?
+            .get_user_id()
+            .to_string();
+        tracing::info!(
+            "Worker 已连接到 Steam (App ID: {}, 会话账号: {}, 本地账号: {})",
+            connected_id,
+            account_id,
+            local_user_id
+        );
+        if local_user_id != account_id.to_string() {
+            self.disconnect();
+            return Err(anyhow!(
+                "Steam 当前登录的账号 ({}) 与软件读取的账号 ({}) 不一致。请在「账户」中切换到当前登录的账号，或在 Steam 中登录对应账号后重试",
+                account_id,
+                local_user_id
+            ));
+        }
         self.app_id = connected_id;
-        tracing::info!("Worker 已连接到 Steam (App ID: {})", connected_id);
         Ok(())
     }
 
@@ -483,12 +503,17 @@ fn handle_worker_request(
             std::process::exit(0);
         }
 
-        WorkerRequest::Connect { app_id } => match manager.connect(app_id) {
-            Ok(_) => WorkerResponse::Connected { app_id },
-            Err(e) => WorkerResponse::Error {
-                message: e.to_string(),
-            },
-        },
+        WorkerRequest::Connect { app_id } => {
+            match manager
+                .connect(app_id)
+                .and_then(|_| manager.session_account_id())
+            {
+                Ok(account_id) => WorkerResponse::Connected { app_id, account_id },
+                Err(e) => WorkerResponse::Error {
+                    message: e.to_string(),
+                },
+            }
+        }
 
         WorkerRequest::Disconnect => {
             manager.disconnect();
