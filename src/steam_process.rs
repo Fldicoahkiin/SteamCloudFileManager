@@ -275,6 +275,22 @@ fn start_steam_macos() -> Result<()> {
 fn close_steam_windows() -> Result<()> {
     tracing::debug!("正在关闭 Windows 上的 Steam 进程...");
     use std::os::windows::process::CommandExt;
+
+    // 先让 Steam 自己退出，保存配置；强制结束只作为兜底
+    if let Ok(steam_dir) = crate::vdf_parser::VdfParser::find_steam_path() {
+        let steam_exe = steam_dir.join("steam.exe");
+        if let Err(e) = Command::new(&steam_exe)
+            .arg("-shutdown")
+            .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+            .spawn()
+        {
+            tracing::warn!("调用 steam.exe -shutdown 失败: {}", e);
+        } else if wait_for_steam_shutdown(15) {
+            return Ok(());
+        }
+    }
+
+    tracing::warn!("Steam 未正常退出，强制结束进程");
     Command::new("taskkill")
         .args(["/F", "/IM", "steam.exe"])
         .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
@@ -297,8 +313,17 @@ fn start_steam_windows() -> Result<()> {
     }
 
     tracing::debug!(path = ?steam_exe, "正在启动 Steam，添加参数: -cef-enable-debugging");
+    // 与本进程分离启动，不继承标准输入输出，避免 Steam 的生命周期受本程序影响
+    use std::os::windows::process::CommandExt;
+    use std::process::Stdio;
     Command::new(&steam_exe)
         .arg("-cef-enable-debugging")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(
+            winapi::um::winbase::DETACHED_PROCESS | winapi::um::winbase::CREATE_NEW_PROCESS_GROUP,
+        )
         .spawn()
         .map_err(|e| anyhow!("无法启动 Steam: {}", e))?;
 
