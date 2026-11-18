@@ -54,6 +54,10 @@ pub struct WorkerCloudFile {
     pub root_description: String,
 }
 
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+// 状态查询在 UI 线程上执行，用短超时
+const STATUS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+
 // Worker 子进程管理器
 pub struct SteamWorkerManager {
     child: Option<Child>,
@@ -114,14 +118,23 @@ impl SteamWorkerManager {
         self.stdin = Some(stdin);
         self.response_rx = Some(rx);
 
-        // 等待 Worker 就绪
-        self.send_request(&WorkerRequest::Ping)?;
-        match self.receive_response_timeout(std::time::Duration::from_secs(5))? {
-            WorkerResponse::Pong => {
+        // 等待 Worker 就绪；失败时清理，避免留下半初始化的 Worker
+        let ready = self
+            .send_request(&WorkerRequest::Ping)
+            .and_then(|_| self.receive_response_timeout(std::time::Duration::from_secs(5)));
+        match ready {
+            Ok(WorkerResponse::Pong) => {
                 tracing::info!("Steam Worker 子进程已就绪");
                 Ok(())
             }
-            other => Err(anyhow!("Worker 启动失败，意外响应: {:?}", other)),
+            Ok(other) => {
+                self.disconnect();
+                Err(anyhow!("Worker 启动失败，意外响应: {:?}", other))
+            }
+            Err(e) => {
+                self.disconnect();
+                Err(e)
+            }
         }
     }
 
@@ -172,19 +185,22 @@ impl SteamWorkerManager {
             .response_rx
             .as_ref()
             .ok_or_else(|| anyhow!("Worker 未启动"))?;
-        rx.recv_timeout(timeout)
-            .map_err(|e| anyhow!("接收 Worker 响应超时: {}", e))
-    }
-
-    // 接收响应（默认超时 30 秒）
-    fn receive_response(&self) -> Result<WorkerResponse> {
-        self.receive_response_timeout(std::time::Duration::from_secs(30))
+        rx.recv_timeout(timeout).map_err(|e| match e {
+            std::sync::mpsc::RecvTimeoutError::Timeout => {
+                anyhow!("Worker 响应超时 ({}s)", timeout.as_secs())
+            }
+            std::sync::mpsc::RecvTimeoutError::Disconnected => anyhow!("Worker 进程已退出"),
+        })
     }
 
     // 连接到 Steam（启动 Worker 子进程）
     pub fn connect(&mut self, app_id: u32) -> Result<()> {
-        // 如果已连接到不同的 app_id，先断开
-        if self.is_connected() && self.app_id != app_id {
+        // 如果已连接到不同的 app_id，或 Worker 已退出，先断开
+        let exited = self
+            .child
+            .as_mut()
+            .is_some_and(|c| !matches!(c.try_wait(), Ok(None)));
+        if exited || (self.is_connected() && self.app_id != app_id) {
             self.disconnect();
         }
 
@@ -192,18 +208,13 @@ impl SteamWorkerManager {
         self.spawn_worker()?;
 
         // 发送连接请求
-        self.send_request(&WorkerRequest::Connect { app_id })?;
-        match self.receive_response()? {
-            WorkerResponse::Connected {
-                app_id: connected_id,
-            } => {
-                self.app_id = connected_id;
-                tracing::info!("Worker 已连接到 Steam (App ID: {})", connected_id);
-                Ok(())
-            }
-            WorkerResponse::Error { message } => Err(anyhow!("{}", message)),
+        let connected_id = self.request(&WorkerRequest::Connect { app_id }, |r| match r {
+            WorkerResponse::Connected { app_id } => Ok(app_id),
             other => Err(anyhow!("连接失败，意外响应: {:?}", other)),
-        }
+        })?;
+        self.app_id = connected_id;
+        tracing::info!("Worker 已连接到 Steam (App ID: {})", connected_id);
+        Ok(())
     }
 
     // 异步连接
@@ -280,8 +291,33 @@ impl SteamWorkerManager {
     where
         F: FnOnce(WorkerResponse) -> Result<T>,
     {
-        self.send_request(req)?;
-        let resp = self.receive_response()?;
+        self.request_with_timeout(req, REQUEST_TIMEOUT, extract)
+    }
+
+    // 协议没有请求 id：一旦收包失败，晚到的响应会被下一个请求读走。
+    // 所以任何发送/接收失败都直接终止 Worker，由调用方重新连接。
+    fn request_with_timeout<T, F>(
+        &mut self,
+        req: &WorkerRequest,
+        timeout: std::time::Duration,
+        extract: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(WorkerResponse) -> Result<T>,
+    {
+        let resp = match self
+            .send_request(req)
+            .and_then(|_| self.receive_response_timeout(timeout))
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                if self.child.is_some() {
+                    tracing::error!("Worker 请求失败，终止 Worker: {}", e);
+                    self.disconnect();
+                }
+                return Err(e);
+            }
+        };
         if let WorkerResponse::Error { message } = &resp {
             return Err(anyhow!("{}", message));
         }
@@ -352,17 +388,25 @@ impl SteamWorkerManager {
     }
 
     pub fn is_cloud_enabled_for_account(&mut self) -> Result<bool> {
-        self.request(&WorkerRequest::IsCloudEnabledForAccount, |r| match r {
-            WorkerResponse::Bool { value } => Ok(value),
-            other => Err(anyhow!("意外响应: {:?}", other)),
-        })
+        self.request_with_timeout(
+            &WorkerRequest::IsCloudEnabledForAccount,
+            STATUS_TIMEOUT,
+            |r| match r {
+                WorkerResponse::Bool { value } => Ok(value),
+                other => Err(anyhow!("意外响应: {:?}", other)),
+            },
+        )
     }
 
     pub fn is_cloud_enabled_for_app(&mut self) -> Result<bool> {
-        self.request(&WorkerRequest::IsCloudEnabledForApp, |r| match r {
-            WorkerResponse::Bool { value } => Ok(value),
-            other => Err(anyhow!("意外响应: {:?}", other)),
-        })
+        self.request_with_timeout(
+            &WorkerRequest::IsCloudEnabledForApp,
+            STATUS_TIMEOUT,
+            |r| match r {
+                WorkerResponse::Bool { value } => Ok(value),
+                other => Err(anyhow!("意外响应: {:?}", other)),
+            },
+        )
     }
 
     pub fn set_cloud_enabled_for_app(&mut self, enabled: bool) -> Result<()> {
@@ -380,10 +424,6 @@ impl SteamWorkerManager {
             WorkerResponse::Ok => Ok(()),
             other => Err(anyhow!("意外响应: {:?}", other)),
         })
-    }
-
-    pub fn run_callbacks(&self) {
-        // Worker 子进程自动处理
     }
 }
 

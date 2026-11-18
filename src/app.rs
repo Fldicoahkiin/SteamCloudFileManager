@@ -576,8 +576,28 @@ impl SteamCloudApp {
 
     fn check_steam_connection(&mut self) {
         if self.connection.is_connected {
-            if let Ok(manager) = self.steam_manager.try_lock() {
-                manager.run_callbacks();
+            // 只用 try_lock：后台线程持锁时跳过本帧，不阻塞 UI
+            if let Ok(mut manager) = self.steam_manager.try_lock() {
+                if !manager.is_connected() {
+                    // Worker 已被终止（请求失败或进程退出）
+                    drop(manager);
+                    tracing::warn!("Steam Worker 已断开，重置连接状态");
+                    self.connection.reset();
+                    self.misc.status_message = self.misc.i18n.error_worker_lost().to_string();
+                    return;
+                }
+
+                let stale = self
+                    .connection
+                    .cloud_status_checked
+                    .is_none_or(|t| t.elapsed() >= Duration::from_secs(2));
+                if stale {
+                    self.connection.cloud_status = (
+                        manager.is_cloud_enabled_for_account().ok(),
+                        manager.is_cloud_enabled_for_app().ok(),
+                    );
+                    self.connection.cloud_status_checked = Some(std::time::Instant::now());
+                }
             }
 
             // 检查超时（30秒）
@@ -646,7 +666,6 @@ impl eframe::App for SteamCloudApp {
                     &mut self.file_list,
                     &self.misc,
                     &self.game_library,
-                    &self.steam_manager,
                 )
             })
             .inner;
@@ -678,6 +697,7 @@ impl eframe::App for SteamCloudApp {
                 {
                     let _ = manager.set_cloud_enabled_for_app(!enabled);
                 }
+                self.connection.cloud_status_checked = None;
             }
             crate::ui::BottomPanelEvent::ShowAppInfo(app_id) => {
                 self.show_appinfo(app_id);

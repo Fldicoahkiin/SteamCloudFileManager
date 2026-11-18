@@ -487,6 +487,10 @@ pub fn steam_restart_success() -> &'static str {
     "Steam restarted successfully!"
 }
 
+pub fn error_worker_lost() -> &'static str {
+    "Lost the connection to Steam (Steam may have exited or stopped responding). Reconnect to continue"
+}
+
 pub fn user_switched() -> &'static str {
     "User switched"
 }

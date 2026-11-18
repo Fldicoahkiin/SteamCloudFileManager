@@ -941,6 +941,13 @@ impl I18n {
         }
     }
 
+    pub fn error_worker_lost(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::error_worker_lost(),
+            Language::Chinese => zh::error_worker_lost(),
+        }
+    }
+
     pub fn user_switched(&self) -> &'static str {
         match self.lang {
             Language::English => en::user_switched(),

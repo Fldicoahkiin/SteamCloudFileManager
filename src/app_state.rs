@@ -15,6 +15,9 @@ pub struct ConnectionState {
     pub is_connecting: bool,
     pub remote_ready: bool,
     pub since_connected: Option<Instant>,
+    // 云同步开关缓存（账户, 当前游戏），由 check_steam_connection 定期刷新，渲染时只读
+    pub cloud_status: (Option<bool>, Option<bool>),
+    pub cloud_status_checked: Option<Instant>,
 }
 
 impl ConnectionState {
@@ -23,6 +26,8 @@ impl ConnectionState {
         self.is_connecting = false;
         self.remote_ready = false;
         self.since_connected = None;
+        self.cloud_status = (None, None);
+        self.cloud_status_checked = None;
     }
 }
 

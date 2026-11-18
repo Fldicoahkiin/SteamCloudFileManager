@@ -470,6 +470,10 @@ pub fn steam_restart_success() -> &'static str {
     "Steam 已成功重启!"
 }
 
+pub fn error_worker_lost() -> &'static str {
+    "与 Steam 的连接已中断（Steam 可能已退出或无响应），请重新连接"
+}
+
 pub fn user_switched() -> &'static str {
     "已切换用户"
 }
