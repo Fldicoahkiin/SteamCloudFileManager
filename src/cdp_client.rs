@@ -14,11 +14,32 @@ struct Target {
     #[serde(rename = "type")]
     target_type: String,
     url: Option<String>,
+    id: Option<String>,
 }
 
 pub struct CdpClient {
     socket: WebSocket<MaybeTlsStream<TcpStream>>,
     message_id: u64,
+    // 由本客户端创建的页面，Drop 时关闭
+    owned_target_id: Option<String>,
+}
+
+fn close_target(id: &str) {
+    if let Err(e) = cdp_http_agent()
+        .put(format!("{}/json/close/{}", CDP_HTTP_BASE, id))
+        .send_empty()
+    {
+        tracing::warn!("关闭 CDP 页面失败: {}", e);
+    }
+}
+
+impl Drop for CdpClient {
+    fn drop(&mut self) {
+        let _ = self.socket.close(None);
+        if let Some(id) = &self.owned_target_id {
+            close_target(id);
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -44,11 +65,27 @@ pub enum CdpTarget {
     FileList,
 }
 
+const CDP_HTTP_BASE: &str = "http://127.0.0.1:8080";
+const CDP_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
+const CDP_SOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
+
+// 本地调试端口不走代理，并设置超时，避免 Steam 无响应时卡住调用方
+fn cdp_http_agent() -> ureq::Agent {
+    ureq::config::Config::builder()
+        .proxy(None)
+        .timeout_global(Some(CDP_HTTP_TIMEOUT))
+        .build()
+        .new_agent()
+}
+
 impl CdpClient {
     // 检查 CDP 服务是否可用
     pub fn is_cdp_running() -> bool {
         static LOG_ONCE: std::sync::Once = std::sync::Once::new();
-        let result = ureq::get("http://127.0.0.1:8080/json").call().is_ok();
+        let result = cdp_http_agent()
+            .get(format!("{}/json/version", CDP_HTTP_BASE))
+            .call()
+            .is_ok();
         LOG_ONCE.call_once(|| {
             if result {
                 tracing::debug!("Steam CEF 调试端口可用 (127.0.0.1:8080)");
@@ -60,15 +97,18 @@ impl CdpClient {
     }
 
     // 连接到指定类型的页面
+    // 只复用已打开的云存储页面；没有时新开一个独立页面，用完关闭。
+    // 不能导航 Steam 自身的页面（SharedJSContext、菜单、弹窗等），否则会破坏 Steam 界面甚至导致闪退。
     pub fn connect_for(target_type: CdpTarget) -> Result<Self> {
-        let resp = ureq::get("http://127.0.0.1:8080/json")
+        let agent = cdp_http_agent();
+        let text = agent
+            .get(format!("{}/json", CDP_HTTP_BASE))
             .call()
-            .map_err(|e| anyhow!("无法连接到 Steam 调试端口: {}", e))?;
-
-        let text = resp.into_body().read_to_string()?;
+            .map_err(|e| anyhow!("无法连接到 Steam 调试端口: {}", e))?
+            .into_body()
+            .read_to_string()?;
         let targets: Vec<Target> = serde_json::from_str(&text)?;
 
-        // 根据目标类型选择正确的页面
         let target_desc = match target_type {
             CdpTarget::GameList => "游戏列表页",
             CdpTarget::FileList => "文件详情页",
@@ -80,60 +120,67 @@ impl CdpClient {
             target_desc
         );
 
-        // 精确匹配目标页面
-        let target = targets
-            .iter()
-            .find(|t| {
-                t.websocket_debugger_url.is_some()
-                    && t.target_type == "page"
-                    && t.url.as_ref().is_some_and(|url| {
-                        match target_type {
+        let existing = targets.into_iter().find(|t| {
+            t.websocket_debugger_url.is_some()
+                && t.target_type == "page"
+                && t.url.as_ref().is_some_and(|url| {
+                    url.contains("store.steampowered.com/account/remotestorage")
+                        && match target_type {
                             CdpTarget::FileList => url.contains("remotestorageapp"),
-                            CdpTarget::GameList => {
-                                // 匹配 remotestorage 但排除 remotestorageapp
-                                url.contains("remotestorage") && !url.contains("remotestorageapp")
-                            }
+                            CdpTarget::GameList => !url.contains("remotestorageapp"),
                         }
-                    })
-            })
-            .or_else(|| {
-                // 回退：选择任意 store.steampowered.com 页面
-                targets.iter().find(|t| {
-                    t.websocket_debugger_url.is_some()
-                        && t.target_type == "page"
-                        && t.url
-                            .as_ref()
-                            .is_some_and(|url| url.contains("store.steampowered.com"))
                 })
-            })
-            .or_else(|| {
-                // 最后回退：任意非 about:blank 的 page
-                targets.iter().find(|t| {
-                    t.websocket_debugger_url.is_some()
-                        && t.target_type == "page"
-                        && t.url.as_ref().is_some_and(|url| !url.starts_with("about:"))
-                })
-            })
-            .ok_or_else(|| {
-                anyhow!(
-                    "未找到{}的调试目标，请先在 Steam 客户端打开云存储页面",
-                    target_desc
-                )
-            })?;
+        });
+
+        let (target, owned_target_id) = match existing {
+            Some(t) => (t, None),
+            None => {
+                let created: Target = serde_json::from_str(
+                    &agent
+                        .put(format!(
+                            "{}/json/new?https://store.steampowered.com/account/remotestorage",
+                            CDP_HTTP_BASE
+                        ))
+                        .send_empty()
+                        .map_err(|e| anyhow!("无法创建 CDP 页面: {}", e))?
+                        .into_body()
+                        .read_to_string()?,
+                )?;
+                let id = created.id.clone();
+                (created, id)
+            }
+        };
 
         tracing::debug!(
-            "CDP 连接到目标 (期望: {}): type={}, url={:?}",
+            "CDP 连接到目标 (期望: {}): type={}, url={:?}, 新建={}",
             target_desc,
             target.target_type,
-            target.url
+            target.url,
+            owned_target_id.is_some()
         );
 
-        let ws_url = target.websocket_debugger_url.as_ref().unwrap();
-        let (socket, _) = tungstenite::connect(ws_url)?;
+        let ws_url = target
+            .websocket_debugger_url
+            .ok_or_else(|| anyhow!("CDP 目标缺少 webSocketDebuggerUrl"))?;
+        let connected = tungstenite::connect(&ws_url).map_err(anyhow::Error::from);
+        let socket = match connected {
+            Ok((socket, _)) => socket,
+            Err(e) => {
+                if let Some(id) = &owned_target_id {
+                    close_target(id);
+                }
+                return Err(e);
+            }
+        };
+        if let MaybeTlsStream::Plain(stream) = socket.get_ref() {
+            stream.set_read_timeout(Some(CDP_SOCKET_TIMEOUT))?;
+            stream.set_write_timeout(Some(CDP_SOCKET_TIMEOUT))?;
+        }
 
         Ok(Self {
             socket,
             message_id: 0,
+            owned_target_id,
         })
     }
 
