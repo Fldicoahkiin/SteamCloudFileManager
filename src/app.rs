@@ -389,7 +389,7 @@ impl SteamCloudApp {
         if !ctx.input(|i| i.raw.hovered_files.is_empty()) {
             let painter = ctx.layer_painter(egui::LayerId::new(
                 egui::Order::Foreground,
-                egui::Id::new("file_drop_overlay"),
+                egui::Id::unique("file_drop_overlay"),
             ));
 
             let screen_rect = ctx.content_rect();

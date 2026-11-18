@@ -111,9 +111,9 @@ files = [
 
 [dependencies]
 # UI Framework
-eframe = "0.36.2"
-egui = "0.36.2"
-egui_extras = { version = "0.36.2", features = [ "all_loaders" ] }
+eframe = "0.37.0"
+egui = "0.37.0"
+egui_extras = { version = "0.37.0", features = [ "all_loaders" ] }
 egui-phosphor = "0.14.0"
 
 # Steam API
@@ -126,7 +126,7 @@ byteorder = "1.5.0"
 image = "0.25.10"
 open = "5.4.5"
 regex = "1.13.1"
-rfd = "0.17.2"
+rfd = "0.18.0"
 walkdir = "2.5.0"
 
 # Serialization
@@ -137,9 +137,8 @@ toml = "1.1.8"
 # Date and Time
 chrono = { version = "0.4.45", features = [ "serde" ] }
 
-# UUID and Directories
+# UUID
 uuid = { version = "1.28.0", features = [ "v4" ] }
-dirs = "7.0.0"
 
 # Logging
 tracing = "0.1.44"

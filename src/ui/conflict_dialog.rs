@@ -139,7 +139,7 @@ pub fn draw_conflict_dialog(
 
     // 渲染对话框窗口
     egui::Window::new(i18n.file_comparison_title())
-        .id(egui::Id::new("conflict_dialog"))
+        .id(egui::Id::unique("conflict_dialog"))
         .open(&mut dialog.show)
         .default_size([900.0, 600.0])
         .resizable(true)
