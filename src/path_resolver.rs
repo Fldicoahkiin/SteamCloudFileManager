@@ -17,6 +17,13 @@ static ROOT_OVERRIDES_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, Vec<RootOver
 static STEAM_CLOUD_DOCS_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, PathBuf>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
 
+// 切换账号后清除与账号相关的路径缓存（SteamCloudDocuments 目录按账号昵称区分）
+pub fn clear_account_path_cache() {
+    if let Ok(mut cache) = STEAM_CLOUD_DOCS_CACHE.lock() {
+        cache.clear();
+    }
+}
+
 // 游戏名称缓存，从 game_scanner/CDP 获取
 static GAME_NAME_CACHE: std::sync::LazyLock<Mutex<HashMap<u32, String>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));

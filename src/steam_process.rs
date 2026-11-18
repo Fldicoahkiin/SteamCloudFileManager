@@ -142,6 +142,13 @@ pub fn switch_account_with_status<F>(
 ) where
     F: Fn() + Send + 'static,
 {
+    // 关闭 Steam 之前先确认能写入，避免关掉 Steam 后才发现切换不了
+    if let Err(e) = check_auto_login_writable(&steam_path, &account_name) {
+        tracing::error!("无法切换 Steam 账号: {}", e);
+        let _ = tx.send(RestartStatus::Error(e.to_string()));
+        on_update();
+        return;
+    }
     restart_steam_inner(tx, on_update, move || {
         set_auto_login_user(&steam_path, &user_id, &account_name)
     });
@@ -170,11 +177,10 @@ where
         return;
     }
 
-    if let Err(e) = before_start() {
+    // 准备失败也要把 Steam 启动回来，错误在启动后再上报
+    let prepare_result = before_start();
+    if let Err(e) = &prepare_result {
         tracing::error!("启动 Steam 前的准备失败: {}", e);
-        let _ = tx.send(RestartStatus::Error(e.to_string()));
-        on_update();
-        return;
     }
 
     // 发送启动状态
@@ -185,6 +191,12 @@ where
     let start_result = start_steam();
 
     if let Err(e) = start_result {
+        let _ = tx.send(RestartStatus::Error(e.to_string()));
+        on_update();
+        return;
+    }
+
+    if let Err(e) = prepare_result {
         let _ = tx.send(RestartStatus::Error(e.to_string()));
         on_update();
         return;
@@ -437,40 +449,65 @@ fn is_valid_account_name(name: &str) -> bool {
     !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
 }
 
-fn set_auto_login_user(steam_path: &Path, user_id: &str, account_name: &str) -> Result<()> {
+#[cfg(target_os = "macos")]
+fn registry_vdf_path(steam_path: &Path) -> Result<PathBuf> {
+    Ok(steam_path.join("registry.vdf"))
+}
+
+#[cfg(target_os = "linux")]
+fn registry_vdf_path(_steam_path: &Path) -> Result<PathBuf> {
+    let home = std::env::var("HOME").map_err(|_| anyhow!("无法获取 HOME 目录"))?;
+    Ok(PathBuf::from(home).join(".steam").join("registry.vdf"))
+}
+
+fn check_auto_login_writable(steam_path: &Path, account_name: &str) -> Result<()> {
     if !is_valid_account_name(account_name) {
         return Err(anyhow!("账号名不合法: {}", account_name));
     }
+    let loginusers = steam_path.join("config").join("loginusers.vdf");
+    std::fs::read_to_string(&loginusers)
+        .map_err(|e| anyhow!("无法读取 {}: {}", loginusers.display(), e))?;
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        let path = registry_vdf_path(steam_path)?;
+        let content = std::fs::read_to_string(&path)
+            .map_err(|e| anyhow!("无法读取 {}: {}", path.display(), e))?;
+        if replace_vdf_value(&content, "AutoLoginUser", account_name).is_none() {
+            return Err(anyhow!(
+                "{} 中没有 AutoLoginUser，请在 Steam 中手动切换账号",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+// 先写自动登录账号，再写 loginusers.vdf：前者失败时 loginusers.vdf 保持原样
+fn set_auto_login_user(steam_path: &Path, user_id: &str, account_name: &str) -> Result<()> {
     tracing::info!("设置 Steam 自动登录账号: user_id={}", user_id);
+
+    #[cfg(target_os = "windows")]
+    set_windows_auto_login_user(account_name)?;
+
+    #[cfg(not(target_os = "windows"))]
+    set_registry_vdf_auto_login_user(&registry_vdf_path(steam_path)?, account_name)?;
 
     let loginusers = steam_path.join("config").join("loginusers.vdf");
     let content = std::fs::read_to_string(&loginusers)
         .map_err(|e| anyhow!("无法读取 {}: {}", loginusers.display(), e))?;
-    std::fs::write(&loginusers, set_most_recent_user(&content, user_id))
-        .map_err(|e| anyhow!("无法写入 {}: {}", loginusers.display(), e))?;
-
-    #[cfg(target_os = "windows")]
-    {
-        set_windows_auto_login_user(account_name)
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        set_registry_vdf_auto_login_user(&steam_path.join("registry.vdf"), account_name)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let home = std::env::var("HOME").map_err(|_| anyhow!("无法获取 HOME 目录"))?;
-        set_registry_vdf_auto_login_user(
-            &PathBuf::from(home).join(".steam").join("registry.vdf"),
-            account_name,
-        )
-    }
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    std::fs::write(&loginusers, mark_login_user_current(&content, user_id, now))
+        .map_err(|e| anyhow!("无法写入 {}: {}", loginusers.display(), e))
 }
 
-// 把目标账号标记为 MostRecent=1，其余账号为 0；目标块没有该键时插入
-fn set_most_recent_user(content: &str, user_id: &str) -> String {
+// 把目标账号标记为当前账号：已有的 MostRecent 改为目标 1、其余 0，目标的 timestamp 改为 now。
+// 不插入新的 MostRecent：新版 Steam 不写这个键，插入后若被保留会长期压过 timestamp。
+// Steam 登录后会用真实时间覆盖 timestamp。
+fn mark_login_user_current(content: &str, user_id: &str, now: i64) -> String {
     const STEAM_ID64_BASE: u64 = 76561197960265728;
     let target_id64 = user_id
         .parse::<u64>()
@@ -480,20 +517,19 @@ fn set_most_recent_user(content: &str, user_id: &str) -> String {
     let mut out = String::with_capacity(content.len() + 32);
     let mut depth = 0usize;
     let mut block_id: Option<String> = None;
-    let mut block_has_most_recent = false;
+    let mut block_has_timestamp = false;
 
     for line in content.lines() {
         let trimmed = line.trim();
         let parts: Vec<&str> = trimmed.split('"').collect();
+        let in_target = block_id.as_deref() == Some(target_id64.as_str());
+        let indent = &line[..line.len() - line.trim_start().len()];
 
         if trimmed == "{" {
             depth += 1;
         } else if trimmed == "}" {
-            if depth == 2
-                && block_id.as_deref() == Some(target_id64.as_str())
-                && !block_has_most_recent
-            {
-                out.push_str("\t\t\"MostRecent\"\t\t\"1\"\n");
+            if depth == 2 && in_target && !block_has_timestamp {
+                out.push_str(&format!("\t\t\"timestamp\"\t\t\"{}\"\n", now));
             }
             if depth == 2 {
                 block_id = None;
@@ -501,16 +537,18 @@ fn set_most_recent_user(content: &str, user_id: &str) -> String {
             depth = depth.saturating_sub(1);
         } else if depth == 1 && parts.len() == 3 {
             block_id = Some(parts[1].to_string());
-            block_has_most_recent = false;
+            block_has_timestamp = false;
         } else if depth == 2 && parts.len() >= 5 && parts[1].eq_ignore_ascii_case("MostRecent") {
-            block_has_most_recent = true;
-            let value = if block_id.as_deref() == Some(target_id64.as_str()) {
-                "1"
-            } else {
-                "0"
-            };
-            let indent = &line[..line.len() - line.trim_start().len()];
+            let value = if in_target { "1" } else { "0" };
             out.push_str(&format!("{}\"{}\"\t\t\"{}\"\n", indent, parts[1], value));
+            continue;
+        } else if depth == 2
+            && in_target
+            && parts.len() >= 5
+            && parts[1].eq_ignore_ascii_case("timestamp")
+        {
+            block_has_timestamp = true;
+            out.push_str(&format!("{}\"{}\"\t\t\"{}\"\n", indent, parts[1], now));
             continue;
         }
 
@@ -610,11 +648,15 @@ mod tests {
     const LOGINUSERS: &str = "\"users\"\n{\n\t\"76561198672877872\"\n\t{\n\t\t\"AccountName\"\t\t\"alpha\"\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n\t\"76561198384877484\"\n\t{\n\t\t\"AccountName\"\t\t\"beta\"\n\t\t\"timestamp\"\t\t\"1700000000\"\n\t}\n}\n";
 
     #[test]
-    fn most_recent_moves_to_target_and_is_inserted_when_missing() {
+    fn marks_target_current_without_inserting_most_recent() {
         let beta_id = (76561198384877484u64 - 76561197960265728).to_string();
-        let out = set_most_recent_user(LOGINUSERS, &beta_id);
-        let expected = "\"users\"\n{\n\t\"76561198672877872\"\n\t{\n\t\t\"AccountName\"\t\t\"alpha\"\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n\t\"76561198384877484\"\n\t{\n\t\t\"AccountName\"\t\t\"beta\"\n\t\t\"timestamp\"\t\t\"1700000000\"\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n}\n";
+        let out = mark_login_user_current(LOGINUSERS, &beta_id, 1800000000);
+        let expected = "\"users\"\n{\n\t\"76561198672877872\"\n\t{\n\t\t\"AccountName\"\t\t\"alpha\"\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n\t\"76561198384877484\"\n\t{\n\t\t\"AccountName\"\t\t\"beta\"\n\t\t\"timestamp\"\t\t\"1800000000\"\n\t}\n}\n";
         assert_eq!(out, expected);
+        // 切换后按 user_manager 的规则也应选中目标账号
+        let alpha_id = (76561198672877872u64 - 76561197960265728).to_string();
+        let out = mark_login_user_current(LOGINUSERS, &alpha_id, 1800000000);
+        assert!(out.contains("\"MostRecent\"\t\t\"1\""));
     }
 
     #[test]

@@ -127,6 +127,7 @@ impl SteamCloudApp {
 
     // 账号切换完成后，按 Steam 当前登录账号重新加载
     fn reload_for_logged_in_user(&mut self) {
+        crate::path_resolver::clear_account_path_cache();
         self.handlers = crate::app_handlers::AppHandlers::new(
             self.steam_manager.clone(),
             VdfParser::new().ok(),
@@ -565,7 +566,13 @@ impl SteamCloudApp {
                         self.game_library.account_switch_pending = false;
                         self.reload_for_logged_in_user();
                     }
-                    RestartStatus::Error(_) => self.game_library.account_switch_pending = false,
+                    RestartStatus::Error(msg) => {
+                        // 显示真实原因，而不是通用的“手动添加调试参数”引导
+                        self.game_library.account_switch_pending = false;
+                        self.dialogs.guide_dialog = None;
+                        self.dialogs.show_error(&msg);
+                        return;
+                    }
                     RestartStatus::Closing | RestartStatus::Starting => {}
                 }
             }
