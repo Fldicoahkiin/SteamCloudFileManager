@@ -257,13 +257,9 @@ impl SteamCloudManager {
         let client = client
             .as_ref()
             .ok_or_else(|| anyhow!("Steam客户端未连接"))?;
-
         let remote_storage = client.remote_storage();
-        let file_handle = remote_storage.file(filename);
 
-        use std::io::Write;
-        let mut writer = file_handle.write();
-        writer.write_all(data).map_err(|e| {
+        write_cloud_file_atomically(filename, data).map_err(|e| {
             let size_str = crate::file_manager::format_size(data.len() as u64);
 
             // 检查云同步状态，辅助诊断
@@ -352,4 +348,45 @@ impl Drop for SteamCloudManager {
 
         Self::cleanup_app_id_file();
     }
+}
+
+// 分块写入云文件，任一块失败就取消写入流。
+// steamworks 0.13 的 SteamFileWriter 在 Drop 时总是 FileWriteStreamClose，失败时会提交截断内容；
+// root 0 的本地文件就是 Steam 的写入目标，截断会直接清空用户存档。
+// FileWriteStreamCancel 会丢弃本次写入，保留原文件。
+fn write_cloud_file_atomically(filename: &str, data: &[u8]) -> Result<()> {
+    const CHUNK_SIZE: usize = 8 * 1024 * 1024;
+    let name = std::ffi::CString::new(filename).map_err(|_| anyhow!("文件名包含 NUL 字符"))?;
+
+    // SAFETY: 调用方持有已初始化的 Steam Client；name 在调用期间有效；
+    // data 切片在每次 WriteChunk 期间有效，长度不超过 CHUNK_SIZE（远小于 i32::MAX）
+    unsafe {
+        let rs = steamworks_sys::SteamAPI_SteamRemoteStorage_v016();
+        if rs.is_null() {
+            return Err(anyhow!("ISteamRemoteStorage 不可用"));
+        }
+        let handle =
+            steamworks_sys::SteamAPI_ISteamRemoteStorage_FileWriteStreamOpen(rs, name.as_ptr());
+        if handle == steamworks_sys::k_UGCFileStreamHandleInvalid {
+            return Err(anyhow!("无法打开云文件写入流"));
+        }
+
+        for chunk in data.chunks(CHUNK_SIZE) {
+            let ok = steamworks_sys::SteamAPI_ISteamRemoteStorage_FileWriteStreamWriteChunk(
+                rs,
+                handle,
+                chunk.as_ptr() as *const std::os::raw::c_void,
+                chunk.len() as i32,
+            );
+            if !ok {
+                steamworks_sys::SteamAPI_ISteamRemoteStorage_FileWriteStreamCancel(rs, handle);
+                return Err(anyhow!("写入数据块失败，已取消写入，原文件未改动"));
+            }
+        }
+
+        if !steamworks_sys::SteamAPI_ISteamRemoteStorage_FileWriteStreamClose(rs, handle) {
+            return Err(anyhow!("提交云文件写入失败"));
+        }
+    }
+    Ok(())
 }
