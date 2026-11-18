@@ -23,6 +23,15 @@ pub struct VdfFileEntry {
     pub sync_state: i32,
 }
 
+impl VdfFileEntry {
+    // 云端是否有这个文件。实测 syncstate=1 的条目带 size/sha/remotetime，
+    // syncstate=2 的条目是 size=0、sha 全零的占位。
+    // 判断偏向“有”：误判为已在云端最多跳过一次同步，误判为仅本地会诱导用户覆盖存档。
+    pub fn has_cloud_copy(&self) -> bool {
+        self.sync_state == 1 || self.sha.chars().any(|c| c != '0')
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppInfo {
     pub app_id: u32,
@@ -1181,5 +1190,36 @@ impl VdfParser {
     // 查找字节模式
     fn find_pattern(data: &[u8], pattern: &[u8]) -> Option<usize> {
         data.windows(pattern.len()).position(|w| w == pattern)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::VdfFileEntry;
+
+    fn entry(sha: &str, sync_state: i32) -> VdfFileEntry {
+        VdfFileEntry {
+            filename: "save.dat".to_string(),
+            root: 0,
+            size: 0,
+            timestamp: 0,
+            sha: sha.to_string(),
+            sync_state,
+        }
+    }
+
+    #[test]
+    fn synced_entry_has_cloud_copy() {
+        assert!(entry("8d4b0c4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c", 1).has_cloud_copy());
+    }
+
+    #[test]
+    fn placeholder_entry_has_no_cloud_copy() {
+        assert!(!entry("0000000000000000000000000000000000000000", 2).has_cloud_copy());
+    }
+
+    #[test]
+    fn entry_with_sha_counts_regardless_of_syncstate() {
+        assert!(entry("da39a3ee5e6b4b0d3255bfef95601890afd80709", 2).has_cloud_copy());
     }
 }

@@ -405,12 +405,13 @@ fn build_cloud_file_from_vdf(
         resolve_cloud_file_path(entry.root, &entry.filename, steam_path, user_id, app_id).ok();
 
     let exists = actual_path.as_ref().map(|p| p.exists()).unwrap_or(false);
+    let is_persisted = entry.has_cloud_copy();
 
     CloudFile {
         name: entry.filename,
         size: entry.size,
         timestamp,
-        is_persisted: entry.sync_state == 2,
+        is_persisted,
         root: entry.root,
         root_description: root_desc,
         exists,
