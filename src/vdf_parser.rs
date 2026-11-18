@@ -309,12 +309,6 @@ impl VdfParser {
         Some((key, val))
     }
 
-    pub fn with_user_id(steam_path: PathBuf, user_id: String) -> Self {
-        Self {
-            steam_path,
-            user_id,
-        }
-    }
     pub fn get_steam_path(&self) -> &PathBuf {
         &self.steam_path
     }

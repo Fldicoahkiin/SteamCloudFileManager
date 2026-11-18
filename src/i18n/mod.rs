@@ -948,6 +948,20 @@ impl I18n {
         }
     }
 
+    pub fn error_account_not_in_loginusers(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::error_account_not_in_loginusers(),
+            Language::Chinese => zh::error_account_not_in_loginusers(),
+        }
+    }
+
+    pub fn account_switch_login_hint(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::account_switch_login_hint(),
+            Language::Chinese => zh::account_switch_login_hint(),
+        }
+    }
+
     // ========== 错误消息 ==========
 
     pub fn error_enter_app_id(&self) -> &'static str {

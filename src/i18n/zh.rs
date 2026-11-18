@@ -474,6 +474,14 @@ pub fn user_switched() -> &'static str {
     "已切换用户"
 }
 
+pub fn error_account_not_in_loginusers() -> &'static str {
+    "该账号没有在本机 Steam 登录过（loginusers.vdf 中找不到账号名），请先在 Steam 中登录一次"
+}
+
+pub fn account_switch_login_hint() -> &'static str {
+    "Steam 未记住该账号的密码，重启后请在 Steam 登录窗口中登录"
+}
+
 pub fn error_enter_app_id() -> &'static str {
     "请输入App ID"
 }

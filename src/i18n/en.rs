@@ -491,6 +491,14 @@ pub fn user_switched() -> &'static str {
     "User switched"
 }
 
+pub fn error_account_not_in_loginusers() -> &'static str {
+    "This account has never signed in to Steam on this computer (no account name in loginusers.vdf). Sign in once in Steam first"
+}
+
+pub fn account_switch_login_hint() -> &'static str {
+    "Steam has not saved this account's password. Sign in from the Steam login window after the restart"
+}
+
 pub fn error_enter_app_id() -> &'static str {
     "Please enter App ID"
 }

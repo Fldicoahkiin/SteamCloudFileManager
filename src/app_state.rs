@@ -96,6 +96,8 @@ pub struct GameLibraryState {
     pub is_scanning_games: bool,
     pub all_users: Vec<UserInfo>,
     pub show_user_selector: bool,
+    // 账号切换触发的 Steam 重启进行中，成功后需按新账号重新加载
+    pub account_switch_pending: bool,
     pub vdf_count: usize,
     pub cdp_count: usize,
 }

@@ -953,6 +953,30 @@ impl AppHandlers {
         });
     }
 
+    pub fn start_switch_account(
+        &self,
+        ctx: &egui::Context,
+        async_handlers: &mut AsyncHandlers,
+        steam_path: std::path::PathBuf,
+        user_id: String,
+        account_name: String,
+    ) {
+        let (tx, rx) = std::sync::mpsc::channel();
+        async_handlers.restart_rx = Some(rx);
+        let ctx_clone = ctx.clone();
+        std::thread::spawn(move || {
+            crate::steam_process::switch_account_with_status(
+                tx,
+                steam_path,
+                user_id,
+                account_name,
+                move || {
+                    ctx_clone.request_repaint();
+                },
+            );
+        });
+    }
+
     pub fn handle_update_download_result(
         &self,
         result: Result<std::path::PathBuf, String>,

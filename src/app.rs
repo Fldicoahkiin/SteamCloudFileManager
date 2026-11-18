@@ -83,6 +83,61 @@ impl SteamCloudApp {
         );
     }
 
+    // 通过重启 Steam 切换到所选账号
+    fn switch_steam_account(&mut self, ctx: &egui::Context, user_id: String) {
+        let steam_path = match VdfParser::new() {
+            Ok(parser) => parser.get_steam_path().clone(),
+            Err(e) => {
+                self.dialogs
+                    .show_error(&self.misc.i18n.error_vdf_parser_init(&e.to_string()));
+                return;
+            }
+        };
+
+        let Some((account_name, remember_password)) =
+            crate::user_manager::read_loginusers(&steam_path)
+                .into_iter()
+                .find(|u| u.user_id == user_id)
+                .and_then(|u| u.account_name.map(|name| (name, u.remember_password)))
+        else {
+            self.dialogs
+                .show_error(self.misc.i18n.error_account_not_in_loginusers());
+            return;
+        };
+
+        tracing::info!("切换 Steam 账号: user_id={}", user_id);
+        if self.connection.is_connected {
+            self.disconnect_from_steam();
+        }
+        if !remember_password {
+            self.misc.status_message = self.misc.i18n.account_switch_login_hint().to_string();
+        }
+        self.dialogs.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
+            self.misc.i18n.closing_steam().to_string(),
+        ));
+        self.game_library.account_switch_pending = true;
+        self.handlers.start_switch_account(
+            ctx,
+            &mut self.async_handlers,
+            steam_path,
+            user_id,
+            account_name,
+        );
+    }
+
+    // 账号切换完成后，按 Steam 当前登录账号重新加载
+    fn reload_for_logged_in_user(&mut self) {
+        self.handlers = crate::app_handlers::AppHandlers::new(
+            self.steam_manager.clone(),
+            VdfParser::new().ok(),
+        );
+        self.game_library.all_users.clear();
+        self.game_library.cloud_games.clear();
+        self.file_list = Default::default();
+        self.misc.status_message = self.misc.i18n.user_switched().to_string();
+        self.scan_cloud_games();
+    }
+
     fn disconnect_from_steam(&mut self) {
         self.handlers.disconnect_from_steam(
             &mut self.connection,
@@ -503,6 +558,17 @@ impl SteamCloudApp {
 
         // Steam 重启状态
         if let Some(status) = self.async_handlers.poll_restart() {
+            use crate::steam_process::RestartStatus;
+            if self.game_library.account_switch_pending {
+                match status {
+                    RestartStatus::Success => {
+                        self.game_library.account_switch_pending = false;
+                        self.reload_for_logged_in_user();
+                    }
+                    RestartStatus::Error(_) => self.game_library.account_switch_pending = false,
+                    RestartStatus::Closing | RestartStatus::Starting => {}
+                }
+            }
             self.handlers
                 .handle_restart_status(status, &mut self.dialogs, &self.misc.i18n);
         }
@@ -761,18 +827,8 @@ impl eframe::App for SteamCloudApp {
                 &self.misc.i18n,
             );
             if let Some(user_id) = selected_user_id {
-                if let Ok(parser) = VdfParser::new() {
-                    let steam_path = parser.get_steam_path().clone();
-                    let new_parser = VdfParser::with_user_id(steam_path, user_id);
-                    self.handlers = crate::app_handlers::AppHandlers::new(
-                        self.steam_manager.clone(),
-                        Some(new_parser),
-                    );
-                    self.game_library.cloud_games.clear();
-                    self.misc.status_message = self.misc.i18n.user_switched().to_string();
-                    self.scan_cloud_games();
-                }
                 self.game_library.show_user_selector = false;
+                self.switch_steam_account(ui.ctx(), user_id);
             }
         }
 

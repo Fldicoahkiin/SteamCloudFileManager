@@ -1,4 +1,5 @@
 use anyhow::{Result, anyhow};
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc::Sender;
 
@@ -127,6 +128,30 @@ pub fn restart_steam_with_status<F>(tx: Sender<RestartStatus>, on_update: F)
 where
     F: Fn() + Send + 'static,
 {
+    restart_steam_inner(tx, on_update, || Ok(()));
+}
+
+// 切换 Steam 账号：关闭 Steam，设置自动登录账号，再带调试参数启动。
+// 必须在 Steam 退出后写入，否则 Steam 退出时会覆盖 loginusers.vdf / registry.vdf。
+pub fn switch_account_with_status<F>(
+    tx: Sender<RestartStatus>,
+    steam_path: PathBuf,
+    user_id: String,
+    account_name: String,
+    on_update: F,
+) where
+    F: Fn() + Send + 'static,
+{
+    restart_steam_inner(tx, on_update, move || {
+        set_auto_login_user(&steam_path, &user_id, &account_name)
+    });
+}
+
+fn restart_steam_inner<F, B>(tx: Sender<RestartStatus>, on_update: F, before_start: B)
+where
+    F: Fn() + Send + 'static,
+    B: FnOnce() -> Result<()>,
+{
     // 发送关闭状态
     let _ = tx.send(RestartStatus::Closing);
     on_update();
@@ -141,6 +166,13 @@ where
         } else {
             let _ = tx.send(RestartStatus::Error(error_msg));
         }
+        on_update();
+        return;
+    }
+
+    if let Err(e) = before_start() {
+        tracing::error!("启动 Steam 前的准备失败: {}", e);
+        let _ = tx.send(RestartStatus::Error(e.to_string()));
         on_update();
         return;
     }
@@ -397,5 +429,209 @@ fn start_steam_linux() -> Result<()> {
             tracing::info!("Steam 已成功启动");
             Ok(())
         }
+    }
+}
+
+// Steam 账号名只允许字母、数字和下划线；写入 VDF / 注册表前校验，避免引号等字符破坏文件
+fn is_valid_account_name(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+fn set_auto_login_user(steam_path: &Path, user_id: &str, account_name: &str) -> Result<()> {
+    if !is_valid_account_name(account_name) {
+        return Err(anyhow!("账号名不合法: {}", account_name));
+    }
+    tracing::info!("设置 Steam 自动登录账号: user_id={}", user_id);
+
+    let loginusers = steam_path.join("config").join("loginusers.vdf");
+    let content = std::fs::read_to_string(&loginusers)
+        .map_err(|e| anyhow!("无法读取 {}: {}", loginusers.display(), e))?;
+    std::fs::write(&loginusers, set_most_recent_user(&content, user_id))
+        .map_err(|e| anyhow!("无法写入 {}: {}", loginusers.display(), e))?;
+
+    #[cfg(target_os = "windows")]
+    {
+        set_windows_auto_login_user(account_name)
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        set_registry_vdf_auto_login_user(&steam_path.join("registry.vdf"), account_name)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = std::env::var("HOME").map_err(|_| anyhow!("无法获取 HOME 目录"))?;
+        set_registry_vdf_auto_login_user(
+            &PathBuf::from(home).join(".steam").join("registry.vdf"),
+            account_name,
+        )
+    }
+}
+
+// 把目标账号标记为 MostRecent=1，其余账号为 0；目标块没有该键时插入
+fn set_most_recent_user(content: &str, user_id: &str) -> String {
+    const STEAM_ID64_BASE: u64 = 76561197960265728;
+    let target_id64 = user_id
+        .parse::<u64>()
+        .map(|id| (id + STEAM_ID64_BASE).to_string())
+        .unwrap_or_default();
+
+    let mut out = String::with_capacity(content.len() + 32);
+    let mut depth = 0usize;
+    let mut block_id: Option<String> = None;
+    let mut block_has_most_recent = false;
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        let parts: Vec<&str> = trimmed.split('"').collect();
+
+        if trimmed == "{" {
+            depth += 1;
+        } else if trimmed == "}" {
+            if depth == 2
+                && block_id.as_deref() == Some(target_id64.as_str())
+                && !block_has_most_recent
+            {
+                out.push_str("\t\t\"MostRecent\"\t\t\"1\"\n");
+            }
+            if depth == 2 {
+                block_id = None;
+            }
+            depth = depth.saturating_sub(1);
+        } else if depth == 1 && parts.len() == 3 {
+            block_id = Some(parts[1].to_string());
+            block_has_most_recent = false;
+        } else if depth == 2 && parts.len() >= 5 && parts[1].eq_ignore_ascii_case("MostRecent") {
+            block_has_most_recent = true;
+            let value = if block_id.as_deref() == Some(target_id64.as_str()) {
+                "1"
+            } else {
+                "0"
+            };
+            let indent = &line[..line.len() - line.trim_start().len()];
+            out.push_str(&format!("{}\"{}\"\t\t\"{}\"\n", indent, parts[1], value));
+            continue;
+        }
+
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    out
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_registry_vdf_auto_login_user(path: &Path, account_name: &str) -> Result<()> {
+    let content =
+        std::fs::read_to_string(path).map_err(|e| anyhow!("无法读取 {}: {}", path.display(), e))?;
+    let updated = replace_vdf_value(&content, "AutoLoginUser", account_name).ok_or_else(|| {
+        anyhow!(
+            "{} 中没有 AutoLoginUser，请在 Steam 中手动切换账号",
+            path.display()
+        )
+    })?;
+    std::fs::write(path, updated).map_err(|e| anyhow!("无法写入 {}: {}", path.display(), e))
+}
+
+// 替换第一个匹配键的值，保留原缩进
+#[cfg(any(not(target_os = "windows"), test))]
+fn replace_vdf_value(content: &str, key: &str, value: &str) -> Option<String> {
+    let mut replaced = false;
+    let mut out = String::with_capacity(content.len());
+    for line in content.lines() {
+        let parts: Vec<&str> = line.trim().split('"').collect();
+        if !replaced && parts.len() >= 5 && parts[1].eq_ignore_ascii_case(key) {
+            let indent = &line[..line.len() - line.trim_start().len()];
+            out.push_str(&format!("{}\"{}\"\t\t\"{}\"\n", indent, parts[1], value));
+            replaced = true;
+        } else {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    replaced.then_some(out)
+}
+
+#[cfg(target_os = "windows")]
+fn set_windows_auto_login_user(account_name: &str) -> Result<()> {
+    use std::ptr::null_mut;
+    use winapi::um::winnt::{KEY_SET_VALUE, REG_DWORD, REG_SZ};
+    use winapi::um::winreg::{HKEY_CURRENT_USER, RegCloseKey, RegOpenKeyExA, RegSetValueExA};
+
+    let account = format!("{}\0", account_name);
+    let remember: u32 = 1;
+    // SAFETY: 所有字符串以 \0 结尾；hkey 仅在打开成功后使用并关闭
+    unsafe {
+        let mut hkey: winapi::shared::minwindef::HKEY = null_mut();
+        let result = RegOpenKeyExA(
+            HKEY_CURRENT_USER,
+            "Software\\Valve\\Steam\0".as_ptr() as *const i8,
+            0,
+            KEY_SET_VALUE,
+            &mut hkey,
+        );
+        if result != 0 {
+            return Err(anyhow!(
+                "无法打开注册表 HKCU\\Software\\Valve\\Steam (错误码 {})",
+                result
+            ));
+        }
+
+        let r1 = RegSetValueExA(
+            hkey,
+            "AutoLoginUser\0".as_ptr() as *const i8,
+            0,
+            REG_SZ,
+            account.as_ptr(),
+            account.len() as u32,
+        );
+        let r2 = RegSetValueExA(
+            hkey,
+            "RememberPassword\0".as_ptr() as *const i8,
+            0,
+            REG_DWORD,
+            &remember as *const u32 as *const u8,
+            std::mem::size_of::<u32>() as u32,
+        );
+        RegCloseKey(hkey);
+
+        if r1 != 0 || r2 != 0 {
+            return Err(anyhow!("写入注册表失败 (错误码 {} / {})", r1, r2));
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LOGINUSERS: &str = "\"users\"\n{\n\t\"76561198672877872\"\n\t{\n\t\t\"AccountName\"\t\t\"alpha\"\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n\t\"76561198384877484\"\n\t{\n\t\t\"AccountName\"\t\t\"beta\"\n\t\t\"timestamp\"\t\t\"1700000000\"\n\t}\n}\n";
+
+    #[test]
+    fn most_recent_moves_to_target_and_is_inserted_when_missing() {
+        let beta_id = (76561198384877484u64 - 76561197960265728).to_string();
+        let out = set_most_recent_user(LOGINUSERS, &beta_id);
+        let expected = "\"users\"\n{\n\t\"76561198672877872\"\n\t{\n\t\t\"AccountName\"\t\t\"alpha\"\n\t\t\"MostRecent\"\t\t\"0\"\n\t}\n\t\"76561198384877484\"\n\t{\n\t\t\"AccountName\"\t\t\"beta\"\n\t\t\"timestamp\"\t\t\"1700000000\"\n\t\t\"MostRecent\"\t\t\"1\"\n\t}\n}\n";
+        assert_eq!(out, expected);
+    }
+
+    #[test]
+    fn replaces_auto_login_user_keeping_indent() {
+        let content = "\"Steam\"\n{\n\t\t\t\t\t\"AutoLoginUser\"\t\t\"alpha\"\n}\n";
+        let out = replace_vdf_value(content, "AutoLoginUser", "beta").unwrap();
+        assert_eq!(
+            out,
+            "\"Steam\"\n{\n\t\t\t\t\t\"AutoLoginUser\"\t\t\"beta\"\n}\n"
+        );
+        assert!(replace_vdf_value("\"a\"\t\"b\"\n", "AutoLoginUser", "x").is_none());
+    }
+
+    #[test]
+    fn rejects_account_names_that_would_break_vdf() {
+        assert!(is_valid_account_name("user_01"));
+        assert!(!is_valid_account_name("bad\"name"));
+        assert!(!is_valid_account_name(""));
     }
 }
