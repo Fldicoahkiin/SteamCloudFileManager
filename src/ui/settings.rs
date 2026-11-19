@@ -456,6 +456,21 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
             .color(text_subtle),
     );
 
+    ui.add_space(16.0);
+    let mut auto_open = crate::config::get_config().steam.auto_open_cloud_page;
+    if ui
+        .checkbox(&mut auto_open, i18n.auto_open_cloud_page())
+        .changed()
+        && let Err(e) = crate::config::set_auto_open_cloud_page(auto_open)
+    {
+        tracing::error!("保存设置失败: {}", e);
+    }
+    ui.label(
+        egui::RichText::new(i18n.auto_open_cloud_page_hint())
+            .size(10.0)
+            .color(text_subtle),
+    );
+
     ui.add_space(24.0);
     ui.separator();
     ui.add_space(16.0);

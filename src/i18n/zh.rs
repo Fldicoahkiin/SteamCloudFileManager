@@ -470,6 +470,14 @@ pub fn steam_restart_success() -> &'static str {
     "Steam 已成功重启!"
 }
 
+pub fn auto_open_cloud_page() -> &'static str {
+    "自动在 Steam 中打开云存储页面"
+}
+
+pub fn auto_open_cloud_page_hint() -> &'static str {
+    "扫描游戏库和连接游戏时，Steam 主窗口会跳转到对应的云存储页面。关闭后读取云端数据不受影响。"
+}
+
 pub fn error_worker_lost() -> &'static str {
     "与 Steam 的连接已中断（Steam 可能已退出或无响应），请重新连接"
 }

@@ -387,21 +387,24 @@ impl AppHandlers {
             .map(|p| (p.get_steam_path().clone(), p.get_user_id().to_string()));
 
         if let Some((steam_path, user_id)) = parser_data {
-            let steam_url = "steam://openurl/https://store.steampowered.com/account/remotestorage";
-            #[cfg(target_os = "macos")]
-            let _ = std::process::Command::new("open").arg(steam_url).spawn();
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                let _ = std::process::Command::new("cmd")
-                    .args(["/C", "start", "", steam_url])
-                    .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+            if crate::config::get_config().steam.auto_open_cloud_page {
+                let steam_url =
+                    "steam://openurl/https://store.steampowered.com/account/remotestorage";
+                #[cfg(target_os = "macos")]
+                let _ = std::process::Command::new("open").arg(steam_url).spawn();
+                #[cfg(target_os = "windows")]
+                {
+                    use std::os::windows::process::CommandExt;
+                    let _ = std::process::Command::new("cmd")
+                        .args(["/C", "start", "", steam_url])
+                        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
+                        .spawn();
+                }
+                #[cfg(target_os = "linux")]
+                let _ = std::process::Command::new("xdg-open")
+                    .arg(steam_url)
                     .spawn();
             }
-            #[cfg(target_os = "linux")]
-            let _ = std::process::Command::new("xdg-open")
-                .arg(steam_url)
-                .spawn();
 
             game_library.is_scanning_games = true;
             misc.status_message = misc.i18n.scanning_game_library().to_string();
@@ -440,24 +443,9 @@ impl AppHandlers {
                 connection.since_connected = Some(Instant::now());
 
                 // 打开对应 app_id 的云存储页面
-                let steam_url = format!(
-                    "steam://openurl/https://store.steampowered.com/account/remotestorageapp/?appid={}",
-                    app_id
-                );
-                #[cfg(target_os = "macos")]
-                let _ = std::process::Command::new("open").arg(&steam_url).spawn();
-                #[cfg(target_os = "windows")]
-                {
-                    use std::os::windows::process::CommandExt;
-                    let _ = std::process::Command::new("cmd")
-                        .args(["/C", "start", "", &steam_url])
-                        .creation_flags(winapi::um::winbase::CREATE_NO_WINDOW)
-                        .spawn();
+                if crate::config::get_config().steam.auto_open_cloud_page {
+                    self.open_cloud_url(&app_id.to_string());
                 }
-                #[cfg(target_os = "linux")]
-                let _ = std::process::Command::new("xdg-open")
-                    .arg(&steam_url)
-                    .spawn();
 
                 true
             }

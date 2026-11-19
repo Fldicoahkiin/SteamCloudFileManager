@@ -487,6 +487,14 @@ pub fn steam_restart_success() -> &'static str {
     "Steam restarted successfully!"
 }
 
+pub fn auto_open_cloud_page() -> &'static str {
+    "Open the Steam Cloud page in Steam automatically"
+}
+
+pub fn auto_open_cloud_page_hint() -> &'static str {
+    "When scanning the library or connecting to a game, the Steam window switches to the matching Steam Cloud page. Turning this off does not affect reading cloud data."
+}
+
 pub fn error_worker_lost() -> &'static str {
     "Lost the connection to Steam (Steam may have exited or stopped responding). Reconnect to continue"
 }

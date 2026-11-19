@@ -21,6 +21,10 @@ pub struct AppConfig {
     #[serde(default)]
     pub logging: LoggingConfig,
 
+    // Steam 客户端行为
+    #[serde(default)]
+    pub steam: SteamConfig,
+
     // 软链接配置
     #[serde(default)]
     pub symlinks: Vec<SymlinkConfigEntry>,
@@ -141,6 +145,31 @@ impl Default for LoggingConfig {
             enabled: default_log_enabled(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SteamConfig {
+    // 扫描游戏库和连接游戏时，让 Steam 打开对应的云存储页面
+    #[serde(default = "default_auto_open_cloud_page")]
+    pub auto_open_cloud_page: bool,
+}
+
+fn default_auto_open_cloud_page() -> bool {
+    true
+}
+
+impl Default for SteamConfig {
+    fn default() -> Self {
+        Self {
+            auto_open_cloud_page: default_auto_open_cloud_page(),
+        }
+    }
+}
+
+pub fn set_auto_open_cloud_page(enabled: bool) -> Result<()> {
+    update_config(|config| {
+        config.steam.auto_open_cloud_page = enabled;
+    })
 }
 
 impl AppConfig {
@@ -427,4 +456,21 @@ pub fn remove_ufs_game_config(app_id: u32) -> Result<()> {
         tracing::info!("已删除 UFS 配置: {}", path.display());
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppConfig;
+
+    #[test]
+    fn auto_open_cloud_page_defaults_on_for_old_configs() {
+        let config: AppConfig = toml::from_str("[logging]\nenabled = true\n").unwrap();
+        assert!(config.steam.auto_open_cloud_page);
+
+        let config: AppConfig = toml::from_str(&AppConfig::default_toml_with_comments()).unwrap();
+        assert!(config.steam.auto_open_cloud_page);
+
+        let config: AppConfig = toml::from_str("[steam]\nauto_open_cloud_page = false\n").unwrap();
+        assert!(!config.steam.auto_open_cloud_page);
+    }
 }

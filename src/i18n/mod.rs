@@ -941,6 +941,20 @@ impl I18n {
         }
     }
 
+    pub fn auto_open_cloud_page(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::auto_open_cloud_page(),
+            Language::Chinese => zh::auto_open_cloud_page(),
+        }
+    }
+
+    pub fn auto_open_cloud_page_hint(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::auto_open_cloud_page_hint(),
+            Language::Chinese => zh::auto_open_cloud_page_hint(),
+        }
+    }
+
     pub fn error_worker_lost(&self) -> &'static str {
         match self.lang {
             Language::English => en::error_worker_lost(),
