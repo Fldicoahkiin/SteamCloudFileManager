@@ -320,7 +320,8 @@ fn close_steam_windows() -> Result<()> {
     tracing::debug!("正在关闭 Windows 上的 Steam 进程...");
     use std::os::windows::process::CommandExt;
 
-    // 先让 Steam 自己退出，保存配置；强制结束只作为兜底
+    // 先让 Steam 自己退出，保存配置；强制结束只作为兜底。
+    // 新版 Steam 退出前会等刚结束的游戏完成云同步，所以多等一会再强制结束
     if let Ok(steam_dir) = crate::vdf_parser::VdfParser::find_steam_path() {
         let steam_exe = steam_dir.join("steam.exe");
         if let Err(e) = Command::new(&steam_exe)
@@ -329,7 +330,7 @@ fn close_steam_windows() -> Result<()> {
             .spawn()
         {
             tracing::warn!("调用 steam.exe -shutdown 失败: {}", e);
-        } else if wait_for_steam_shutdown(15) {
+        } else if wait_for_steam_shutdown(60) {
             return Ok(());
         }
     }
