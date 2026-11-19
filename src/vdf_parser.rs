@@ -21,14 +21,17 @@ pub struct VdfFileEntry {
     pub timestamp: i64,
     pub sha: String,
     pub sync_state: i32,
+    // SteamDatabase ECloudStoragePersistState: 0=Persisted, 1=Forgotten, 2=Deleted
+    pub persist_state: i32,
 }
 
 impl VdfFileEntry {
     // 云端是否有这个文件。实测 syncstate=1 的条目带 size/sha/remotetime，
     // syncstate=2 的条目是 size=0、sha 全零的占位。
     // 判断偏向“有”：误判为已在云端最多跳过一次同步，误判为仅本地会诱导用户覆盖存档。
+    // persiststate 非 0（已移出或已删除）时云端没有。
     pub fn has_cloud_copy(&self) -> bool {
-        self.sync_state == 1 || self.sha.chars().any(|c| c != '0')
+        self.persist_state == 0 && (self.sync_state == 1 || self.sha.chars().any(|c| c != '0'))
     }
 }
 
@@ -266,6 +269,7 @@ impl VdfParser {
                         timestamp: 0,
                         sha: String::new(),
                         sync_state: 0,
+                        persist_state: 0,
                     });
                 }
                 continue;
@@ -300,6 +304,9 @@ impl VdfParser {
                     }
                     "syncstate" => {
                         e.sync_state = val.parse().unwrap_or(0);
+                    }
+                    "persiststate" => {
+                        e.persist_state = val.parse().unwrap_or(0);
                     }
                     _ => {}
                 }
@@ -1205,6 +1212,16 @@ mod tests {
             timestamp: 0,
             sha: sha.to_string(),
             sync_state,
+            persist_state: 0,
+        }
+    }
+
+    #[test]
+    fn forgotten_or_deleted_entry_has_no_cloud_copy() {
+        for persist_state in [1, 2] {
+            let mut e = entry("8d4b0c4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c", 1);
+            e.persist_state = persist_state;
+            assert!(!e.has_cloud_copy());
         }
     }
 
