@@ -600,12 +600,12 @@ fn set_windows_auto_login_user(account_name: &str) -> Result<()> {
 
     let account = format!("{}\0", account_name);
     let remember: u32 = 1;
-    // SAFETY: 所有字符串以 \0 结尾；hkey 仅在打开成功后使用并关闭
+    // SAFETY: 名称都是 C 字符串字面量，account 以 \0 结尾；hkey 仅在打开成功后使用并关闭
     unsafe {
         let mut hkey: winapi::shared::minwindef::HKEY = null_mut();
         let result = RegOpenKeyExA(
             HKEY_CURRENT_USER,
-            "Software\\Valve\\Steam\0".as_ptr() as *const i8,
+            c"Software\\Valve\\Steam".as_ptr(),
             0,
             KEY_SET_VALUE,
             &mut hkey,
@@ -619,7 +619,7 @@ fn set_windows_auto_login_user(account_name: &str) -> Result<()> {
 
         let r1 = RegSetValueExA(
             hkey,
-            "AutoLoginUser\0".as_ptr() as *const i8,
+            c"AutoLoginUser".as_ptr(),
             0,
             REG_SZ,
             account.as_ptr(),
@@ -627,7 +627,7 @@ fn set_windows_auto_login_user(account_name: &str) -> Result<()> {
         );
         let r2 = RegSetValueExA(
             hkey,
-            "RememberPassword\0".as_ptr() as *const i8,
+            c"RememberPassword".as_ptr(),
             0,
             REG_DWORD,
             &remember as *const u32 as *const u8,
