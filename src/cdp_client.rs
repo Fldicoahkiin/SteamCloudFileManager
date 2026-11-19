@@ -73,15 +73,6 @@ struct CdpResponse {
     error: Option<Value>,
 }
 
-// CDP 连接目标类型
-#[derive(Debug, Clone, Copy)]
-pub enum CdpTarget {
-    // 游戏列表页 (remotestorage)
-    GameList,
-    // 文件详情页 (remotestorageapp?appid=xxx)
-    FileList,
-}
-
 const CDP_HTTP_BASE: &str = "http://127.0.0.1:8080";
 const CDP_HTTP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
 const CDP_SOCKET_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(20);
@@ -113,10 +104,11 @@ impl CdpClient {
         result
     }
 
-    // 连接到指定类型的页面
-    // 只复用已打开的云存储页面；没有时新开一个独立页面，用完关闭。
-    // 不能导航 Steam 自身的页面（SharedJSContext、菜单、弹窗等），否则会破坏 Steam 界面甚至导致闪退。
-    pub fn connect_for(target_type: CdpTarget) -> Result<Self> {
+    // 连接到一个 store.steampowered.com 页面，之后只在其中执行只读的 fetch，不导航。
+    // Steam 自己的商店页带有网页登录态；新建页面不一定有（实测会跳到登录页），所以优先复用。
+    // 绝不导航 Steam 自身的页面（SharedJSContext、菜单、弹窗、商店页），否则会破坏 Steam 界面甚至导致闪退。
+    // 没有商店页时才新开一个，用完关闭。
+    pub fn connect() -> Result<Self> {
         let agent = cdp_http_agent();
         let text = agent
             .get(format!("{}/json", CDP_HTTP_BASE))
@@ -124,38 +116,35 @@ impl CdpClient {
             .map_err(|e| anyhow!("无法连接到 Steam 调试端口: {}", e))?
             .into_body()
             .read_to_string()?;
-        let targets: Vec<Target> = serde_json::from_str(&text)?;
+        let mut targets: Vec<Target> = serde_json::from_str(&text)?;
+        tracing::debug!("CDP 发现 {} 个调试目标", targets.len());
 
-        let target_desc = match target_type {
-            CdpTarget::GameList => "游戏列表页",
-            CdpTarget::FileList => "文件详情页",
-        };
-
-        tracing::debug!(
-            "CDP 发现 {} 个调试目标，正在查找{}...",
-            targets.len(),
-            target_desc
-        );
-
-        let existing = targets.into_iter().find(|t| {
+        targets.retain(|t| {
             t.websocket_debugger_url.is_some()
                 && t.target_type == "page"
-                && t.url.as_ref().is_some_and(|url| {
-                    url.contains("store.steampowered.com/account/remotestorage")
-                        && match target_type {
-                            CdpTarget::FileList => url.contains("remotestorageapp"),
-                            CdpTarget::GameList => !url.contains("remotestorageapp"),
-                        }
-                })
+                && t.url
+                    .as_ref()
+                    .is_some_and(|url| url.starts_with("https://store.steampowered.com/"))
+        });
+        // 已打开的云存储页优先，其次 Steam 主窗口的商店页，最后其他商店页（如隐藏的营销消息页）
+        targets.sort_by_key(|t| {
+            let url = t.url.as_deref().unwrap_or("");
+            if url.contains("/account/remotestorage") {
+                0
+            } else if url.contains("marketingmessages") {
+                2
+            } else {
+                1
+            }
         });
 
-        let (target, owned_target_id) = match existing {
+        let (target, owned_target_id) = match targets.into_iter().next() {
             Some(t) => (t, None),
             None => {
                 let created: Target = serde_json::from_str(
                     &agent
                         .put(format!(
-                            "{}/json/new?https://store.steampowered.com/account/remotestorage",
+                            "{}/json/new?https://store.steampowered.com/",
                             CDP_HTTP_BASE
                         ))
                         .send_empty()
@@ -172,9 +161,7 @@ impl CdpClient {
         };
 
         tracing::debug!(
-            "CDP 连接到目标 (期望: {}): type={}, url={:?}, 新建={}",
-            target_desc,
-            target.target_type,
+            "CDP 连接到目标: url={:?}, 新建={}",
             target.url,
             owned_target_id.is_some()
         );
@@ -197,11 +184,15 @@ impl CdpClient {
             stream.set_write_timeout(Some(CDP_SOCKET_TIMEOUT))?;
         }
 
-        Ok(Self {
+        let mut client = Self {
             socket,
             message_id: 0,
             owned_target_id,
-        })
+        };
+        if client.owned_target_id.is_some() {
+            client.wait_until_loaded();
+        }
+        Ok(client)
     }
 
     // 发送命令并等待响应
@@ -232,57 +223,42 @@ impl CdpClient {
         }
     }
 
-    // 导航到指定 URL
-    pub fn navigate(&mut self, url: &str) -> Result<()> {
-        self.send_command("Page.navigate", serde_json::json!({ "url": url }))?;
-
+    // 新建页面需要加载完成后才有同源上下文可用于 fetch
+    fn wait_until_loaded(&mut self) {
         let start = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(15);
-
-        // 等待导航开始
-        std::thread::sleep(std::time::Duration::from_millis(500));
-
-        // 轮询 document.readyState 直到 complete 或超时
-        loop {
-            if start.elapsed() > timeout {
-                tracing::warn!("CDP 页面加载超时 ({}s)", timeout.as_secs());
-                break;
+        while start.elapsed() < std::time::Duration::from_secs(15) {
+            if self
+                .evaluate("location.origin === 'https://store.steampowered.com' && document.readyState === 'complete'")
+                .is_ok_and(|v| v.as_bool() == Some(true))
+            {
+                return;
             }
-
-            match self.evaluate("document.readyState") {
-                Ok(value) if value.as_str() == Some("complete") => {
-                    tracing::debug!("CDP 页面加载完成 ({:.1}s)", start.elapsed().as_secs_f64());
-                    break;
-                }
-                Ok(_) => {
-                    std::thread::sleep(std::time::Duration::from_millis(300));
-                }
-                Err(_) => {
-                    // 导航中 JS 上下文可能暂时不可用
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                }
-            }
+            std::thread::sleep(std::time::Duration::from_millis(300));
         }
-
-        Ok(())
+        tracing::warn!("CDP 新建页面加载超时");
     }
 
-    // 等待指定 CSS 选择器的元素出现
-    fn wait_for_element(&mut self, selector: &str, timeout_secs: u64) -> bool {
-        let script = format!("document.querySelector('{}') !== null", selector);
-        let start = std::time::Instant::now();
-        let timeout = std::time::Duration::from_secs(timeout_secs);
-
-        while start.elapsed() < timeout {
-            if let Ok(value) = self.evaluate(&script)
-                && value.as_bool() == Some(true)
-            {
-                return true;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(500));
+    // 在页面里 fetch 一个商店页面并用 DOMParser 解析，返回 extract(doc) 的结果。
+    // 只读：不导航、不改动当前页面。被重定向到登录页时返回明确的错误。
+    fn fetch_and_extract(&mut self, path: &str, extract: &str) -> Result<Value> {
+        let script = format!(
+            r#"(async () => {{
+                const r = await fetch({path}, {{ credentials: 'include', signal: AbortSignal.timeout(15000) }});
+                if (new URL(r.url).pathname.startsWith('/login')) return {{ login_required: true }};
+                const doc = new DOMParser().parseFromString(await r.text(), 'text/html');
+                return {{ data: ({extract})(doc) }};
+            }})()"#,
+            path = serde_json::to_string(path)?,
+            extract = extract
+        );
+        let value = self.evaluate(&script)?;
+        if value["login_required"].as_bool() == Some(true) {
+            return Err(anyhow!(
+                "Steam 网页登录已失效（{} 被重定向到登录页）。请在 Steam 客户端中打开一次「查看 Steam 云」页面后重试",
+                path
+            ));
         }
-
-        false
+        Ok(value["data"].clone())
     }
 
     // 执行 JavaScript 并获取结果
@@ -310,49 +286,22 @@ impl CdpClient {
     pub fn fetch_game_list(&mut self) -> Result<Vec<CloudGameInfo>> {
         tracing::info!("正在读取 Steam 云存储页面...");
 
-        // 检查当前页面是否为游戏列表页
-        let is_game_list_page = self
-            .evaluate("window.location.href")
-            .ok()
-            .and_then(|v| v.as_str().map(String::from))
-            .is_some_and(|url| url.contains("remotestorage") && !url.contains("remotestorageapp"));
+        let extract = r#"(doc) => Array.from(doc.querySelectorAll('.accountTable tr')).map(tr => {
+                const tds = tr.querySelectorAll('td');
+                // 游戏列表页有4列：游戏名, 文件数, 大小, 链接
+                if (tds.length < 3) return null;
+                const link = tr.querySelector('a[href*="appid="]');
+                const appIdMatch = link ? (link.getAttribute('href') || '').match(/appid=(\d+)/) : null;
+                if (!appIdMatch) return null;
+                return {
+                    app_id: parseInt(appIdMatch[1]),
+                    game_name: tds[0].textContent.trim(),
+                    file_count: parseInt(tds[1].textContent.trim()) || 0,
+                    total_size_str: tds[2].textContent.trim()
+                };
+            }).filter(x => x)"#;
 
-        if is_game_list_page {
-            // 已在正确页面，等待数据表格加载
-            self.wait_for_element(".accountTable", 10);
-        } else {
-            // 当前页面不是游戏列表页，导航到正确页面
-            tracing::debug!("CDP 当前页面不是游戏列表页，导航到正确页面");
-            self.navigate("https://store.steampowered.com/account/remotestorage")?;
-            self.wait_for_element(".accountTable", 10);
-        }
-
-        let script = r#"
-            (function() {
-                // 只选择 accountTable 下的行
-                const rows = Array.from(document.querySelectorAll('.accountTable tr'));
-                // 过滤掉表头（通常第一行）和无效行
-                return rows.map(tr => {
-                    const tds = tr.querySelectorAll('td');
-                    // 游戏列表页有4列：游戏名, 文件数, 大小, 链接
-                    if(tds.length < 3) return null;
-                    
-                    // 在行内查找包含 appid 的链接
-                    const link = tr.querySelector('a[href*="appid="]');
-                    const appIdMatch = link ? link.href.match(/appid=(\d+)/) : null;
-                    if(!appIdMatch) return null;
-                    
-                    return {
-                        app_id: parseInt(appIdMatch[1]),
-                        game_name: tds[0].textContent.trim(),
-                        file_count: parseInt(tds[1].textContent.trim()) || 0,
-                        total_size_str: tds[2].textContent.trim()
-                    };
-                }).filter(x => x);
-            })()
-        "#;
-
-        let value = self.evaluate(script)?;
+        let value = self.fetch_and_extract("/account/remotestorage", extract)?;
         if let Some(arr) = value.as_array() {
             let summary: Vec<String> = arr
                 .iter()
@@ -420,68 +369,40 @@ impl CdpClient {
 
         loop {
             let index = (page - 1) * 50;
-            let url = if page > 1 {
+            let path = if page > 1 {
                 format!(
-                    "https://store.steampowered.com/account/remotestorageapp/?appid={}&index={}",
+                    "/account/remotestorageapp/?appid={}&index={}",
                     app_id, index
                 )
             } else {
-                format!(
-                    "https://store.steampowered.com/account/remotestorageapp/?appid={}",
-                    app_id
-                )
+                format!("/account/remotestorageapp/?appid={}", app_id)
             };
 
-            self.navigate(&url)?;
-
-            // 等待数据表格出现
-            self.wait_for_element(".accountTable", 8);
-
-            let script = r#"
-                (function() {
-                    const rows = Array.from(document.querySelectorAll('.accountTable tr'));
-                    return rows.map(tr => {
+            let next_index = index + 50;
+            let extract = format!(
+                r#"(doc) => ({{
+                    rows: Array.from(doc.querySelectorAll('.accountTable tr')).map(tr => {{
                         const tds = tr.querySelectorAll('td');
                         // 文件列表页有 5 列: 文件夹, 文件名, 大小, 时间, 下载链接
-                        if(tds.length < 4) return null;
-                        
-                        // 查找下载链接：可能是 "ugc" 也可能是 "filedownload"
+                        if (tds.length < 4) return null;
                         const link = tr.querySelector('a[href*="ugc"], a[href*="filedownload"], a[href*="steamusercontent"]');
-                        const download_url = link ? link.href : "";
-                        
-                        // 文件夹, 文件名, 大小, 时间
-                        return {
+                        const href = link ? link.getAttribute('href') : '';
+                        return {{
                             folder: tds[0].textContent.trim(),
                             name: tds[1].textContent.trim(),
                             size_str: tds[2].textContent.trim(),
                             time_str: tds[3].textContent.trim(),
-                            url: download_url
-                        };
-                    }).filter(x => x && x.name);
-                })()
-            "#;
-
-            let mut value = self.evaluate(script)?;
-
-            // 首页结果为空时重试
-            if page == 1 && value.as_array().is_some_and(|a| a.is_empty()) {
-                tracing::debug!("CDP 首次查询返回空结果，等待后重试");
-                if let Ok(page_info) =
-                    self.evaluate("document.title + ' | ' + window.location.href")
-                {
-                    tracing::debug!("CDP 当前页面: {:?}", page_info);
-                }
-                std::thread::sleep(std::time::Duration::from_secs(3));
-                if let Ok(retry_value) = self.evaluate(script) {
-                    value = retry_value;
-                }
-            }
+                            url: href ? new URL(href, 'https://store.steampowered.com/').href : ''
+                        }};
+                    }}).filter(x => x && x.name),
+                    has_next: Array.from(doc.querySelectorAll('a')).some(a => (a.getAttribute('href') || '').includes('index={next_index}'))
+                }})"#
+            );
+            let result = self.fetch_and_extract(&path, &extract)?;
+            let value = result["rows"].clone();
+            let has_next = result["has_next"].as_bool().unwrap_or(false);
 
             if let Some(arr) = value.as_array() {
-                if arr.is_empty() {
-                    // 如果本页没数据，停止翻页
-                }
-
                 for item in arr {
                     let folder = item["folder"].as_str().unwrap_or("").to_string();
                     let filename = item["name"].as_str().unwrap_or("unknown").to_string();
@@ -509,23 +430,6 @@ impl CdpClient {
                     });
                 }
             }
-
-            // 下一页检测
-            let next_index = index + 50;
-            // 使用 JS 遍历查找链接，比 querySelector 更稳健
-            let check_next_script = format!(
-                r#"
-                (function() {{
-                    const links = Array.from(document.querySelectorAll('a'));
-                    return links.some(a => a.href.includes('index={0}'));
-                }})()
-                "#,
-                next_index
-            );
-            let has_next = self
-                .evaluate(&check_next_script)?
-                .as_bool()
-                .unwrap_or(false);
 
             if has_next {
                 page += 1;

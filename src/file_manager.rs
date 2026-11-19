@@ -148,9 +148,9 @@ impl FileService {
 
         tracing::info!("尝试通过 CDP 补充文件信息");
 
-        if let Ok(mut client) =
-            crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList)
-            && let Ok(cdp_files) = client.fetch_game_files(app_id)
+        if let Ok(cdp_files) = crate::cdp_client::CdpClient::connect()
+            .and_then(|mut client| client.fetch_game_files(app_id))
+            .inspect_err(|e| tracing::warn!("CDP 补充文件信息失败: {}", e))
         {
             tracing::info!(count = cdp_files.len(), "CDP 返回文件");
 
@@ -265,8 +265,7 @@ impl FileService {
         tracing::info!("通过 CDP 获取系统级 App ID {} 的文件列表", app_id);
 
         let mut client =
-            crate::cdp_client::CdpClient::connect_for(crate::cdp_client::CdpTarget::FileList)
-                .map_err(|e| anyhow!("CDP 连接失败: {}", e))?;
+            crate::cdp_client::CdpClient::connect().map_err(|e| anyhow!("CDP 连接失败: {}", e))?;
 
         let cdp_files = client
             .fetch_game_files(app_id)
