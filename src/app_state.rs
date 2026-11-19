@@ -103,6 +103,8 @@ pub struct GameLibraryState {
     pub show_user_selector: bool,
     // 账号切换触发的 Steam 重启进行中，成功后需按新账号重新加载
     pub account_switch_pending: bool,
+    // 等待用户确认切换的目标账号 user_id
+    pub switch_confirm_user: Option<String>,
     pub vdf_count: usize,
     pub cdp_count: usize,
 }

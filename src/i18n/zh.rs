@@ -470,6 +470,17 @@ pub fn steam_restart_success() -> &'static str {
     "Steam 已成功重启!"
 }
 
+pub fn switch_account_confirm_title() -> &'static str {
+    "切换 Steam 账号"
+}
+
+pub fn switch_account_confirm_message(account: &str) -> String {
+    format!(
+        "将关闭 Steam（包括正在运行的游戏），然后以「{}」重新登录。确定继续吗？",
+        account
+    )
+}
+
 pub fn auto_open_cloud_page() -> &'static str {
     "自动在 Steam 中打开云存储页面"
 }

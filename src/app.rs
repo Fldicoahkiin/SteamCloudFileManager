@@ -855,7 +855,26 @@ impl eframe::App for SteamCloudApp {
             );
             if let Some(user_id) = selected_user_id {
                 self.game_library.show_user_selector = false;
-                self.switch_steam_account(ui.ctx(), user_id);
+                self.game_library.switch_confirm_user = Some(user_id);
+            }
+        }
+
+        // 切换账号会关闭 Steam（以及正在运行的游戏），先确认
+        if let Some(user_id) = self.game_library.switch_confirm_user.clone() {
+            let label = self
+                .game_library
+                .all_users
+                .iter()
+                .find(|u| u.user_id == user_id)
+                .and_then(|u| u.persona_name.clone())
+                .unwrap_or_else(|| user_id.clone());
+            match crate::ui::draw_switch_account_confirm(ui.ctx(), &label, &self.misc.i18n) {
+                Some(true) => {
+                    self.game_library.switch_confirm_user = None;
+                    self.switch_steam_account(ui.ctx(), user_id);
+                }
+                Some(false) => self.game_library.switch_confirm_user = None,
+                None => {}
             }
         }
 

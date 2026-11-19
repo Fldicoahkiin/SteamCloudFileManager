@@ -487,6 +487,17 @@ pub fn steam_restart_success() -> &'static str {
     "Steam restarted successfully!"
 }
 
+pub fn switch_account_confirm_title() -> &'static str {
+    "Switch Steam Account"
+}
+
+pub fn switch_account_confirm_message(account: &str) -> String {
+    format!(
+        "Steam (and any running game) will be closed, then Steam signs in as \"{}\". Continue?",
+        account
+    )
+}
+
 pub fn auto_open_cloud_page() -> &'static str {
     "Open the Steam Cloud page in Steam automatically"
 }

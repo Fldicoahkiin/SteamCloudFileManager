@@ -941,6 +941,20 @@ impl I18n {
         }
     }
 
+    pub fn switch_account_confirm_title(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::switch_account_confirm_title(),
+            Language::Chinese => zh::switch_account_confirm_title(),
+        }
+    }
+
+    pub fn switch_account_confirm_message(&self, account: &str) -> String {
+        match self.lang {
+            Language::English => en::switch_account_confirm_message(account),
+            Language::Chinese => zh::switch_account_confirm_message(account),
+        }
+    }
+
     pub fn auto_open_cloud_page(&self) -> &'static str {
         match self.lang {
             Language::English => en::auto_open_cloud_page(),

@@ -228,6 +228,36 @@ fn draw_user_item(ui: &mut egui::Ui, user: &UserInfo, i18n: &I18n) -> Option<Str
     }
 }
 
+// 切换账号确认窗口：Some(true) 确认，Some(false) 取消，None 尚未选择
+pub fn draw_switch_account_confirm(
+    ctx: &egui::Context,
+    account_label: &str,
+    i18n: &I18n,
+) -> Option<bool> {
+    let mut choice = None;
+    let mut open = true;
+
+    egui::Window::new(i18n.switch_account_confirm_title())
+        .open(&mut open)
+        .collapsible(false)
+        .resizable(false)
+        .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+        .show(ctx, |ui| {
+            ui.label(i18n.switch_account_confirm_message(account_label));
+            ui.add_space(12.0);
+            ui.horizontal(|ui| {
+                if ui.button(i18n.ok()).clicked() {
+                    choice = Some(true);
+                }
+                if ui.button(i18n.cancel()).clicked() {
+                    choice = Some(false);
+                }
+            });
+        });
+
+    if !open { Some(false) } else { choice }
+}
+
 // 绘制错误窗口
 pub fn draw_error_window(
     ctx: &egui::Context,
