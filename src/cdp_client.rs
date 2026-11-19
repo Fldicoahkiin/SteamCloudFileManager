@@ -24,7 +24,24 @@ pub struct CdpClient {
     owned_target_id: Option<String>,
 }
 
+// 本进程新建、尚未关闭的页面。程序退出时后台扫描线程会被直接结束、来不及 Drop，
+// 由 close_owned_targets 在退出时统一关闭，避免在 Steam 里留下页面
+static OWNED_TARGETS: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+pub fn close_owned_targets() {
+    let ids = match OWNED_TARGETS.lock() {
+        Ok(mut ids) => std::mem::take(&mut *ids),
+        Err(_) => return,
+    };
+    for id in ids {
+        close_target(&id);
+    }
+}
+
 fn close_target(id: &str) {
+    if let Ok(mut ids) = OWNED_TARGETS.lock() {
+        ids.retain(|owned| owned != id);
+    }
     if let Err(e) = cdp_http_agent()
         .put(format!("{}/json/close/{}", CDP_HTTP_BASE, id))
         .send_empty()
@@ -147,6 +164,9 @@ impl CdpClient {
                         .read_to_string()?,
                 )?;
                 let id = created.id.clone();
+                if let (Some(id), Ok(mut ids)) = (&id, OWNED_TARGETS.lock()) {
+                    ids.push(id.clone());
+                }
                 (created, id)
             }
         };

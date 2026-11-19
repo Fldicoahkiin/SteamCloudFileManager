@@ -624,6 +624,10 @@ impl SteamCloudApp {
 }
 
 impl eframe::App for SteamCloudApp {
+    fn on_exit(&mut self) {
+        crate::cdp_client::close_owned_targets();
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         // 动态更新窗口标题
         ui.ctx().send_viewport_cmd(egui::ViewportCommand::Title(
