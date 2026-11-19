@@ -269,7 +269,32 @@ impl SteamCloudManager {
             .ok_or_else(|| anyhow!("Steam客户端未连接"))?;
         let remote_storage = client.remote_storage();
 
-        write_cloud_file_atomically(filename, data).map_err(|e| {
+        // root 0 的本地副本就是 Steam 的写入目标。实测（App 480，配额不足）写入失败后
+        // Steam 会删除这个本地文件，即使调用了 FileWriteStreamCancel；所以先备份，失败时写回。
+        let account_id = client.user().steam_id().account_id().raw();
+        let local_copy = crate::vdf_parser::VdfParser::find_steam_path()?
+            .join("userdata")
+            .join(account_id.to_string())
+            .join(self.app_id.to_string())
+            .join("remote")
+            .join(filename);
+        let backup =
+            if local_copy.is_file() {
+                Some(std::fs::read(&local_copy).map_err(|e| {
+                    anyhow!("写入前无法备份本地文件 {}: {}", local_copy.display(), e)
+                })?)
+            } else {
+                None
+            };
+
+        let written = write_cloud_file_atomically(filename, data);
+        if written.is_err()
+            && let Some(original) = &backup
+        {
+            restore_local_copy(&local_copy, original);
+        }
+
+        written.map_err(|e| {
             let size_str = crate::file_manager::format_size(data.len() as u64);
 
             // 检查云同步状态，辅助诊断
@@ -360,10 +385,27 @@ impl Drop for SteamCloudManager {
     }
 }
 
+// 写入失败后，本地文件丢失或内容变化时写回备份
+fn restore_local_copy(path: &std::path::Path, original: &[u8]) {
+    if std::fs::read(path).is_ok_and(|current| current == original) {
+        return;
+    }
+    let restored = path
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|_| std::fs::write(path, original));
+    match restored {
+        Ok(()) => tracing::warn!("云端写入失败，已恢复本地文件: {}", path.display()),
+        Err(e) => tracing::error!(
+            "云端写入失败，恢复本地文件 {} 也失败: {}",
+            path.display(),
+            e
+        ),
+    }
+}
+
 // 分块写入云文件，任一块失败就取消写入流。
-// steamworks 0.13 的 SteamFileWriter 在 Drop 时总是 FileWriteStreamClose，失败时会提交截断内容；
-// root 0 的本地文件就是 Steam 的写入目标，截断会直接清空用户存档。
-// FileWriteStreamCancel 会丢弃本次写入，保留原文件。
+// steamworks 0.13 的 SteamFileWriter 在 Drop 时总是 FileWriteStreamClose，失败时会提交截断内容。
 fn write_cloud_file_atomically(filename: &str, data: &[u8]) -> Result<()> {
     const CHUNK_SIZE: usize = 8 * 1024 * 1024;
     let name = std::ffi::CString::new(filename).map_err(|_| anyhow!("文件名包含 NUL 字符"))?;
@@ -390,7 +432,7 @@ fn write_cloud_file_atomically(filename: &str, data: &[u8]) -> Result<()> {
             );
             if !ok {
                 steamworks_sys::SteamAPI_ISteamRemoteStorage_FileWriteStreamCancel(rs, handle);
-                return Err(anyhow!("写入数据块失败，已取消写入，原文件未改动"));
+                return Err(anyhow!("写入数据块失败，已取消写入"));
             }
         }
 
