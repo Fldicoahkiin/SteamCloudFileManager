@@ -262,6 +262,14 @@ jobs:
                   sudo install -m 644 "$STEAM_LIB" /usr/lib/x86_64-linux-gnu/
                   sudo ldconfig
 
+                  # winit 运行时用 dlopen 加载 xkbcommon，ldd 看不到，auto_link 也就不会收；
+                  # 预先放进 AppDir 的 lib/x86_64-linux-gnu（AppRun 的库搜索路径之一，cargo-appimage 构建时只重建 usr/）
+                  sudo apt-get install -y libxkbcommon0 libxkbcommon-x11-0 libxcb-xkb1
+                  mkdir -p target/SteamCloudFileManager.AppDir/lib/x86_64-linux-gnu
+                  for lib in libxkbcommon.so.0 libxkbcommon-x11.so.0 libxcb-xkb.so.1; do
+                    cp -L "/usr/lib/x86_64-linux-gnu/$lib" target/SteamCloudFileManager.AppDir/lib/x86_64-linux-gnu/
+                  done
+
                   # 安装 cargo-appimage
                   cargo install cargo-appimage --locked --version 2.4.0
 
@@ -276,6 +284,12 @@ jobs:
 
                   # 使用 cargo-appimage 构建（不使用 --target）；appimagetool 自身解包运行，构建机不需要 FUSE
                   APPIMAGE_EXTRACT_AND_RUN=1 cargo appimage
+                  for lib in libsteam_api.so libxkbcommon.so.0 libxkbcommon-x11.so.0 libxcb-xkb.so.1; do
+                    if ! find target/SteamCloudFileManager.AppDir -name "$lib" | grep -q .; then
+                      echo "错误: AppDir 里缺少 $lib"
+                      exit 1
+                    fi
+                  done
 
                   # 查找生成的 AppImage（cargo-appimage 生成在 target/appimage/ 目录）
                   APPIMAGE_FILE=$(find target/appimage -name "*.AppImage" | head -n 1)
