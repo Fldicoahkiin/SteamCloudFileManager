@@ -246,22 +246,21 @@ pub fn load_config() -> Result<AppConfig> {
 // 保存配置
 pub fn save_config(config: &AppConfig) -> Result<()> {
     let config_path = get_config_path()?;
-
-    // 如果是默认配置，写入带注释的版本
-    let content = if config.paths.steam_path.is_none()
-        && config.appearance.theme_mode == "system"
-        && config.appearance.language == "auto"
-        && config.logging.enabled
-    {
-        AppConfig::default_toml_with_comments()
-    } else {
-        toml::to_string_pretty(config)?
-    };
-
+    let content = config_file_content(config)?;
     std::fs::write(&config_path, content)?;
     tracing::debug!("保存配置文件: {:?}", config_path);
 
     Ok(())
+}
+
+// 整份配置都是默认值时，写入带注释的版本
+fn config_file_content(config: &AppConfig) -> Result<String> {
+    let content = toml::to_string_pretty(config)?;
+    if content == toml::to_string_pretty(&AppConfig::default())? {
+        Ok(AppConfig::default_toml_with_comments())
+    } else {
+        Ok(content)
+    }
 }
 
 // 初始化全局配置
@@ -472,5 +471,38 @@ mod tests {
 
         let config: AppConfig = toml::from_str("[steam]\nauto_open_cloud_page = false\n").unwrap();
         assert!(!config.steam.auto_open_cloud_page);
+    }
+
+    #[test]
+    fn saving_keeps_settings_outside_the_template_check() {
+        let mut config = AppConfig::default();
+        config.steam.auto_open_cloud_page = false;
+        config.symlinks.push(super::SymlinkConfigEntry {
+            id: "test".to_string(),
+            app_id: 480,
+            direction: "remote_to_local".to_string(),
+            local_path: std::path::PathBuf::from("/tmp/saves"),
+            remote_subfolder: "saves".to_string(),
+            platform: "linux".to_string(),
+            created_at: 0,
+            note: String::new(),
+        });
+
+        let content = super::config_file_content(&config).unwrap();
+        let saved: AppConfig = toml::from_str(&content).unwrap();
+        assert!(!saved.steam.auto_open_cloud_page);
+        assert_eq!(saved.symlinks.len(), 1);
+    }
+
+    #[test]
+    fn default_config_is_saved_as_the_commented_template() {
+        let content = super::config_file_content(&AppConfig::default()).unwrap();
+        assert_eq!(content, AppConfig::default_toml_with_comments());
+
+        let template: AppConfig = toml::from_str(&AppConfig::default_toml_with_comments()).unwrap();
+        assert_eq!(
+            toml::to_string_pretty(&template).unwrap(),
+            toml::to_string_pretty(&AppConfig::default()).unwrap()
+        );
     }
 }
