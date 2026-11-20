@@ -1,6 +1,6 @@
 # Steam Cloud File Manager
 
-[English](README.en.md) | **简体中文**
+**English** | [简体中文](README.zh-CN.md)
 
 <p align="center">
   <img src="assets/steam_cloud-iOS-Default-1024x1024@1x.png" width="160" alt="steam_cloud" />
@@ -19,7 +19,7 @@
   <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/releases"><img src="https://img.shields.io/github/downloads/Fldicoahkiin/SteamCloudFileManager/total?color=success" alt="GitHub downloads"></a>
   <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml"><img src="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/build.yml/badge.svg" alt="Build"></a>
   <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml"><img src="https://github.com/Fldicoahkiin/SteamCloudFileManager/actions/workflows/release.yml/badge.svg" alt="Release"></a>
-  <a href="https://qm.qq.com/q/rljNzv4OaS"><img src="https://img.shields.io/badge/QQ群-324504270-12B7F5?logo=tencentqq&logoColor=white" alt="QQ群"></a>
+  <a href="https://qm.qq.com/q/rljNzv4OaS"><img src="https://img.shields.io/badge/QQ_Group-324504270-12B7F5?logo=tencentqq&logoColor=white" alt="QQ Group"></a>
 </p>
 
 <p align="center">
@@ -34,70 +34,70 @@
   <img src="https://img.shields.io/badge/AppImage-2c9784?logo=linux&logoColor=white" alt="AppImage">
 </p>
 
-> 基于 Rust 和 egui 构建的跨平台 Steam 云存档管理工具
+> Cross-platform Steam Cloud file management utility built with Rust and egui.
 
-## 功能
+## Features
 
-基于 Rust 与 Steamworks SDK 开发的云存档管理工具。通过直接调用 Steam 底层接口，实现了对云端文件的完全可视与控制。支持任意文件的上传、下载与删除，并提供软链接同步功能，有效解决了部分游戏配置文件无法跨平台同步的问题。
+A cloud save management utility built with Rust and the Steamworks SDK. By directly interfacing with low-level Steam APIs, it provides complete visibility and control over your cloud files. It supports uploading, downloading, and deleting individual files, and introduces a symlink sync solution to resolve cross-platform configuration sync issues.
 
-- **VDF 文件树可视化**：完整解析 `remotecache.vdf`，还原云端目录结构。
-- **批量传输**：支持多文件选择与拖拽上传/下载。
-- **深度控制**：直接删除云端文件，强制更新同步状态。
-- **Root 路径映射**：解析 `remotecache.vdf` 中的数字 Root ID (0-12)，自动转换为本地磁盘绝对路径（该映射关系在官方文档中未公开）。
-- **搜索与过滤**：支持文件名、路径及同步状态的正则表达式检索。
-- **游戏库扫描**：通过解析 `libraryfolders.vdf` 自动发现本地游戏。
-- **软链接同步**：支持将非原生支持的本地文件通过软链接挂载至 Steam Cloud（实验性）。
-- **UFS 配置管理**：直接读写 `appinfo.vdf`，实现类 Steamworks 后台的 Auto-Cloud 配置编辑（实验性）。可添加/编辑/删除 savefiles 规则和 rootoverrides 路径映射，自定义游戏的云同步行为。
-- **多平台支持**：Windows / macOS / Linux。
+- **VDF File Tree Visualization**: Fully parses `remotecache.vdf` to reconstruct the cloud directory structure.
+- **Batch Transfer**: Supports multi-file selection and drag-and-drop for uploads/downloads.
+- **Deep Control**: Directly delete cloud files and force sync status updates.
+- **Root Path Mapping**: Parses numeric Root IDs (0-12) from `remotecache.vdf` and automatically resolves them to absolute local disk paths (this mapping is undocumented in official sources).
+- **Search & Filter**: Supports regex search for filenames, paths, and sync status.
+- **Game Library Scanning**: Automatically discovers local games by parsing `libraryfolders.vdf`.
+- **Symlink Sync**: Supports mounting locally unsupported files to Steam Cloud via symlinks (Experimental).
+- **UFS Config Management**: Directly read/write `appinfo.vdf` to edit Auto-Cloud configuration like the Steamworks backend (Experimental). Add/edit/delete savefiles rules and rootoverrides path mappings to customize cloud sync behavior.
+- **Multi-Platform Support**: Windows / macOS / Linux.
 
-## 平台兼容性
+## Platform Compatibility
 
-支持 **Windows (x64)**、**macOS (Intel & Apple Silicon)** 以及 **Linux (x64)**。
-构建产物包含常规的安装包及免安装版本（Generic Binary / AppImage）。
+Supports **Windows (x64)**, **macOS (Intel & Apple Silicon)**, and **Linux (x64)**.
+Build artifacts include standard installers and portable versions (Generic Binary / AppImage).
 
-> _注：由于 Steamworks SDK 的上游限制，目前无法构建 Windows 和 Linux 的 ARM64 版本。_
+> _Note: Due to upstream Steamworks SDK limitations, we cannot currently build ARM64 versions for Windows and Linux._
 
-## 安装
+## Installation
 
 ### Windows
 
-1. 下载 [![Portable-x64](https://img.shields.io/badge/Portable-x64-0078D6.svg?logo=windows)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
-2. 解压到任意位置
-3. 双击 `SteamCloudFileManager.exe` 运行
+1. Download [![Portable-x64](https://img.shields.io/badge/Portable-x64-0078D6.svg?logo=windows)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+2. Extract to any location
+3. Double-click `SteamCloudFileManager.exe` to run
 
-> **注意**：
+> **Note**:
 >
-> - Windows 版本日志保存在应用所在目录的 `logs/` 文件夹。
-> - macOS 版本日志保存在 `~/Library/Logs/SteamCloudFileManager/` 目录。
-> - Linux 版本日志保存在 `~/.local/share/SteamCloudFileManager/logs/` 目录。
+> - Windows: Logs are saved in the `logs/` folder in the application directory.
+> - macOS: Logs are saved in `~/Library/Logs/SteamCloudFileManager/` directory.
+> - Linux: Logs are saved in `~/.local/share/SteamCloudFileManager/logs/` directory.
 
 ### macOS
 
 #### Homebrew
 
-**安装（推荐，自动安装到应用程序）：**
+**Install (Recommended, auto-installs to Applications):**
 
 ```bash
 brew tap Fldicoahkiin/tap
 brew install --cask steam-cloud-file-manager
 ```
 
-> 如果安装后提示应用损坏，请运行：`xattr -cr "/Applications/Steam Cloud File Manager.app"`
+> If the app is reported as damaged, run: `xattr -cr "/Applications/Steam Cloud File Manager.app"`
 
-**作为 Formula 安装（仅提供终端启动命令）：**
+**Install as Formula (Terminal launch command only):**
 
 ```bash
 brew install steam-cloud-file-manager
 ```
 
-#### 手动安装
+#### Manual Installation
 
-1. 下载对应版本：
-   - Intel 芯片：[![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
-   - Apple Silicon：[![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
-2. 打开 DMG 文件
-3. 将应用拖入 Applications 文件夹
-4. 如遇 "损坏" 或 "无法打开" 提示，请在终端执行以下命令修复签名：
+1. Download the version for your architecture:
+   - Intel: [![DMG-Intel](https://img.shields.io/badge/DMG-Intel-0071C5.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+   - Apple Silicon: [![DMG-Apple Silicon](https://img.shields.io/badge/DMG-Apple%20Silicon-CDCDCD.svg?logo=apple)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+2. Open the DMG file
+3. Drag the app to the Applications folder
+4. If you encounter a "Damaged" or "Cannot be opened" error, run the following command in Terminal to fix the signature:
 
    ```bash
    xattr -c "/Applications/Steam Cloud File Manager.app"
@@ -107,11 +107,11 @@ brew install steam-cloud-file-manager
 
 ```bash
 yay -S steam-cloud-file-manager-bin
-# 或
+# or
 paru -S steam-cloud-file-manager-bin
 ```
 
-手动构建：
+Manual build:
 
 ```bash
 git clone https://aur.archlinux.org/steam-cloud-file-manager-bin.git
@@ -120,7 +120,7 @@ makepkg -si
 steam-cloud-file-manager
 ```
 
-或下载 [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) 预构建包：
+Or download [![AUR-x64](https://img.shields.io/badge/AUR-x64-1793d1.svg?logo=arch-linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases) pre-built package:
 
 ```bash
 tar -xzf SteamCloudFileManager-*-linux-x86_64-aur.tar.gz
@@ -131,7 +131,7 @@ steam-cloud-file-manager
 
 ### Debian/Ubuntu
 
-下载 [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+Download [![Deb-x64](https://img.shields.io/badge/Deb-x64-D70A53.svg?logo=debian&logoColor=D70A53)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
 sudo dpkg -i steam-cloud-file-manager_*.deb
@@ -141,32 +141,32 @@ steam-cloud-file-manager
 
 ### Fedora/RHEL/openSUSE
 
-下载 [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+Download [![Rpm-x64](https://img.shields.io/badge/Rpm-x64-CC0000.svg?logo=redhat&logoColor=CC0000)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
 sudo dnf install ./steam-cloud-file-manager-*.rpm
 steam-cloud-file-manager
 ```
 
-### AppImage（通用）
+### AppImage (Universal)
 
-下载 [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+Download [![AppImage-x64](https://img.shields.io/badge/AppImage-x64-F1C40F.svg?logo=linux)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
 chmod +x SteamCloudFileManager-*.AppImage
 ./SteamCloudFileManager-*.AppImage
 ```
 
-### .tar.gz（通用）
+### .tar.gz (Universal)
 
-下载 [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
+Download [![tar.gz-x64](https://img.shields.io/badge/tar.gz-x64-F0F0F0.svg?logo=linux&logoColor=F0F0F0)](https://github.com/Fldicoahkiin/SteamCloudFileManager/releases)
 
 ```bash
 tar -xzf SteamCloudFileManager-*-linux-x86_64.tar.gz
 ./steam-cloud-file-manager
 ```
 
-### 从源码构建
+### Build from Source
 
 ```bash
 git clone https://github.com/Fldicoahkiin/SteamCloudFileManager.git
@@ -174,51 +174,51 @@ cd SteamCloudFileManager
 cargo build --release
 ```
 
-**构建依赖：**
+**Build Dependencies:**
 
 - **Cargo**
 - **Rust 1.90.0+**
-  - 使用 Rust 2021 edition
-  - 安装：`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+  - Uses Rust 2021 edition
+  - Install: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
 
-- **C++ 编译工具链：**
+- **C++ Toolchain:**
   - **Windows**:
-    - Visual Studio 2019 或更新版本（推荐安装 "Desktop development with C++" 工作负载）
-    - 或 [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
+    - Visual Studio 2019 or newer (recommend installing "Desktop development with C++" workload)
+    - Or [Build Tools for Visual Studio](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
   - **macOS**:
     - Xcode Command Line Tools: `xcode-select --install`
   - **Linux**:
-    - gcc/g++ 或 clang
+    - gcc/g++ or clang
     - Ubuntu/Debian: `sudo apt install build-essential`
     - Fedora: `sudo dnf install gcc gcc-c++`
     - Arch: `sudo pacman -S base-devel`
 
-**运行依赖：**
+**Runtime Dependencies:**
 
-- Steam 客户端（必须以调试模式运行）
+- Steam client (must run in debug mode)
 
-## 使用说明
+## Usage
 
-### Steam 调试模式
+### Steam Debug Mode
 
-本工具使用 CDP 协议与 Steam 通信，**必须**以调试模式启动 Steam。
+This tool uses the CDP protocol to communicate with Steam, so you **must** launch Steam with debugging enabled.
 
-**为什么需要调试模式？**
+**Why is this required?**
 
-- CDP（Chrome DevTools Protocol）是 Steam 内置浏览器的调试接口
-- 我们通过这个接口获取云端文件列表和下载链接
-- 只有开启调试模式，CDP 端口才会启用
+- CDP (Chrome DevTools Protocol) is the debugging interface for Steam's built-in browser.
+- We use this interface to fetch the cloud file list and download links.
+- The CDP port is only active when debug mode is enabled.
 
 **Windows:**
 
-1. 右键点击 Steam 快捷方式，选择“属性”
-2. 在“目标”栏末尾添加：`-cef-enable-debugging`
-3. 点击“确定”并启动 Steam
+1. Right-click your Steam shortcut and select "Properties".
+2. Add `-cef-enable-debugging` to the end of the "Target" field.
+3. Click "OK" and launch Steam.
 
 **macOS:**
 
-1. 退出 Steam
-2. 在终端执行：
+1. Quit Steam.
+2. Run in Terminal:
 
    ```bash
    open -a Steam --args -cef-enable-debugging
@@ -226,204 +226,202 @@ cargo build --release
 
 **Linux:**
 
-1. 关闭 Steam
-2. 在终端执行：
+1. Close Steam.
+2. Run in Terminal:
 
    ```bash
    steam -cef-enable-debugging &
    ```
 
-   或者修改 Steam 快捷方式，在 Exec 行末尾添加 `-cef-enable-debugging`
+   Or edit your Steam shortcut and append `-cef-enable-debugging` to the Exec line.
 
-**注意：** 本软件提供了“以调试模式重启 Steam”按钮，可以自动根据引导完成上述操作。
+**Note:** The software features a built-in "Restart Steam in Debug Mode" button that automates this process.
 
-### 基本操作流程
+### Basic Workflow
 
-1. 确保 Steam 已运行在调试模式。
-2. 选择目标游戏：
-   - **游戏库选择**：点击游戏库按钮选择本地游戏（会自动连接）。
-   - **手动输入**：输入 App ID 后点击 **"连接"**。
-3. 加载完成后，可在左侧树状视图中操作文件。
+1. Ensure Steam is running in debug mode.
+2. Select the target game:
+   - **Game Library**: Click the game library button to select a local game (auto-connects).
+   - **Manual Input**: Enter App ID and click **"Connect"**.
+3. Once loaded, manipulate files via the tree view on the left.
 
-App ID 可以通过 Steam 商店 URL 或 [SteamDB](https://steamdb.info/) 上找到。
+App IDs can be found in Steam Store URLs or on [SteamDB](https://steamdb.info/).
 
-> ⚠️ **警告**
+> ⚠️ **Warning**
 >
-> - **删除不可逆**：删除操作会立即提交至本地缓存，无法撤销。
-> - **数据安全**：建议在批量操作前先备份原始文件。
-> - **同步机制**：文件变更写入本地缓存后，Steam 会在后台异步上传。请勿在同步完成前强制杀掉 Steam 进程。
+> - **Irreversible Action**: Deletions are committed to the local cache immediately.
+> - **Data Safety**: We recommend backing up original files before batch operations.
+> - **Sync Mechanism**: Changes are written to the local cache and uploaded asynchronously by Steam. Do not kill the Steam process before sync completes.
 
-## 技术架构
-
-### 云同步机制
+### Cloud Sync Mechanism
 
 ```mermaid
 graph TB
-    subgraph dev["🔧 开发者"]
-        Steamworks["Steamworks 后台<br/>配置 ufs"]
-        GameCode["游戏代码"]
+    subgraph dev["🔧 Developer"]
+        Steamworks["Steamworks Backend<br/>Configure ufs"]
+        GameCode["Game Code"]
     end
     
-    Cloud(("🌐 Steam 服务器"))
+    Cloud(("🌐 Steam Server"))
     
-    subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["本地 VDF 文件"]
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["☁️ Steam 云同步"]
-            Auto["Steam 自动云 Auto-Cloud<br/>自动递归查找匹配文件"]
-            API["Steam 云 API<br/>ISteamRemoteStorage接口"]
+        subgraph sync["☁️ Steam Cloud Sync"]
+            Auto["Steam Auto-Cloud<br/>Auto recursive file matching"]
+            API["Steam Cloud API<br/>ISteamRemoteStorage"]
         end
     end
     
-    %% Steamworks 配置下发流程
+    %% Steamworks config delivery
     Steamworks --> Cloud
-    Cloud -->|下发 ufs 配置| AppInfo
-    AppInfo -->|ufs 配置规则| Auto
+    Cloud -->|Deliver ufs Config| AppInfo
+    AppInfo -->|ufs Config Rules| Auto
     Auto --> RemoteCache
     
-    %% 游戏代码调用 API
-    GameCode -->|调用 API| API
-    API -->|写入文件| RemoteCache
+    %% Game code calls API
+    GameCode -->|Call API| API
+    API -->|Write File| RemoteCache
     
-    %% 双向同步
-    RemoteCache <===>|双向同步| Cloud
+    %% Bidirectional sync
+    RemoteCache <===>|Bidirectional Sync| Cloud
 ```
 
-**本工具交互流程：**
+**This Tool's Interaction Flow:**
 
 ```mermaid
 graph TB
-    Tool["🛠️ 本工具"]
+    Tool["🛠️ This Tool"]
     
-    subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["本地 VDF 文件"]
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["☁️ Steam 云同步"]
-            Auto["Steam 自动云 Auto-Cloud"]
-            API["Steam 云 API"]
+        subgraph sync["☁️ Steam Cloud Sync"]
+            Auto["Steam Auto-Cloud"]
+            API["Steam Cloud API"]
         end
         
-        Browser["🌐 Steam 内置浏览器<br/>127.0.0.1:8080"]
+        Browser["🌐 Steam Built-in Browser<br/>127.0.0.1:8080"]
     end
     
-    Cloud(("🌐 Steam 服务器"))
+    Cloud(("🌐 Steam Server"))
     
-    %% 本工具的操作（介入流程）
-    Tool -.->|读取| AppInfo
-    Tool -.->|读取| RemoteCache
-    Tool ==>|注入 ufs 配置| AppInfo
-    Tool -->|调用 API| API
-    Tool -->|CDP 获取下载链接| Browser
+    %% This tool's operations (inject into flow)
+    Tool -.->|Read| AppInfo
+    Tool -.->|Read| RemoteCache
+    Tool ==>|Inject ufs Config| AppInfo
+    Tool -->|Call API| API
+    Tool -->|CDP Get Download Link| Browser
     
-    %% Steam 内部流程
-    AppInfo -->|ufs 配置规则| Auto
+    %% Steam internal flow
+    AppInfo -->|ufs Config Rules| Auto
     Auto --> RemoteCache
-    API -->|写入文件| RemoteCache
-    RemoteCache <===>|双向同步| Cloud
-    Browser <-->|访问云存储| Cloud
+    API -->|Write File| RemoteCache
+    RemoteCache <===>|Bidirectional Sync| Cloud
+    Browser <-->|Access Cloud Storage| Cloud
 ```
 
 <details>
-<summary><b>完整架构图（点击展开）</b></summary>
+<summary><b>Full Architecture Diagram (Click to Expand)</b></summary>
 
 ```mermaid
 graph LR
-    subgraph left["外部"]
-        subgraph dev["🔧 开发者"]
-            Steamworks["Steamworks 后台<br/>配置 ufs"]
-            GameCode["游戏代码"]
+    subgraph left["External"]
+        subgraph dev["🔧 Developer"]
+            Steamworks["Steamworks Backend<br/>Configure ufs"]
+            GameCode["Game Code"]
         end
-        Tool["🛠️ 本工具"]
+        Tool["🛠️ This Tool"]
     end
     
-    subgraph client["🖥️ Steam 客户端"]
-        subgraph vdf["本地 VDF 文件"]
+    subgraph client["🖥️ Steam Client"]
+        subgraph vdf["Local VDF Files"]
             AppInfo[(appinfo.vdf)]
             RemoteCache[(remotecache.vdf)]
         end
         
-        subgraph sync["☁️ Steam 云同步"]
+        subgraph sync["☁️ Steam Cloud Sync"]
             Auto["Auto-Cloud"]
-            API["Steam 云 API"]
+            API["Steam Cloud API"]
         end
         
-        Browser["🌐 内置浏览器"]
+        Browser["🌐 Built-in Browser"]
     end
     
-    Cloud(("🌐 Steam<br/>服务器"))
+    Cloud(("🌐 Steam<br/>Server"))
     
-    %% 开发者流程
+    %% Developer flow
     Steamworks --> Cloud
-    Cloud -->|下发 ufs 配置| AppInfo
-    GameCode -->|调用 API| API
+    Cloud -->|Deliver ufs Config| AppInfo
+    GameCode -->|Call API| API
     
-    %% Steam 内部流程
+    %% Steam internal flow
     AppInfo --> Auto
     Auto --> RemoteCache
     API --> RemoteCache
     RemoteCache <===> Cloud
     Browser <--> Cloud
     
-    %% 本工具的操作
-    Tool -.->|读取| AppInfo
-    Tool -.->|读取| RemoteCache
-    Tool ==>|注入 ufs| AppInfo
-    Tool -->|调用| API
+    %% This tool's operations
+    Tool -.->|Read| AppInfo
+    Tool -.->|Read| RemoteCache
+    Tool ==>|Inject ufs| AppInfo
+    Tool -->|Call| API
     Tool -->|CDP| Browser
 ```
 
 </details>
 
-#### Steam 云同步的两种方式
+#### Two Types of Steam Cloud Sync
 
-Steam 提供两种云同步机制：
+Steam provides two cloud sync mechanisms:
 
-**自动云（Auto-Cloud）**\
-开发者在 Steamworks 后台配置，Steam 自动扫描指定目录：
+**Auto-Cloud**\
+Developers configure in Steamworks backend, Steam automatically scans specified directories:
 
-- Steam 会主动扫描配置的目录
-- 根据 pattern（如 `*.sav`）自动匹配文件
-- 新文件会自动添加到 remotecache.vdf 并同步
-- 配置存储在 appinfo.vdf 的 `ufs` 节中
+- Steam actively scans configured directories
+- Automatically matches files based on patterns (e.g., `*.sav`)
+- New files are automatically added to remotecache.vdf and synced
+- Configuration stored in appinfo.vdf's `ufs` section
 
 **Steam Cloud API**\
-游戏代码调用 `ISteamRemoteStorage::FileWrite()` 显式注册文件：
+Game code calls `ISteamRemoteStorage::FileWrite()` to explicitly register files:
 
-- Steam 不会主动扫描
-- 需要游戏调用 API 注册文件
-- 用户手动创建的文件不会自动同步
+- Steam does not actively scan
+- Requires game to call API to register files
+- User-created files are not automatically synced
 
-**本工具的定位**：\
-本工具提供两种方式控制云同步：
+**This Tool's Positioning**:\
+This tool provides two ways to control cloud sync:
 
-1. **Steam Cloud API**：手动调用 API 注册文件，解决游戏不写入软链接目录的问题
-2. **UFS 配置注入**（新功能）：直接修改本地 `appinfo.vdf` 的 `ufs` 节，实现类似 Steamworks 后台的配置管理。可以：
-   - 添加/编辑/删除 `savefiles` 规则（指定同步目录、文件匹配模式、递归搜索选项）
-   - 添加/编辑/删除 `rootoverrides` 路径映射（跨平台路径转换）
-   - 配置 `pathtransforms` 路径转换规则（可选，用于动态路径替换）
-   - 为任意游戏自定义云同步路径
+1. **Steam Cloud API**: Manually call API to register files, solving the problem of games not writing to symlinked directories
+2. **UFS Config Injection** (New Feature): Directly modify local `appinfo.vdf`'s `ufs` section, enabling Steamworks-like configuration management. You can:
+   - Add/edit/delete `savefiles` rules (specify sync directories, file patterns, and recursive search option)
+   - Add/edit/delete `rootoverrides` path mappings (cross-platform path conversion)
+   - Configure `pathtransforms` path transformation rules (optional, for dynamic path substitution)
+   - Customize cloud sync paths for any game
 
-> ⚠️ **注意**：UFS 配置注入修改的是本地 appinfo.vdf，Steam 更新可能会覆盖这些修改。建议在修改前备份配置。
+> ⚠️ **Note**: UFS config injection modifies local appinfo.vdf. Steam updates may overwrite these changes. Backup your configuration before modifying.
 
-### 数据流
+### Data Flow
 
 ```mermaid
 graph TD
-    subgraph 操作栏
-        Upload[上传]
-        Download[下载]
-        SyncToCloud[同步到云端]
-        Delete[删除]
-        Forget[移出同步]
-        Compare[文件对比]
-        Refresh[刷新]
-        Backup[备份]
+    subgraph Toolbar
+        Upload[Upload]
+        Download[Download]
+        SyncToCloud[Sync to Cloud]
+        Delete[Delete]
+        Forget[Forget]
+        Compare[Compare Files]
+        Refresh[Refresh]
+        Backup[Backup]
     end
     
     subgraph SteamAPI[Steam API]
@@ -434,82 +432,82 @@ graph TD
         SyncCloud[sync_cloud_files]
     end
     
-    subgraph 数据获取
-        CDPClient[CDP 客户端]
-        VDFParser[VDF 解析器]
+    subgraph DataFetch[Data Fetching]
+        CDPClient[CDP Client]
+        VDFParser[VDF Parser]
     end
     
-    Upload -->|选择本地文件| WriteFile
+    Upload -->|Select Local File| WriteFile
     WriteFile --> SyncCloud
     
     Download --> CDPClient
-    CDPClient -->|获取下载链接| HTTP[HTTP 下载]
-    HTTP --> LocalDisk[本地磁盘]
+    CDPClient -->|Get Download URL| HTTP[HTTP Download]
+    HTTP --> LocalDisk[Local Disk]
     
-    SyncToCloud -->|仅本地文件上传| WriteFile
+    SyncToCloud -->|Upload Local-Only Files| WriteFile
     
     Delete --> DeleteFile
     DeleteFile --> SyncCloud
     
-    Forget -->|从云端移除但保留本地| ForgetFile
+    Forget -->|Remove from Cloud, Keep Local| ForgetFile
     ForgetFile --> SyncCloud
     
     Compare --> CDPClient
     Compare --> VDFParser
-    CDPClient -->|计算云端 Hash| HashCompare[Hash 对比]
-    VDFParser -->|计算本地 Hash| HashCompare
+    CDPClient -->|Calculate Cloud Hash| HashCompare[Hash Compare]
+    VDFParser -->|Calculate Local Hash| HashCompare
     
     Backup --> ReadFile
     ReadFile --> LocalDisk
     
     Refresh --> VDFParser
     Refresh --> CDPClient
-    VDFParser --> FileList[文件列表]
+    VDFParser --> FileList[File List]
     CDPClient --> FileList
     
-    SyncCloud -.->|后台异步| CloudServer[Steam 云端]
+    SyncCloud -.->|Background Async| CloudServer[Steam Cloud]
 ```
 
-### 数据源优先级
+### Data Source Priority
 
-| 来源          | 数据内容                     | 优先级 | 说明                       |
-| ------------- | ---------------------------- | ------ | -------------------------- |
-| **VDF**       | 本地缓存的文件列表、同步状态 | 主要   | 解析 `remotecache.vdf`     |
-| **CDP**       | 云端实时文件列表、下载链接   | 补充   | 通过 Steam 内置浏览器获取  |
-| **Steam API** | 文件读写、删除、配额查询     | 操作   | `ISteamRemoteStorage` 接口 |
+| Source        | Data Content                             | Priority   | Description                     |
+| ------------- | ---------------------------------------- | ---------- | ------------------------------- |
+| **VDF**       | Local cached file list, sync status      | Primary    | Parses `remotecache.vdf`        |
+| **CDP**       | Real-time cloud file list, download URLs | Supplement | Via Steam's built-in browser    |
+| **Steam API** | File read/write/delete, quota query      | Operations | `ISteamRemoteStorage` interface |
 
-### 同步状态 (`is_persisted`)
+### Sync Status (`is_persisted`)
 
 ```
-新上传的文件
-  is_persisted = false  ← 仅在本地缓存
+Newly uploaded file
+  is_persisted = false  ← Only in local cache
   ↓
-  Steam 后台上传（需要数秒到数分钟）
+  Steam background upload (takes seconds to minutes)
   ↓
-  is_persisted = true   ← 已同步到云端
+  is_persisted = true   ← Synced to cloud
 ```
 
-> ⚠️ **重要**：`sync_cloud_files()` 调用后会立即返回，实际上传在后台异步进行。断开连接时 Steam 会强制完成同步。
+> ⚠️ **Important**: `sync_cloud_files()` returns immediately; actual upload happens asynchronously in background. Steam forces sync completion on disconnect.
 
-### CDP 协议
+### CDP Protocol
 
-通过 Steam 客户端的 CEF (Chromium Embedded Framework) 调试接口获取云端实时数据：
+Fetches real-time cloud data via Steam's CEF (Chromium Embedded Framework) debug interface:
 
-1. **检测**: 访问 `http://127.0.0.1:8080/json` 获取调试目标列表
-2. **连接**: 建立 WebSocket 连接到目标页面
-3. **导航**: 跳转到 `store.steampowered.com/account/remotestorage`
-4. **注入**: 执行 JavaScript 提取文件列表和下载链接
-5. **合并**: 将 CDP 数据与 VDF 数据合并，补充下载链接和实时状态
+1. **Detect**: Access `http://127.0.0.1:8080/json` to get debug target list
+2. **Connect**: Establish WebSocket connection to target page
+3. **Navigate**: Go to `store.steampowered.com/account/remotestorage`
+4. **Inject**: Execute JavaScript to extract file list and download URLs
+5. **Merge**: Combine CDP data with VDF data, supplementing download URLs and real-time status
 
-### VDF 解析与 Root 映射
+### VDF Parsing & Root Mapping
 
-工具实时解析 `remotecache.vdf` 获取文件列表，同时解析 **`appinfo.vdf`** 提取游戏的云存储规则 (`ufs` 节)，自动处理 Steam 的 Root ID 映射系统：
+The tool parses `remotecache.vdf` in real-time for file lists, and parses **`appinfo.vdf`** to extract game cloud rules (`ufs` section), automatically handling Steam's Root ID mapping:
 
-**什么是 Root ID？**
+**What is Root ID?**
 
-Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位置。**这个数字 ID 到路径的映射关系在任何官方文档中都没有公开**，是通过解析 VDF 文件和实际游戏测试验证得出的。
+Steam uses numeric Root IDs (0-12) in `remotecache.vdf` to identify file storage locations. **This numeric ID to path mapping is not documented in any official sources** - it has been verified through VDF file parsing and actual game testing.
 
-| Root ID | Steamworks 根名称       | Windows 路径示例                  |
+| Root ID | Steamworks Root Name    | Windows Path Example              |
 | ------- | ----------------------- | --------------------------------- |
 | 0       | `Default`               | `userdata/{uid}/{appid}/remote/`  |
 | 1       | `App Install Directory` | `steamapps/common/GameName/`      |
@@ -519,190 +517,190 @@ Steam 在 `remotecache.vdf` 中使用数字 Root ID (0-12) 标识文件存储位
 | 11      | `SteamCloudDocuments`   | `Documents\Steam Cloud\`          |
 | 12      | `WinAppDataLocalLow`    | `%USERPROFILE%\AppData\LocalLow\` |
 
-**详细说明**：
+**Details**:
 
-- 开发者在 Steamworks 后台配置时使用**字符串名称**（如 `WinMyDocuments`）
-- Steam 客户端在 `remotecache.vdf` 中存储为**数字 ID**（如 `2`）
-- 官方只公开了字符串名称，**数字 ID 需要通过解析 remotecache.vdf 获取**
+- Developers use **string names** in Steamworks backend configuration (e.g., `WinMyDocuments`)
+- Steam client stores as **numeric IDs** in `remotecache.vdf` (e.g., `2`)
+- Official docs only publish string names; **numeric IDs are obtained by parsing remotecache.vdf**
 
-- **[Root 路径映射表](ROOT_PATH_MAPPING.md)** - 完整的验证数据和跨平台映射
+- **[Root Path Mapping Table](ROOT_PATH_MAPPING.md)** - Complete validation data and cross-platform mappings
 
-> **注意**：Root 路径映射表通过实际游戏测试验证，欢迎提交新的验证数据！
+> **Note**: The Root path mapping table is verified through actual game testing. Contributions of new validation data are welcome!
 
 ## TODO
 
-### 功能开发
+### Feature Development
 
-- [x] 多语言支持（i18n）- 已支持简体中文/English
-- [x] 版本更新检测
-- [x] 树状视图
-- [x] 批量上传/下载
-- [x] 文件冲突检测与处理
-- [x] 云存档备份
-- [x] 软链接同步支持（实验性）
-- [x] UFS 配置管理（实验性）- 类 Steamworks 后台的 Auto-Cloud 配置编辑
-- [ ] 自动备份计划
-- [ ] 开机自启动（随系统启动，托盘后台运行）
-- [ ] 启动时自动注入 UFS 配置（无需手动操作即可识别本地存档路径）
-- [ ] UFS 配置管理页面（独立的可视化界面，替代当前弹窗式编辑）
-- [ ] 云存档版本历史（查看和回滚历史版本）
+- [x] Multi-language support (i18n) - Chinese/English
+- [x] Version update detection
+- [x] Tree view
+- [x] Batch upload/download
+- [x] File conflict detection and handling
+- [x] Cloud save backup
+- [x] Symlink sync support (experimental)
+- [x] UFS config management (experimental) - Steamworks-like Auto-Cloud configuration editing
+- [ ] Automatic backup schedule
+- [ ] Launch on startup (system tray background service)
+- [ ] Auto-inject UFS config on startup (auto-detect local save paths without manual operation)
+- [ ] UFS config management page (dedicated visual interface, replacing current popup editor)
+- [ ] Cloud save version history (view and rollback to previous versions)
 
-### 包管理器支持
+### Package Manager Support
 
 - [x] AUR (Arch User Repository) - `yay -S steam-cloud-file-manager-bin`
 - [x] Homebrew (macOS) - `brew tap Fldicoahkiin/tap && brew install steam-cloud-file-manager`
 - [ ] Winget (Windows) - `winget install steam-cloud-file-manager`
 - [ ] Scoop (Windows) - `scoop install steam-cloud-file-manager`
 - [ ] Chocolatey (Windows) - `choco install steam-cloud-file-manager`
-- [ ] APT 仓库 (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
-- [ ] DNF/YUM 仓库 (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
+- [ ] APT Repository (Debian/Ubuntu) - `apt install steam-cloud-file-manager`
+- [ ] DNF/YUM Repository (Fedora/RHEL) - `dnf install steam-cloud-file-manager`
 - [ ] Flatpak - `flatpak install steam-cloud-file-manager`
 - [ ] Snap - `snap install steam-cloud-file-manager`
 
-## 贡献
+## Contributing
 
-欢迎提交 Issue 和 Pull Request！详细指南请查看 [CONTRIBUTING.md](CONTRIBUTING.md)。
+Welcome to submit Issues and Pull Requests! See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
 
-### 如何贡献
+### How to Contribute
 
-- 🐛 **报告 Bug**：使用 Issue 模板提交问题
-- ✨ **请求功能**：分享你的想法和建议
-- 📖 **完善文档**：帮助改进 README 和技术文档
-- 🌐 **贡献翻译**：添加新的语言支持，请查看 [i18n 贡献指南](I18N_GUIDE.md)
-- 🗺️ **补充 Root 映射**：提交游戏的 remotecache.vdf 验证数据，帮助完善 [Root 路径映射表](ROOT_PATH_MAPPING.md)
-- 🔧 **提交代码**：修复 Bug 或实现新功能
+- 🐛 **Report Bugs**: Use Issue templates to submit problems
+- ✨ **Request Features**: Share your ideas and suggestions
+- 📖 **Improve Documentation**: Help improve README and technical docs
+- 🌐 **Contribute Translations**: Add new languages, see [i18n Contribution Guide](I18N_GUIDE.md)
+- 🗺️ **Add Root Mappings**: Submit game remotecache.vdf validation data to help improve the [Root Path Mapping Table](ROOT_PATH_MAPPING.md)
+- 🔧 **Submit Code**: Fix bugs or implement new features
 
-当前支持的语言：
+Currently supported languages:
 
 - 简体中文
 - English
 
-## 贡献者
+## Contributors
 
 <a href="https://github.com/Fldicoahkiin/SteamCloudFileManager/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=Fldicoahkiin/SteamCloudFileManager" />
 </a>
 
-## 项目结构
+## Project Structure
 
 ```
 src/
-├── main.rs                 # 入口：初始化日志、启动 eframe
-├── app.rs                  # 主应用：状态持有、UI 渲染循环
-├── app_state.rs            # 状态结构定义
-├── app_handlers.rs         # 业务逻辑处理器
-├── async_handlers.rs       # 异步任务管理（channel 持有）
+├── main.rs                 # Entry: initialize logger, start eframe
+├── app.rs                  # Main app: state holder, UI render loop
+├── app_state.rs            # State structure definitions
+├── app_handlers.rs         # Business logic handlers
+├── async_handlers.rs       # Async task management (channel holders)
 │
-├── steam_api.rs            # Steam API 封装（CloudFile 结构）
-├── steam_worker.rs         # 外部进程通信（JSON RPC）
-├── steam_process.rs        # Steam 进程管理（启动/关闭）
+├── steam_api.rs            # Steam API wrapper (CloudFile struct)
+├── steam_worker.rs         # External process communication (JSON RPC)
+├── steam_process.rs        # Steam process management (start/stop)
 │
-├── file_manager.rs         # 文件操作（上传/下载/删除）
-├── file_tree.rs            # 文件树结构
-├── downloader.rs           # 批量下载器
-├── backup.rs               # 备份功能
-├── conflict.rs             # 冲突检测
-├── symlink_manager.rs      # 软链接管理
+├── file_manager.rs         # File operations (upload/download/delete)
+├── file_tree.rs            # File tree structure
+├── downloader.rs           # Batch downloader
+├── backup.rs               # Backup functionality
+├── conflict.rs             # Conflict detection
+├── symlink_manager.rs      # Symlink management
 │
-├── vdf_parser.rs           # VDF 文件解析（appinfo.vdf, loginusers.vdf）
-├── appinfo_writer.rs       # appinfo.vdf 写入（UFS 配置注入）
-├── path_resolver.rs        # 路径解析（savefiles 配置 → 实际路径）
-├── cdp_client.rs           # CDP 网页解析（获取远程文件列表）
-├── game_scanner.rs         # 游戏扫描（合并 VDF + CDP）
-├── user_manager.rs         # 用户管理
+├── vdf_parser.rs           # VDF file parsing (appinfo.vdf, loginusers.vdf)
+├── appinfo_writer.rs       # appinfo.vdf writing (UFS config injection)
+├── path_resolver.rs        # Path resolution (savefiles config → actual paths)
+├── cdp_client.rs           # CDP web parsing (fetch remote file list)
+├── game_scanner.rs         # Game scanning (merge VDF + CDP)
+├── user_manager.rs         # User management
 │
-├── config.rs               # 配置管理（设置持久化）
-├── update.rs               # 自动更新
-├── logger.rs               # 日志系统
-├── i18n/                   # 国际化
-│   ├── mod.rs              # 语言枚举与分发逻辑
+├── config.rs               # Configuration management (settings persistence)
+├── update.rs               # Auto update
+├── logger.rs               # Logging system
+├── i18n/                   # Internationalization
+│   ├── mod.rs              # Language enum and dispatch
 │   ├── en.rs               # English
-│   └── zh.rs               # 简体中文
-├── icons.rs                # 图标系统（Phosphor Icons）
-├── version.rs              # 版本信息
+│   └── zh.rs               # 简体中文 (Chinese Simplified)
+├── icons.rs                # Icon system (Phosphor Icons)
+├── version.rs              # Version info
 │
 └── ui/
-    ├── mod.rs              # UI 模块导出
-    ├── app_panels.rs       # 面板渲染（顶部/底部/中心、操作按钮、状态栏）
-    ├── controls.rs         # 控件渲染
-    ├── file_list.rs        # 文件列表（表格/树状）
-    ├── windows.rs          # 窗口（游戏选择、用户选择）
-    ├── settings.rs         # 设置窗口
-    ├── theme.rs            # 主题系统（颜色/深色模式）
-    ├── upload_dialog.rs    # 上传对话框
-    ├── backup_dialog.rs    # 备份对话框
-    ├── conflict_dialog.rs  # 冲突对话框
-    ├── guide_dialog.rs     # 引导对话框
-    ├── appinfo_dialog.rs   # AppInfo 对话框
-    ├── symlink_dialog.rs   # 软链接对话框
-    └── font_loader.rs      # 字体加载
+    ├── mod.rs              # UI module exports
+    ├── app_panels.rs       # Panel rendering (top/bottom/center, action buttons, status bar)
+    ├── controls.rs         # Control rendering
+    ├── file_list.rs        # File list (table/tree view)
+    ├── windows.rs          # Windows (game selector, user selector)
+    ├── settings.rs         # Settings window
+    ├── theme.rs            # Theme system (dark/light mode)
+    ├── upload_dialog.rs    # Upload dialog
+    ├── backup_dialog.rs    # Backup dialog
+    ├── conflict_dialog.rs  # Conflict dialog
+    ├── guide_dialog.rs     # Guide dialog
+    ├── appinfo_dialog.rs   # AppInfo dialog
+    ├── symlink_dialog.rs   # Symlink dialog
+    └── font_loader.rs      # Font loader
 ```
 
-## 许可证
+## License
 
-本项目采用 GPL-3.0 许可证 - 详见 [LICENSE](LICENSE) 文件
+This project is licensed under GPL-3.0 - see [LICENSE](LICENSE) file for details.
 
-## 致谢
+## Acknowledgments
 
-### 核心依赖
+### Core Dependencies
 
-- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs) - Steamworks SDK 的 Rust 绑定
-- [egui](https://github.com/emilk/egui) - 即时模式 GUI 框架
-- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) - egui 的跨平台框架
-- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs) - VDF 文本格式解析器
-- [tungstenite](https://github.com/snapview/tungstenite-rs) - WebSocket 客户端（CDP 通信）
+- [steamworks-rs](https://github.com/Thinkofname/steamworks-rs) - Rust bindings for Steamworks SDK
+- [egui](https://github.com/emilk/egui) - Immediate mode GUI framework
+- [eframe](https://github.com/emilk/egui/tree/master/crates/eframe) - Cross-platform framework for egui
+- [keyvalues-parser](https://github.com/CosmicHorrorDev/vdf-rs) - VDF text format parser
+- [tungstenite](https://github.com/snapview/tungstenite-rs) - WebSocket client (CDP communication)
 
-### 工具库
+### Utility Libraries
 
-- [rfd](https://github.com/PolyMeilex/rfd) - 原生文件对话框
-- [ureq](https://github.com/algesten/ureq) - HTTP 客户端
-- [anyhow](https://github.com/dtolnay/anyhow) - 错误处理
-- [tracing](https://github.com/tokio-rs/tracing) - 日志追踪
-- [serde](https://github.com/serde-rs/serde) - 序列化框架
-- [image](https://github.com/image-rs/image) - 图像处理
-- [self_update](https://github.com/jaemk/self_update) - 自动更新
-- [regex](https://github.com/rust-lang/regex) - 正则表达式
-- [chrono](https://github.com/chronotope/chrono) - 时间日期
-- [walkdir](https://github.com/BurntSushi/walkdir) - 目录遍历
-- [open](https://github.com/Byron/open-rs) - 打开文件/URL
-- [dirs](https://github.com/dirs-dev/dirs-rs) - 系统目录
-- [uuid](https://github.com/uuid-rs/uuid) - UUID 生成
-- [sha1](https://github.com/RustCrypto/hashes) - 哈希计算
-- [byteorder](https://github.com/BurntSushi/byteorder) - 字节序处理
+- [rfd](https://github.com/PolyMeilex/rfd) - Native file dialogs
+- [ureq](https://github.com/algesten/ureq) - HTTP client
+- [anyhow](https://github.com/dtolnay/anyhow) - Error handling
+- [tracing](https://github.com/tokio-rs/tracing) - Logging/tracing
+- [serde](https://github.com/serde-rs/serde) - Serialization framework
+- [image](https://github.com/image-rs/image) - Image processing
+- [self_update](https://github.com/jaemk/self_update) - Auto update
+- [regex](https://github.com/rust-lang/regex) - Regular expressions
+- [chrono](https://github.com/chronotope/chrono) - Date/time
+- [walkdir](https://github.com/BurntSushi/walkdir) - Directory traversal
+- [open](https://github.com/Byron/open-rs) - Open files/URLs
+- [dirs](https://github.com/dirs-dev/dirs-rs) - System directories
+- [uuid](https://github.com/uuid-rs/uuid) - UUID generation
+- [sha1](https://github.com/RustCrypto/hashes) - Hash computation
+- [byteorder](https://github.com/BurntSushi/byteorder) - Byte order handling
 
-### UI 扩展
+### UI Extensions
 
-- [egui-phosphor](https://github.com/amPerl/egui-phosphor) - Phosphor 图标库
-- [egui_extras](https://github.com/emilk/egui/tree/master/crates/egui_extras) - egui 扩展组件
+- [egui-phosphor](https://github.com/amPerl/egui-phosphor) - Phosphor icon library
+- [egui_extras](https://github.com/emilk/egui/tree/master/crates/egui_extras) - egui extension components
 
-### 打包工具
+### Packaging Tools
 
-- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .app/.dmg 打包
-- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb 打包
-- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm 打包
-- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - 通用 AppImage 打包
-- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD 生成
+- [cargo-bundle](https://github.com/burtonageo/cargo-bundle) - macOS .app/.dmg packaging
+- [cargo-deb](https://github.com/kornelski/cargo-deb) - Debian/Ubuntu .deb packaging
+- [cargo-generate-rpm](https://github.com/cat-in-136/cargo-generate-rpm) - Fedora/RHEL .rpm packaging
+- [cargo-appimage](https://github.com/StratusFearMe21/cargo-appimage) - Universal AppImage packaging
+- [cargo-aur](https://github.com/fosskers/cargo-aur) - Arch Linux PKGBUILD generation
 
-### 参考项目
+### Reference Projects
 
-- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite) - C# 实现的轻量版本
-- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - Steamworks C# 封装
-- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools) - 开源 Steam 工具箱
-- [SteamDatabase/SteamAppInfo](https://github.com/SteamDatabase/SteamAppInfo) - appinfo.vdf 二进制格式文档
-- [tormak9970/new-vdf-parser](https://lib.rs/crates/new-vdf-parser) - Rust 二进制 VDF 解析库
-- [tralph3/Steam-Metadata-Editor](https://github.com/tralph3/Steam-Metadata-Editor) - Python Steam 元数据编辑器
+- [SteamCloudFileManagerLite](https://github.com/GMMan/SteamCloudFileManagerLite) - Lightweight C# implementation
+- [Facepunch.Steamworks](https://github.com/Facepunch/Facepunch.Steamworks) - Steamworks C# wrapper
+- [SteamTools (Watt Toolkit)](https://github.com/BeyondDimension/SteamTools) - Open source Steam toolkit
+- [SteamDatabase/SteamAppInfo](https://github.com/SteamDatabase/SteamAppInfo) - appinfo.vdf binary format documentation
+- [tormak9970/new-vdf-parser](https://lib.rs/crates/new-vdf-parser) - Rust binary VDF parser library
+- [tralph3/Steam-Metadata-Editor](https://github.com/tralph3/Steam-Metadata-Editor) - Python Steam metadata editor
 
-### 文档资料
+### Documentation
 
-- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api) - 官方 SDK 文档
-- [Steamworks Steam Cloud](https://partner.steamgames.com/doc/features/cloud) - 官方 Steam Cloud 文档
-- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - Steam Cloud API 参考
-- [Steam Cloud Best Practices](https://partner.steamgames.com/doc/features/cloud#best_practices) - 官方最佳实践
-- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - Python VDF 解析库
-- [Stack Exchange: Steam Cloud](https://gaming.stackexchange.com/questions/146644) - Root 路径社区验证
-- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - 开发者云存档指南
-- [A Gentle Introduction to Steamworks](https://www.gamedeveloper.com/business/a-gentle-introduction-to-steamworks) - Steamworks 集成入门教程
-- [Elena Temple Dev Blog](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html) - Unity 云存档配置实例
+- [Steamworks SDK](https://partner.steamgames.com/doc/sdk/api) - Official SDK documentation
+- [Steamworks Steam Cloud](https://partner.steamgames.com/doc/features/cloud) - Official Steam Cloud documentation
+- [ISteamRemoteStorage API](https://partner.steamgames.com/doc/api/ISteamRemoteStorage) - Steam Cloud API reference
+- [Steam Cloud Best Practices](https://partner.steamgames.com/doc/features/cloud#best_practices) - Official best practices
+- [VDF Parser (Python)](https://github.com/ValvePython/vdf) - Python VDF parser library
+- [Stack Exchange: Steam Cloud](https://gaming.stackexchange.com/questions/146644) - Root path community verification
+- [Quick Guide to Steam Cloud Saves](https://www.gamedeveloper.com/game-platforms/quick-guide-to-steam-cloud-saves) - Developer cloud save guide
+- [A Gentle Introduction to Steamworks](https://www.gamedeveloper.com/business/a-gentle-introduction-to-steamworks) - Steamworks integration tutorial
+- [Elena Temple Dev Blog](https://www.grimtalin.com/2018/04/elena-temple-steam-cloud-saves.html) - Unity cloud save configuration example
 
 ## Star History
 
