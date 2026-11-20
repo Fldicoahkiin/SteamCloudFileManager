@@ -969,6 +969,48 @@ impl I18n {
         }
     }
 
+    pub fn ufs_injection_enabled(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_enabled(),
+            Language::Chinese => zh::ufs_injection_enabled(),
+        }
+    }
+
+    pub fn ufs_injection_hint(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_hint(),
+            Language::Chinese => zh::ufs_injection_hint(),
+        }
+    }
+
+    pub fn ufs_injection_risk_title(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_risk_title(),
+            Language::Chinese => zh::ufs_injection_risk_title(),
+        }
+    }
+
+    pub fn ufs_injection_risk_body(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_risk_body(),
+            Language::Chinese => zh::ufs_injection_risk_body(),
+        }
+    }
+
+    pub fn ufs_injection_risk_confirm(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_risk_confirm(),
+            Language::Chinese => zh::ufs_injection_risk_confirm(),
+        }
+    }
+
+    pub fn ufs_injection_disabled_notice(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::ufs_injection_disabled_notice(),
+            Language::Chinese => zh::ufs_injection_disabled_notice(),
+        }
+    }
+
     pub fn error_worker_lost(&self) -> &'static str {
         match self.lang {
             Language::English => en::error_worker_lost(),

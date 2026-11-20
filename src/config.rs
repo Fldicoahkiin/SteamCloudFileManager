@@ -152,6 +152,9 @@ pub struct SteamConfig {
     // 扫描游戏库和连接游戏时，让 Steam 打开对应的云存储页面
     #[serde(default = "default_auto_open_cloud_page")]
     pub auto_open_cloud_page: bool,
+    // 实验功能：允许把 UFS 配置注入 appinfo.vdf，默认关闭
+    #[serde(default)]
+    pub ufs_injection_enabled: bool,
 }
 
 fn default_auto_open_cloud_page() -> bool {
@@ -162,6 +165,7 @@ impl Default for SteamConfig {
     fn default() -> Self {
         Self {
             auto_open_cloud_page: default_auto_open_cloud_page(),
+            ufs_injection_enabled: false,
         }
     }
 }
@@ -169,6 +173,12 @@ impl Default for SteamConfig {
 pub fn set_auto_open_cloud_page(enabled: bool) -> Result<()> {
     update_config(|config| {
         config.steam.auto_open_cloud_page = enabled;
+    })
+}
+
+pub fn set_ufs_injection_enabled(enabled: bool) -> Result<()> {
+    update_config(|config| {
+        config.steam.ufs_injection_enabled = enabled;
     })
 }
 
@@ -504,5 +514,12 @@ mod tests {
             toml::to_string_pretty(&template).unwrap(),
             toml::to_string_pretty(&AppConfig::default()).unwrap()
         );
+    }
+
+    #[test]
+    fn ufs_injection_is_off_by_default() {
+        assert!(!AppConfig::default().steam.ufs_injection_enabled);
+        let config: AppConfig = toml::from_str("[steam]\nauto_open_cloud_page = true\n").unwrap();
+        assert!(!config.steam.ufs_injection_enabled);
     }
 }

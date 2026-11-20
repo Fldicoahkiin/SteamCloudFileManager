@@ -78,6 +78,7 @@ pub struct SettingsWindowState {
     pub steam_path_input: String,
     pub steam_path_changed: bool,
     pub show_reset_confirm: bool,
+    pub show_ufs_injection_confirm: bool,
     pub log_dir_display: String,
     pub steam_log_dir_display: String,
     pub config_path_display: String,
@@ -113,6 +114,7 @@ impl Default for SettingsWindowState {
             steam_path_input: current_path,
             steam_path_changed: false,
             show_reset_confirm: false,
+            show_ufs_injection_confirm: false,
             log_dir_display: log_dir,
             steam_log_dir_display: steam_log_dir,
             config_path_display: config_path,
@@ -470,6 +472,50 @@ fn draw_advanced_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i1
             .size(10.0)
             .color(text_subtle),
     );
+
+    // 开启 UFS 注入要先确认风险，关闭不需要确认
+    ui.add_space(16.0);
+    let mut ufs_injection = crate::config::get_config().steam.ufs_injection_enabled;
+    if ui
+        .checkbox(&mut ufs_injection, i18n.ufs_injection_enabled())
+        .changed()
+    {
+        if ufs_injection {
+            state.show_ufs_injection_confirm = true;
+        } else if let Err(e) = crate::config::set_ufs_injection_enabled(false) {
+            tracing::error!("保存设置失败: {}", e);
+        }
+    }
+    ui.label(
+        egui::RichText::new(i18n.ufs_injection_hint())
+            .size(10.0)
+            .color(text_subtle),
+    );
+
+    if state.show_ufs_injection_confirm {
+        let modal =
+            egui::Modal::new(egui::Id::unique("ufs_injection_confirm")).show(ui.ctx(), |ui| {
+                ui.set_max_width(460.0);
+                ui.heading(i18n.ufs_injection_risk_title());
+                ui.add_space(8.0);
+                ui.label(i18n.ufs_injection_risk_body());
+                ui.add_space(12.0);
+                ui.horizontal(|ui| {
+                    if ui.button(i18n.ufs_injection_risk_confirm()).clicked() {
+                        if let Err(e) = crate::config::set_ufs_injection_enabled(true) {
+                            tracing::error!("保存设置失败: {}", e);
+                        }
+                        state.show_ufs_injection_confirm = false;
+                    }
+                    if ui.button(i18n.cancel()).clicked() {
+                        state.show_ufs_injection_confirm = false;
+                    }
+                });
+            });
+        if modal.should_close() {
+            state.show_ufs_injection_confirm = false;
+        }
+    }
 
     ui.add_space(24.0);
     ui.separator();

@@ -774,6 +774,7 @@ pub fn draw_appinfo_dialog(
 
                     // 保存和注入按钮
                     ui.separator();
+                    let injection_enabled = crate::config::get_config().steam.ufs_injection_enabled;
                     ui.horizontal(|ui| {
                         let has_changes = !dialog.editing_savefiles.is_empty()
                             || !dialog.editing_overrides.is_empty();
@@ -785,7 +786,10 @@ pub fn draw_appinfo_dialog(
                             action = AppInfoDialogAction::SaveGameConfig;
                         }
                         if ui
-                            .add_enabled(has_changes, egui::Button::new(i18n.ufs_inject_to_vdf()))
+                            .add_enabled(
+                                has_changes && injection_enabled,
+                                egui::Button::new(i18n.ufs_inject_to_vdf()),
+                            )
                             .clicked()
                         {
                             action = AppInfoDialogAction::InjectFullConfig;
@@ -814,6 +818,9 @@ pub fn draw_appinfo_dialog(
                             action = AppInfoDialogAction::ClearGameConfig;
                         }
                     });
+                    if !injection_enabled {
+                        ui.label(egui::RichText::new(i18n.ufs_injection_disabled_notice()).small());
+                    }
 
                     ui.separator();
 

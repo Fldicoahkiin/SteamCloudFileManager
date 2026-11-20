@@ -506,6 +506,34 @@ pub fn auto_open_cloud_page_hint() -> &'static str {
     "When scanning the library or connecting to a game, the Steam window switches to the matching Steam Cloud page. Turning this off does not affect reading cloud data."
 }
 
+pub fn ufs_injection_enabled() -> &'static str {
+    "Enable UFS injection (experimental)"
+}
+
+pub fn ufs_injection_hint() -> &'static str {
+    "Allows the \"Configure appinfo.vdf\" window to inject your custom UFS rules into Steam's appinfo.vdf. When off, you can still view and save rules, but not inject them."
+}
+
+pub fn ufs_injection_risk_title() -> &'static str {
+    "Before enabling UFS injection"
+}
+
+pub fn ufs_injection_risk_body() -> &'static str {
+    "UFS injection modifies Steam's local cache file appinfo.vdf and rewrites this game's Auto-Cloud sync rules.\n\n\
+    · Modifying Steam's files may violate sections 2.G (no modifying Steam software) and 4.B (no tampering with the execution of Steam) of the Steam Subscriber Agreement. Valve may restrict or terminate accounts without notice. We know of no public case of an account penalized for this, but there is no guarantee.\n\
+    · Steam overwrites the change when it receives new app info from its servers. Inject before Steam starts, or restart Steam right after injecting.\n\
+    · With wrong rules, Steam may sync the wrong folder or upload files to the wrong place.\n\
+    · Before every injection, appinfo.vdf is backed up as appinfo.<timestamp>.bak in the same folder."
+}
+
+pub fn ufs_injection_risk_confirm() -> &'static str {
+    "I understand the risks, enable"
+}
+
+pub fn ufs_injection_disabled_notice() -> &'static str {
+    "UFS injection is an experimental feature and is off by default. To inject, enable it in Settings → Advanced."
+}
+
 pub fn error_worker_lost() -> &'static str {
     "Lost the connection to Steam (Steam may have exited or stopped responding). Reconnect to continue"
 }

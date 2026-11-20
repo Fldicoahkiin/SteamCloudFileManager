@@ -489,6 +489,34 @@ pub fn auto_open_cloud_page_hint() -> &'static str {
     "扫描游戏库和连接游戏时，Steam 主窗口会跳转到对应的云存储页面。关闭后读取云端数据不受影响。"
 }
 
+pub fn ufs_injection_enabled() -> &'static str {
+    "启用 UFS 注入（实验功能）"
+}
+
+pub fn ufs_injection_hint() -> &'static str {
+    "允许在「配置 appinfo.vdf」窗口里把自定义的 UFS 规则注入 Steam 的 appinfo.vdf。关闭时仍可查看和保存规则，只是不能注入。"
+}
+
+pub fn ufs_injection_risk_title() -> &'static str {
+    "开启 UFS 注入前请了解风险"
+}
+
+pub fn ufs_injection_risk_body() -> &'static str {
+    "UFS 注入会直接修改 Steam 的本地缓存文件 appinfo.vdf，改写这个游戏的 Auto-Cloud 同步规则。\n\n\
+    · 修改 Steam 的文件可能违反《Steam 订户协议》第 2.G 条（不得修改 Steam 软件）和第 4.B 条（不得篡改 Steam 的运行）。Valve 有权限制或注销账号，且无需事先通知。目前没有查到因此受处罚的公开案例，但不能保证。\n\
+    · Steam 从服务器取到新的游戏信息时会覆盖修改，需要在 Steam 启动前注入，或注入后立即重启 Steam。\n\
+    · 规则写错时，Steam 可能同步错误的目录，或把文件上传到错误的位置。\n\
+    · 每次注入前会在同一目录下备份为 appinfo.<时间戳>.bak。"
+}
+
+pub fn ufs_injection_risk_confirm() -> &'static str {
+    "我已了解风险，开启"
+}
+
+pub fn ufs_injection_disabled_notice() -> &'static str {
+    "UFS 注入是实验功能，默认关闭。需要注入时，请在 设置 → 高级 中开启。"
+}
+
 pub fn error_worker_lost() -> &'static str {
     "与 Steam 的连接已中断（Steam 可能已退出或无响应），请重新连接"
 }
