@@ -946,6 +946,15 @@ impl eframe::App for SteamCloudApp {
             self.async_handlers.update_download_rx = Some(rx);
         }
 
+        if let Some(lang) = self.dialogs.settings_state.language_selection.take() {
+            self.misc.i18n.set_language(lang);
+            if let Err(e) = crate::config::update_config(|config| {
+                config.appearance.language = lang.to_config().to_string();
+            }) {
+                tracing::error!("保存语言设置失败: {}", e);
+            }
+        }
+
         // 关闭设置窗口时，如果是 NoUpdate 状态则重置为 Idle
         if was_showing_settings
             && !self.dialogs.show_settings

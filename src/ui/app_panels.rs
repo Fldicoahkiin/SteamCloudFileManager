@@ -79,35 +79,7 @@ pub fn render_top_panel(
     async_handlers: &mut AsyncHandlers,
     misc: &mut MiscState,
 ) -> TopPanelEvent {
-    ui.horizontal(|ui| {
-        ui.heading(misc.i18n.app_title());
-
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let current_lang = misc.i18n.language();
-            egui::ComboBox::from_id_salt("language_selector")
-                .selected_text(current_lang.display_name())
-                .width(80.0)
-                .show_ui(ui, |ui| {
-                    for lang in crate::i18n::Language::all() {
-                        let is_selected = current_lang == *lang;
-                        if ui
-                            .selectable_label(is_selected, lang.display_name())
-                            .clicked()
-                        {
-                            misc.i18n.set_language(*lang);
-                            // 持久化语言设置
-                            if let Err(e) = crate::config::update_config(|config| {
-                                config.appearance.language = lang.to_config().to_string();
-                            }) {
-                                tracing::error!("保存语言设置失败: {}", e);
-                            }
-                        }
-                    }
-                });
-            // 在语言选择器左边显示标签
-            ui.label(misc.i18n.language_label());
-        });
-    });
+    ui.heading(misc.i18n.app_title());
 
     let mut event = TopPanelEvent::None;
 

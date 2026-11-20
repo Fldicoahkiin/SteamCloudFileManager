@@ -79,6 +79,8 @@ pub struct SettingsWindowState {
     pub steam_path_changed: bool,
     pub show_reset_confirm: bool,
     pub show_ufs_injection_confirm: bool,
+    // 外观页里选中的语言，由调用方应用并保存
+    pub language_selection: Option<crate::i18n::Language>,
     pub log_dir_display: String,
     pub steam_log_dir_display: String,
     pub config_path_display: String,
@@ -115,6 +117,7 @@ impl Default for SettingsWindowState {
             steam_path_changed: false,
             show_reset_confirm: false,
             show_ufs_injection_confirm: false,
+            language_selection: None,
             log_dir_display: log_dir,
             steam_log_dir_display: steam_log_dir,
             config_path_display: config_path,
@@ -208,7 +211,13 @@ fn draw_content_area(
                 match state.tab {
                     SettingsTab::Log => draw_log_settings(ui, state, i18n),
                     SettingsTab::Appearance => {
-                        draw_appearance_settings(ctx, ui, &mut state.theme_mode, i18n);
+                        draw_appearance_settings(
+                            ctx,
+                            ui,
+                            &mut state.theme_mode,
+                            &mut state.language_selection,
+                            i18n,
+                        );
                     }
                     SettingsTab::Advanced => draw_advanced_settings(ui, state, i18n),
                     SettingsTab::Backup => draw_backup_settings(ui, state, i18n),
@@ -318,8 +327,31 @@ fn draw_appearance_settings(
     ctx: &egui::Context,
     ui: &mut egui::Ui,
     theme_mode: &mut crate::ui::theme::ThemeMode,
+    language_selection: &mut Option<crate::i18n::Language>,
     i18n: &I18n,
 ) {
+    // 语言选择
+    ui.horizontal(|ui| {
+        ui.label(i18n.language_label());
+
+        let current_lang = i18n.language();
+        egui::ComboBox::from_id_salt("language_selector")
+            .selected_text(current_lang.display_name())
+            .width(120.0)
+            .show_ui(ui, |ui| {
+                for lang in crate::i18n::Language::all() {
+                    if ui
+                        .selectable_label(current_lang == *lang, lang.display_name())
+                        .clicked()
+                    {
+                        *language_selection = Some(*lang);
+                    }
+                }
+            });
+    });
+
+    ui.add_space(8.0);
+
     // 主题选择
     ui.horizontal(|ui| {
         ui.label(i18n.theme_mode_label());
