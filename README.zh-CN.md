@@ -50,6 +50,18 @@
 - **UFS 配置管理**：直接读写 `appinfo.vdf`，实现类 Steamworks 后台的 Auto-Cloud 配置编辑（实验性）。可添加/编辑/删除 savefiles 规则和 rootoverrides 路径映射，自定义游戏的云同步行为。
 - **多平台支持**：Windows / macOS / Linux。
 
+## 风险说明
+
+本工具通过 Valve 没有向玩家公开文档的接口与 Steam 交互，使用前请先阅读以下内容。
+
+- **删除不可撤销。** 「删除」会从 Steam 云移除文件，同时删除本地副本；「移出云端」只从 Steam 云移除，保留本地副本。两者都无法撤销，删除前请先用「备份」。
+- **Steam 调试模式。** 文件列表和下载链接来自 Steam 自己已登录的网页，通过 `-cef-enable-debugging` 启动参数读取。工具只读取这些页面，不做修改。Steam 客户端或网页结构变化可能随时导致这项功能失效。
+- **以游戏身份调用 Steamworks API。** 修改云文件时，Worker 进程会用该游戏的 App ID 加载 Steamworks SDK。连接期间，Steam 会显示你正在玩这个游戏。
+- **UFS 注入（实验功能，默认关闭）。** 它会修改 Steam 的本地文件 `appinfo.vdf`。Steam 取到新的游戏信息时会覆盖修改；规则写错时，Steam 可能同步错误的目录。需要在 设置 → 高级 中阅读风险提示后才能开启。每次注入前都会备份 `appinfo.vdf`。
+- **账号切换** 会写入 Steam 的登录设置：`loginusers.vdf`，以及 macOS/Linux 上的 `registry.vdf` 或 Windows 注册表中的 `AutoLoginUser`。
+- **服务条款。** [《Steam 订户协议》](https://store.steampowered.com/subscriber_agreement/)禁止修改 Steam 软件（第 2.G 条），也禁止篡改 Steam 的运行或使用未经授权的第三方软件与其进程交互（第 4.B 条）。Valve 有权不经通知限制或注销账号（第 4.D 条、第 9.C 条）。UFS 注入最接近这些条款。目前没有查到因同类工具受处罚的公开案例，但不能保证。使用风险自负，本软件不提供任何担保（见[许可证](#许可证)）。
+- **本工具不做的事。** 不注入 DLL，不 hook Steam 客户端，不模拟 Steam 的网络协议，不支持你未拥有的游戏。
+
 ## 平台兼容性
 
 支持 **Windows (x64)**、**macOS (Intel & Apple Silicon)** 以及 **Linux (x64)**。
@@ -637,6 +649,8 @@ src/
     ├── symlink_dialog.rs   # 软链接对话框
     └── font_loader.rs      # 字体加载
 ```
+
+<a id="许可证"></a>
 
 ## 许可证
 

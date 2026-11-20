@@ -50,6 +50,18 @@ A cloud save management utility built with Rust and the Steamworks SDK. By direc
 - **UFS Config Management**: Directly read/write `appinfo.vdf` to edit Auto-Cloud configuration like the Steamworks backend (Experimental). Add/edit/delete savefiles rules and rootoverrides path mappings to customize cloud sync behavior.
 - **Multi-Platform Support**: Windows / macOS / Linux.
 
+## Risks
+
+This tool works with Steam through interfaces that Valve does not document for players. Read this before you use it.
+
+- **Deletion is permanent.** Delete removes a file from Steam Cloud and also deletes the local copy. Forget removes it from Steam Cloud and keeps the local copy. Neither can be undone. Use Backup before you delete.
+- **Steam debug mode.** The file list and download links come from Steam's own logged-in web pages, read through the `-cef-enable-debugging` launch option. The tool only reads these pages. Steam client or page changes can break this at any time.
+- **Steamworks API as the game.** To change cloud files, a worker process loads the Steamworks SDK with the game's App ID. While it is connected, Steam shows you as playing that game.
+- **UFS injection (experimental, off by default).** It modifies Steam's local `appinfo.vdf`. Steam overwrites the change when it receives new app info, and wrong rules can make Steam sync the wrong folder. It must be enabled in Settings → Advanced, after a risk notice. `appinfo.vdf` is backed up before every injection.
+- **Account switching** writes Steam's login settings: `loginusers.vdf`, plus `registry.vdf` on macOS/Linux or the `AutoLoginUser` registry value on Windows.
+- **Terms of Service.** The [Steam Subscriber Agreement](https://store.steampowered.com/subscriber_agreement/) forbids modifying Steam software (section 2.G) and tampering with the execution of Steam or using unauthorized third-party software to interact with its processes (section 4.B). Valve may restrict or terminate accounts without notice (sections 4.D and 9.C). UFS injection is closest to these clauses. We know of no public case of an account penalized for tools like this one, but there is no guarantee. Use at your own risk; the software comes with no warranty (see [License](#license)).
+- **What it does not do.** No DLL injection, no hooking of the Steam client, no emulation of Steam's network protocols, and no support for games you do not own.
+
 ## Platform Compatibility
 
 Supports **Windows (x64)**, **macOS (Intel & Apple Silicon)**, and **Linux (x64)**.
@@ -635,6 +647,8 @@ src/
     ├── symlink_dialog.rs   # Symlink dialog
     └── font_loader.rs      # Font loader
 ```
+
+<a id="license"></a>
 
 ## License
 
