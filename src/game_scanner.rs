@@ -49,19 +49,44 @@ pub fn discover_library_steamapps(steam_path: &Path) -> Vec<PathBuf> {
 
     let libraryfolders_path = main.join("libraryfolders.vdf");
     if let Ok(content) = fs::read_to_string(&libraryfolders_path) {
-        for line in content.lines() {
-            if line.contains("\"path\"")
-                && let Some(path_str) = line.split('"').nth(3)
-            {
-                let lib_path = PathBuf::from(path_str).join("steamapps");
-                if lib_path.exists() && lib_path != main {
-                    libs.push(lib_path);
-                }
+        for library in library_paths(&content) {
+            let lib_path = library.join("steamapps");
+            if lib_path.exists() && lib_path != main {
+                libs.push(lib_path);
             }
         }
     }
 
     libs
+}
+
+// libraryfolders.vdf 里每个库的 "path" 值
+fn library_paths(content: &str) -> Vec<PathBuf> {
+    content
+        .lines()
+        .filter(|line| line.contains("\"path\""))
+        .filter_map(|line| line.split('"').nth(3))
+        .map(|value| PathBuf::from(unescape_vdf_value(value)))
+        .collect()
+}
+
+// 文本 VDF 用反斜杠转义：Windows 路径写成 "E:\\SteamLibrary"
+fn unescape_vdf_value(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars();
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some(other) => out.push(other),
+            None => out.push('\\'),
+        }
+    }
+    out
 }
 
 // 解析单个 app manifest 文件
@@ -430,4 +455,34 @@ pub fn fetch_and_merge_games(steam_path: PathBuf, user_id: String) -> Result<Sca
         vdf_count,
         cdp_count,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::library_paths;
+    use std::path::PathBuf;
+
+    #[test]
+    fn library_paths_unescape_vdf_backslashes() {
+        let content = r#""libraryfolders"
+{
+	"0"
+	{
+		"path"		"D:\\steam"
+		"label"		""
+	}
+	"1"
+	{
+		"path"		"E:\\SteamLibrary"
+	}
+}
+"#;
+        assert_eq!(
+            library_paths(content),
+            vec![
+                PathBuf::from(r"D:\steam"),
+                PathBuf::from(r"E:\SteamLibrary")
+            ]
+        );
+    }
 }
