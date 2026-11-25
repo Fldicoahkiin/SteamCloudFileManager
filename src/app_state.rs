@@ -132,6 +132,7 @@ pub struct DialogState {
     pub download_progress: Option<crate::ui::DownloadProgressDialog>,
     pub appinfo_dialog: Option<crate::ui::AppInfoDialog>,
     pub symlink_dialog: Option<crate::ui::SymlinkDialog>,
+    pub pending_removal: Option<crate::ui::FileRemoval>,
 }
 
 impl Default for DialogState {
@@ -155,6 +156,7 @@ impl Default for DialogState {
             download_progress: None,
             appinfo_dialog: None,
             symlink_dialog: None,
+            pending_removal: None,
         }
     }
 }

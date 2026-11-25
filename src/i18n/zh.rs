@@ -481,6 +481,30 @@ pub fn switch_account_confirm_message(account: &str) -> String {
     )
 }
 
+pub fn delete_confirm_title(count: usize) -> String {
+    format!("删除 {} 个文件", count)
+}
+
+pub fn forget_confirm_title(count: usize) -> String {
+    format!("移出云端 {} 个文件", count)
+}
+
+pub fn removal_cloud_delete(count: usize) -> String {
+    format!("云端：删除 {} 个文件", count)
+}
+
+pub fn removal_cloud_forget(count: usize) -> String {
+    format!("云端：移除 {} 个文件", count)
+}
+
+pub fn removal_local_delete(count: usize) -> String {
+    format!("本地：删除 {} 个文件，无法恢复", count)
+}
+
+pub fn removal_local_kept() -> String {
+    "本地：保留，不改动".to_string()
+}
+
 pub fn auto_open_cloud_page() -> &'static str {
     "自动在 Steam 中打开云存储页面"
 }

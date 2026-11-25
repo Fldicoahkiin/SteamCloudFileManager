@@ -498,6 +498,50 @@ pub fn switch_account_confirm_message(account: &str) -> String {
     )
 }
 
+pub fn delete_confirm_title(count: usize) -> String {
+    format!(
+        "Delete {} {}",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
+pub fn forget_confirm_title(count: usize) -> String {
+    format!(
+        "Forget {} {}",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
+pub fn removal_cloud_delete(count: usize) -> String {
+    format!(
+        "Steam Cloud: delete {} {}",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
+pub fn removal_cloud_forget(count: usize) -> String {
+    format!(
+        "Steam Cloud: remove {} {}",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
+pub fn removal_local_delete(count: usize) -> String {
+    format!(
+        "Local: delete {} {}; this cannot be undone",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
+pub fn removal_local_kept() -> String {
+    "Local: kept, unchanged".to_string()
+}
+
 pub fn auto_open_cloud_page() -> &'static str {
     "Open the Steam Cloud page in Steam automatically"
 }

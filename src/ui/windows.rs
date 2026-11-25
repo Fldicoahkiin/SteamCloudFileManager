@@ -258,6 +258,72 @@ pub fn draw_switch_account_confirm(
     if !open { Some(false) } else { choice }
 }
 
+// 删除或移出云端，执行前确认
+#[derive(Clone, Copy)]
+pub enum FileRemoval {
+    Delete,
+    Forget,
+}
+
+pub fn draw_file_removal_confirm(
+    ctx: &egui::Context,
+    removal: FileRemoval,
+    files: &[&crate::steam_api::CloudFile],
+    i18n: &I18n,
+) -> Option<bool> {
+    let in_cloud = files.iter().filter(|f| f.is_persisted).count();
+    let local = files.iter().filter(|f| f.exists).count();
+    let (title, cloud_line, local_line, confirm_label) = match removal {
+        FileRemoval::Delete => (
+            i18n.delete_confirm_title(files.len()),
+            i18n.removal_cloud_delete(in_cloud),
+            i18n.removal_local_delete(local),
+            i18n.delete(),
+        ),
+        FileRemoval::Forget => (
+            i18n.forget_confirm_title(in_cloud),
+            i18n.removal_cloud_forget(in_cloud),
+            i18n.removal_local_kept(),
+            i18n.forget(),
+        ),
+    };
+
+    let mut choice = None;
+    let modal = egui::Modal::new(egui::Id::unique("file_removal_confirm")).show(ctx, |ui| {
+        ui.set_max_width(480.0);
+        ui.heading(title);
+        ui.add_space(8.0);
+        ui.label(cloud_line);
+        ui.label(local_line);
+        ui.add_space(8.0);
+        egui::ScrollArea::vertical()
+            .max_height(200.0)
+            .show(ui, |ui| {
+                for file in files {
+                    ui.monospace(&file.name);
+                }
+            });
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            let confirm =
+                egui::Button::new(egui::RichText::new(confirm_label).color(egui::Color32::WHITE))
+                    .fill(crate::ui::theme::error_color(ui.ctx()));
+            if ui.add(confirm).clicked() {
+                choice = Some(true);
+            }
+            if ui.button(i18n.cancel()).clicked() {
+                choice = Some(false);
+            }
+        });
+    });
+
+    if modal.should_close() {
+        Some(false)
+    } else {
+        choice
+    }
+}
+
 // 绘制错误窗口
 pub fn draw_error_window(
     ctx: &egui::Context,

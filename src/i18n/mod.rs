@@ -955,6 +955,48 @@ impl I18n {
         }
     }
 
+    pub fn delete_confirm_title(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::delete_confirm_title(count),
+            Language::Chinese => zh::delete_confirm_title(count),
+        }
+    }
+
+    pub fn forget_confirm_title(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::forget_confirm_title(count),
+            Language::Chinese => zh::forget_confirm_title(count),
+        }
+    }
+
+    pub fn removal_cloud_delete(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::removal_cloud_delete(count),
+            Language::Chinese => zh::removal_cloud_delete(count),
+        }
+    }
+
+    pub fn removal_cloud_forget(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::removal_cloud_forget(count),
+            Language::Chinese => zh::removal_cloud_forget(count),
+        }
+    }
+
+    pub fn removal_local_delete(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::removal_local_delete(count),
+            Language::Chinese => zh::removal_local_delete(count),
+        }
+    }
+
+    pub fn removal_local_kept(&self) -> String {
+        match self.lang {
+            Language::English => en::removal_local_kept(),
+            Language::Chinese => zh::removal_local_kept(),
+        }
+    }
+
     pub fn auto_open_cloud_page(&self) -> &'static str {
         match self.lang {
             Language::English => en::auto_open_cloud_page(),

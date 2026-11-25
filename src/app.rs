@@ -698,8 +698,12 @@ impl eframe::App for SteamCloudApp {
             }
             crate::ui::BottomPanelEvent::Download => self.download(),
             crate::ui::BottomPanelEvent::Upload => self.upload(),
-            crate::ui::BottomPanelEvent::Delete => self.delete(),
-            crate::ui::BottomPanelEvent::Forget => self.forget(),
+            crate::ui::BottomPanelEvent::Delete => {
+                self.dialogs.pending_removal = Some(crate::ui::FileRemoval::Delete);
+            }
+            crate::ui::BottomPanelEvent::Forget => {
+                self.dialogs.pending_removal = Some(crate::ui::FileRemoval::Forget);
+            }
             crate::ui::BottomPanelEvent::SyncToCloud => self.sync_to_cloud(),
             crate::ui::BottomPanelEvent::CompareFiles => self.compare_files(),
             crate::ui::BottomPanelEvent::ToggleCloud => {
@@ -878,6 +882,27 @@ impl eframe::App for SteamCloudApp {
                     self.switch_steam_account(ui.ctx(), user_id);
                 }
                 Some(false) => self.game_library.switch_confirm_user = None,
+                None => {}
+            }
+        }
+
+        // 删除和移出云端：执行前确认
+        if let Some(removal) = self.dialogs.pending_removal {
+            let files: Vec<&crate::steam_api::CloudFile> = self
+                .file_list
+                .selected_files
+                .iter()
+                .filter_map(|&i| self.file_list.files.get(i))
+                .collect();
+            match crate::ui::draw_file_removal_confirm(ui.ctx(), removal, &files, &self.misc.i18n) {
+                Some(true) => {
+                    self.dialogs.pending_removal = None;
+                    match removal {
+                        crate::ui::FileRemoval::Delete => self.delete(),
+                        crate::ui::FileRemoval::Forget => self.forget(),
+                    }
+                }
+                Some(false) => self.dialogs.pending_removal = None,
                 None => {}
             }
         }
