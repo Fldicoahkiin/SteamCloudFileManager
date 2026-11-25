@@ -984,10 +984,7 @@ impl AppHandlers {
             Ok(download_path) => {
                 tracing::info!("下载完成: {}", download_path.display());
 
-                // 三平台统一使用自动安装
-                if let Err(e) = update_manager.install_downloaded_update(&download_path) {
-                    update_manager.set_error(i18n.error_install_failed(&e.to_string()));
-                }
+                update_manager.set_ready_to_install(download_path);
             }
             Err(err) => {
                 tracing::error!("下载失败: {}", err);

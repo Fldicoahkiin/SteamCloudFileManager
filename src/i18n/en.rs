@@ -294,16 +294,24 @@ pub fn installing_update() -> String {
     format!("{} Installing update...", icons::GEAR)
 }
 
-pub fn update_success() -> String {
-    format!("{} Update installed successfully!", icons::CHECK)
-}
-
-pub fn restart_to_apply() -> &'static str {
-    "Please restart the app to use the new version"
-}
-
 pub fn restart_now() -> String {
     format!("{} Restart Now", icons::REFRESH)
+}
+
+pub fn update_ready_title() -> &'static str {
+    "Update downloaded"
+}
+
+pub fn update_ready_message() -> &'static str {
+    "Restart to install the new version."
+}
+
+pub fn update_ready_busy() -> &'static str {
+    "A task is still running; restarting now will interrupt it."
+}
+
+pub fn later() -> &'static str {
+    "Later"
 }
 
 pub fn log_enabled_hint() -> &'static str {

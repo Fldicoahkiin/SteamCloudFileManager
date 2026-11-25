@@ -136,6 +136,8 @@ pub struct DialogState {
     pub symlink_dialog: Option<crate::ui::SymlinkDialog>,
     pub pending_removal: Option<crate::ui::FileRemoval>,
     pub confirm_restart_steam: bool,
+    // 用户对「更新已下载」弹窗选了「稍后」
+    pub update_install_postponed: bool,
 }
 
 impl Default for DialogState {
@@ -161,6 +163,7 @@ impl Default for DialogState {
             symlink_dialog: None,
             pending_removal: None,
             confirm_restart_steam: false,
+            update_install_postponed: false,
         }
     }
 }

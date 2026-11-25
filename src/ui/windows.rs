@@ -349,6 +349,34 @@ pub fn draw_restart_steam_confirm(ctx: &egui::Context, i18n: &I18n) -> Option<bo
     }
 }
 
+pub fn draw_update_ready_confirm(ctx: &egui::Context, busy: bool, i18n: &I18n) -> Option<bool> {
+    let mut choice = None;
+    let modal = egui::Modal::new(egui::Id::unique("update_ready_confirm")).show(ctx, |ui| {
+        ui.set_max_width(420.0);
+        ui.heading(i18n.update_ready_title());
+        ui.add_space(8.0);
+        ui.label(i18n.update_ready_message());
+        if busy {
+            ui.label(i18n.update_ready_busy());
+        }
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            if ui.button(i18n.restart_now()).clicked() {
+                choice = Some(true);
+            }
+            if ui.button(i18n.later()).clicked() {
+                choice = Some(false);
+            }
+        });
+    });
+
+    if modal.should_close() {
+        Some(false)
+    } else {
+        choice
+    }
+}
+
 // 绘制错误窗口
 pub fn draw_error_window(
     ctx: &egui::Context,

@@ -40,7 +40,7 @@ pub enum UpdateStatus {
     NoUpdate,
     Downloading(f32), // 下载进度 0.0-1.0
     Installing,
-    Success,
+    ReadyToInstall(std::path::PathBuf), // 已下载，等用户确认重启安装
     Error(String),
 }
 
@@ -336,13 +336,15 @@ impl UpdateManager {
         Ok(())
     }
 
-    // 安装已下载的更新
+    // 下载完成，等用户确认后再安装（安装会退出程序）
+    pub fn set_ready_to_install(&mut self, download_path: std::path::PathBuf) {
+        self.status = UpdateStatus::ReadyToInstall(download_path);
+    }
+
+    // 安装已下载的更新：启动安装脚本后退出程序
     pub fn install_downloaded_update(&mut self, download_path: &std::path::Path) -> Result<()> {
         self.status = UpdateStatus::Installing;
-        self.install_update(download_path)?;
-        self.status = UpdateStatus::Success;
-        tracing::info!("更新安装成功");
-        Ok(())
+        self.install_update(download_path)
     }
 
     // 根据平台选择资源文件

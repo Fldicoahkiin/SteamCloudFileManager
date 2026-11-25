@@ -81,6 +81,8 @@ pub struct SettingsWindowState {
     pub show_ufs_injection_confirm: bool,
     // 外观页里选中的语言，由调用方应用并保存
     pub language_selection: Option<crate::i18n::Language>,
+    // 关于页里点了「立即重启」安装已下载的更新
+    pub install_update_requested: bool,
     pub log_dir_display: String,
     pub steam_log_dir_display: String,
     pub config_path_display: String,
@@ -118,6 +120,7 @@ impl Default for SettingsWindowState {
             show_reset_confirm: false,
             show_ufs_injection_confirm: false,
             language_selection: None,
+            install_update_requested: false,
             log_dir_display: log_dir,
             steam_log_dir_display: steam_log_dir,
             config_path_display: config_path,
@@ -225,6 +228,7 @@ fn draw_content_area(
                         download_release = draw_about_content(
                             ui,
                             &mut state.about_icon_texture,
+                            &mut state.install_update_requested,
                             update_manager,
                             i18n,
                         );
@@ -648,6 +652,7 @@ fn draw_backup_settings(ui: &mut egui::Ui, state: &mut SettingsWindowState, i18n
 fn draw_about_content(
     ui: &mut egui::Ui,
     about_icon_texture: &mut Option<egui::TextureHandle>,
+    install_update_requested: &mut bool,
     update_manager: &mut crate::update::UpdateManager,
     i18n: &I18n,
 ) -> Option<crate::update::ReleaseInfo> {
@@ -831,20 +836,15 @@ fn draw_about_content(
                     .color(steam_blue),
             );
         }
-        crate::update::UpdateStatus::Success => {
+        crate::update::UpdateStatus::ReadyToInstall(_) => {
             ui.add_space(12.0);
             ui.label(
-                egui::RichText::new(i18n.update_success())
+                egui::RichText::new(i18n.update_ready_title())
                     .size(12.0)
                     .color(crate::ui::theme::success_color(ui.ctx())),
             );
-            ui.label(
-                egui::RichText::new(i18n.restart_to_apply())
-                    .size(10.0)
-                    .color(text_subtle),
-            );
             if ui.button(i18n.restart_now()).clicked() {
-                std::process::exit(0);
+                *install_update_requested = true;
             }
         }
         _ => {}

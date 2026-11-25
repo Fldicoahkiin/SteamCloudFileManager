@@ -84,6 +84,16 @@ impl SteamCloudApp {
     }
 
     // 通过重启 Steam 切换到所选账号
+    fn install_downloaded_update(&mut self) {
+        if let crate::update::UpdateStatus::ReadyToInstall(path) =
+            self.update_manager.status().clone()
+            && let Err(e) = self.update_manager.install_downloaded_update(&path)
+        {
+            self.update_manager
+                .set_error(self.misc.i18n.error_install_failed(&e.to_string()));
+        }
+    }
+
     // Steam 正在运行时，重启会关掉它和正在运行的游戏，先确认
     fn request_restart_steam(&mut self, ctx: &egui::Context) {
         if crate::steam_process::is_steam_running() {
@@ -917,6 +927,22 @@ impl eframe::App for SteamCloudApp {
             }
         }
 
+        // 更新下载完成：安装会退出程序，先问
+        if matches!(
+            self.update_manager.status(),
+            crate::update::UpdateStatus::ReadyToInstall(_)
+        ) && !self.dialogs.update_install_postponed
+        {
+            let busy = self.dialogs.upload_progress.is_some()
+                || self.dialogs.backup_progress.is_some()
+                || self.dialogs.download_progress.is_some();
+            match crate::ui::draw_update_ready_confirm(ui.ctx(), busy, &self.misc.i18n) {
+                Some(true) => self.install_downloaded_update(),
+                Some(false) => self.dialogs.update_install_postponed = true,
+                None => {}
+            }
+        }
+
         if self.dialogs.confirm_restart_steam {
             match crate::ui::draw_restart_steam_confirm(ui.ctx(), &self.misc.i18n) {
                 Some(true) => {
@@ -1011,6 +1037,10 @@ impl eframe::App for SteamCloudApp {
             // 启动异步下载
             let rx = self.update_manager.start_download(&release);
             self.async_handlers.update_download_rx = Some(rx);
+        }
+
+        if std::mem::take(&mut self.dialogs.settings_state.install_update_requested) {
+            self.install_downloaded_update();
         }
 
         if let Some(lang) = self.dialogs.settings_state.language_selection.take() {

@@ -286,16 +286,24 @@ pub fn installing_update() -> String {
     format!("{} 正在安装更新...", icons::GEAR)
 }
 
-pub fn update_success() -> String {
-    format!("{} 更新安装成功！", icons::CHECK)
-}
-
-pub fn restart_to_apply() -> &'static str {
-    "请重启应用以使用新版本"
-}
-
 pub fn restart_now() -> String {
     format!("{} 立即重启", icons::REFRESH)
+}
+
+pub fn update_ready_title() -> &'static str {
+    "更新已下载"
+}
+
+pub fn update_ready_message() -> &'static str {
+    "重启后安装新版本。"
+}
+
+pub fn update_ready_busy() -> &'static str {
+    "有任务正在进行，现在重启会中断它。"
+}
+
+pub fn later() -> &'static str {
+    "稍后"
 }
 
 pub fn log_enabled_hint() -> &'static str {

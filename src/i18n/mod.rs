@@ -624,24 +624,38 @@ impl I18n {
         }
     }
 
-    pub fn update_success(&self) -> String {
-        match self.lang {
-            Language::English => en::update_success(),
-            Language::Chinese => zh::update_success(),
-        }
-    }
-
-    pub fn restart_to_apply(&self) -> &'static str {
-        match self.lang {
-            Language::English => en::restart_to_apply(),
-            Language::Chinese => zh::restart_to_apply(),
-        }
-    }
-
     pub fn restart_now(&self) -> String {
         match self.lang {
             Language::English => en::restart_now(),
             Language::Chinese => zh::restart_now(),
+        }
+    }
+
+    pub fn update_ready_title(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::update_ready_title(),
+            Language::Chinese => zh::update_ready_title(),
+        }
+    }
+
+    pub fn update_ready_message(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::update_ready_message(),
+            Language::Chinese => zh::update_ready_message(),
+        }
+    }
+
+    pub fn update_ready_busy(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::update_ready_busy(),
+            Language::Chinese => zh::update_ready_busy(),
+        }
+    }
+
+    pub fn later(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::later(),
+            Language::Chinese => zh::later(),
         }
     }
 
