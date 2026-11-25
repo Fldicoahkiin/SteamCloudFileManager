@@ -1311,14 +1311,25 @@ impl UploadExecutor {
     }
 
     // 执行上传
-    pub fn execute(&self, queue: &mut UploadQueue) -> Result<UploadResult> {
+    // cancel 置位后，传完当前文件就停；中途打断写入会让 Steam 删掉本地副本
+    pub fn execute(
+        &self,
+        queue: &mut UploadQueue,
+        cancel: &std::sync::atomic::AtomicBool,
+    ) -> Result<UploadResult> {
         let start_time = SystemTime::now();
         let mut success_count = 0;
         let mut failed_files = Vec::new();
+        let mut cancelled_count = 0;
         let total_size: u64 = queue.tasks.iter().map(|t| t.size).sum();
         let total_files = queue.tasks.len();
 
         for (index, task) in queue.tasks.iter_mut().enumerate() {
+            if cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                cancelled_count = total_files - index;
+                break;
+            }
+
             // 发送进度更新
             if let Some(ref callback) = self.progress_callback {
                 callback(index + 1, total_files, &task.cloud_path);
@@ -1350,6 +1361,7 @@ impl UploadExecutor {
         Ok(UploadResult {
             success_count,
             failed_count: failed_files.len(),
+            cancelled_count,
             total_size,
             elapsed_secs: elapsed.as_secs(),
             failed_files,
@@ -1432,6 +1444,7 @@ impl UploadExecutor {
 pub struct UploadResult {
     pub success_count: usize,
     pub failed_count: usize,
+    pub cancelled_count: usize,
     pub total_size: u64,
     pub elapsed_secs: u64,
     pub failed_files: Vec<(String, String)>,
@@ -1475,5 +1488,39 @@ pub fn parse_size(s: &str) -> u64 {
         }
     } else {
         num as u64
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TaskStatus, UploadExecutor, UploadQueue, UploadTask};
+    use std::sync::atomic::AtomicBool;
+    use std::sync::{Arc, Mutex};
+
+    fn task(name: &str) -> UploadTask {
+        UploadTask {
+            local_path: std::path::PathBuf::from(name),
+            cloud_path: name.to_string(),
+            size: 1,
+            status: TaskStatus::Pending,
+            retry_count: 0,
+            error: None,
+        }
+    }
+
+    #[test]
+    fn cancelled_upload_stops_before_the_next_file() {
+        let manager = Arc::new(Mutex::new(crate::steam_worker::SteamWorkerManager::new()));
+        let mut queue = UploadQueue::new();
+        queue.tasks = vec![task("a.sav"), task("b.sav")];
+        let cancel = AtomicBool::new(true);
+
+        let result = UploadExecutor::new(manager)
+            .execute(&mut queue, &cancel)
+            .unwrap();
+
+        assert_eq!(result.success_count, 0);
+        assert_eq!(result.failed_count, 0);
+        assert_eq!(result.cancelled_count, 2);
     }
 }

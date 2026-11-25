@@ -442,6 +442,14 @@ pub fn upload_partial(success: usize, failed: usize) -> String {
     )
 }
 
+pub fn upload_cancelling() -> &'static str {
+    "正在取消，当前文件传完后停止…"
+}
+
+pub fn upload_cancelled_remaining(count: usize) -> String {
+    format!("已取消，{} 个文件未上传", count)
+}
+
 pub fn elapsed_time(secs: u64) -> String {
     format!("用时: {} 秒", secs)
 }

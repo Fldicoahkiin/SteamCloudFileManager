@@ -890,6 +890,20 @@ impl I18n {
         }
     }
 
+    pub fn upload_cancelling(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::upload_cancelling(),
+            Language::Chinese => zh::upload_cancelling(),
+        }
+    }
+
+    pub fn upload_cancelled_remaining(&self, count: usize) -> String {
+        match self.lang {
+            Language::English => en::upload_cancelled_remaining(count),
+            Language::Chinese => zh::upload_cancelled_remaining(count),
+        }
+    }
+
     pub fn elapsed_time(&self, secs: u64) -> String {
         match self.lang {
             Language::English => en::elapsed_time(secs),

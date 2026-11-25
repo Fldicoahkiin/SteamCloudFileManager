@@ -298,6 +298,7 @@ impl UploadPreviewDialog {
 // 上传进度对话框
 pub struct UploadProgressDialog {
     pub show: bool,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
     pub current_file: String,
     pub current_index: usize,
     pub total_files: usize,
@@ -307,9 +308,10 @@ pub struct UploadProgressDialog {
 }
 
 impl UploadProgressDialog {
-    pub fn new(total_files: usize) -> Self {
+    pub fn new(total_files: usize, cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Self {
         Self {
             show: true,
+            cancel,
             current_file: String::new(),
             current_index: 0,
             total_files,
@@ -367,8 +369,11 @@ impl UploadProgressDialog {
 
                     // 控制按钮
                     ui.horizontal(|ui| {
-                        if ui.button(format!("✕ {}", i18n.cancel())).clicked() {
-                            self.show = false;
+                        if self.cancel.load(std::sync::atomic::Ordering::Relaxed) {
+                            ui.add_enabled(false, egui::Button::new(i18n.upload_cancelling()));
+                        } else if ui.button(format!("✕ {}", i18n.cancel())).clicked() {
+                            self.cancel
+                                .store(true, std::sync::atomic::Ordering::Relaxed);
                         }
                     });
                 });
@@ -381,6 +386,7 @@ pub struct UploadCompleteDialog {
     pub show: bool,
     pub success_count: usize,
     pub failed_count: usize,
+    pub cancelled_count: usize,
     pub total_size: u64,
     pub elapsed_secs: u64,
     pub failed_files: Vec<(String, String)>,
@@ -390,6 +396,7 @@ impl UploadCompleteDialog {
     pub fn new(
         success_count: usize,
         failed_count: usize,
+        cancelled_count: usize,
         total_size: u64,
         elapsed_secs: u64,
         failed_files: Vec<(String, String)>,
@@ -398,6 +405,7 @@ impl UploadCompleteDialog {
             show: true,
             success_count,
             failed_count,
+            cancelled_count,
             total_size,
             elapsed_secs,
             failed_files,
@@ -431,6 +439,10 @@ impl UploadCompleteDialog {
                             .size(16.0)
                             .color(crate::ui::theme::warning_color(ctx)),
                         );
+                    }
+
+                    if self.cancelled_count > 0 {
+                        ui.label(i18n.upload_cancelled_remaining(self.cancelled_count));
                     }
 
                     ui.add_space(10.0);

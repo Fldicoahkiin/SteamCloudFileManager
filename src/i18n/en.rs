@@ -459,6 +459,18 @@ pub fn upload_partial(success: usize, failed: usize) -> String {
     )
 }
 
+pub fn upload_cancelling() -> &'static str {
+    "Cancelling after the current file…"
+}
+
+pub fn upload_cancelled_remaining(count: usize) -> String {
+    format!(
+        "Cancelled; {} {} not uploaded",
+        count,
+        if count == 1 { "file" } else { "files" }
+    )
+}
+
 pub fn elapsed_time(secs: u64) -> String {
     format!("Time: {} second{}", secs, if secs != 1 { "s" } else { "" })
 }

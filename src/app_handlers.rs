@@ -259,7 +259,11 @@ impl AppHandlers {
         async_handlers: &mut AsyncHandlers,
     ) {
         let total_files = queue.total_files();
-        dialogs.upload_progress = Some(crate::ui::UploadProgressDialog::new(total_files));
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        dialogs.upload_progress = Some(crate::ui::UploadProgressDialog::new(
+            total_files,
+            cancel.clone(),
+        ));
 
         let steam_manager = self.steam_manager.clone();
         let (tx, rx) = std::sync::mpsc::channel();
@@ -274,11 +278,12 @@ impl AppHandlers {
                     let _ = progress_tx.send((current, total, filename.to_string()));
                 });
 
-            match executor.execute(&mut queue) {
+            match executor.execute(&mut queue, &cancel) {
                 Ok(result) => {
                     let result_json = serde_json::json!({
                         "success_count": result.success_count,
                         "failed_count": result.failed_count,
+                        "cancelled_count": result.cancelled_count,
                         "total_size": result.total_size,
                         "elapsed_secs": result.elapsed_secs,
                         "failed_files": result.failed_files,
@@ -669,6 +674,7 @@ impl AppHandlers {
                 if let Ok(result) = serde_json::from_str::<serde_json::Value>(&msg) {
                     let success_count = result["success_count"].as_u64().unwrap_or(0) as usize;
                     let failed_count = result["failed_count"].as_u64().unwrap_or(0) as usize;
+                    let cancelled_count = result["cancelled_count"].as_u64().unwrap_or(0) as usize;
                     let total_size = result["total_size"].as_u64().unwrap_or(0);
                     let elapsed_secs = result["elapsed_secs"].as_u64().unwrap_or(0);
 
@@ -689,6 +695,7 @@ impl AppHandlers {
                     dialogs.upload_complete = Some(crate::ui::UploadCompleteDialog::new(
                         success_count,
                         failed_count,
+                        cancelled_count,
                         total_size,
                         elapsed_secs,
                         failed_files,
