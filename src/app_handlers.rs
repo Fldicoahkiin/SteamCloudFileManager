@@ -92,6 +92,7 @@ impl AppHandlers {
         }
 
         file_list.is_refreshing = true;
+        file_list.load_error = None;
         file_list.files.clear();
         file_list.hash_checked_app_id = None;
         file_list.hash_checker.cancel();
@@ -547,8 +548,9 @@ impl AppHandlers {
                 connection.remote_ready = true;
             }
             Err(err) => {
-                dialogs.show_error(&misc.i18n.refresh_files_failed(&err));
+                file_list.load_error = Some(misc.i18n.refresh_files_failed(&err));
                 file_list.is_refreshing = false;
+                connection.remote_ready = true;
             }
         }
     }

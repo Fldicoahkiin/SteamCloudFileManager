@@ -58,6 +58,7 @@ pub struct FileListState {
     pub hash_checker: AsyncHashChecker,               // 异步 hash 检测器
     pub hash_checked_app_id: Option<u32>, // 已完成 Hash 检测的 app_id (缓存，避免重复检测)
     pub open_folder_error: Option<String>, // 打开文件夹失败时的路径
+    pub load_error: Option<String>,       // 文件列表加载失败的原因，显示在中间区域
 }
 
 impl FileListState {
@@ -72,6 +73,7 @@ impl FileListState {
         self.hash_checker.cancel();
         self.hash_checked_app_id = None;
         self.open_folder_error = None;
+        self.load_error = None;
     }
 
     // 更新同步状态

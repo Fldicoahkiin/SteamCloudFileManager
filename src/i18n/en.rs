@@ -590,6 +590,14 @@ pub fn error_worker_lost() -> &'static str {
     "Lost the connection to Steam (Steam may have exited or stopped responding). Reconnect to continue"
 }
 
+pub fn error_task_aborted() -> &'static str {
+    "The background task stopped unexpectedly. Try again"
+}
+
+pub fn retry() -> &'static str {
+    "Retry"
+}
+
 pub fn user_switched() -> &'static str {
     "User switched"
 }

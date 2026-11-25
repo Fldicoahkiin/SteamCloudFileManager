@@ -1074,6 +1074,20 @@ impl I18n {
         }
     }
 
+    pub fn error_task_aborted(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::error_task_aborted(),
+            Language::Chinese => zh::error_task_aborted(),
+        }
+    }
+
+    pub fn retry(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::retry(),
+            Language::Chinese => zh::retry(),
+        }
+    }
+
     pub fn user_switched(&self) -> &'static str {
         match self.lang {
             Language::English => en::user_switched(),

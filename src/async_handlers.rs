@@ -3,7 +3,7 @@ use crate::steam_api::CloudFile;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, TryRecvError};
 
 #[derive(Default)]
 pub struct AsyncHandlers {
@@ -37,142 +37,92 @@ impl AsyncHandlers {
     }
 }
 
+// 取结果型任务：线程没送出结果就退出时，返回 aborted 作为错误，让调用方复位状态
+fn poll_result<T>(
+    slot: &mut Option<Receiver<Result<T, String>>>,
+    aborted: &str,
+) -> Option<Result<T, String>> {
+    let rx = slot.as_ref()?;
+    match rx.try_recv() {
+        Ok(result) => {
+            *slot = None;
+            Some(result)
+        }
+        Err(TryRecvError::Disconnected) => {
+            *slot = None;
+            Some(Err(aborted.to_string()))
+        }
+        Err(TryRecvError::Empty) => None,
+    }
+}
+
+// 取状态或进度：发送端结束即任务结束
+fn poll_value<T>(slot: &mut Option<Receiver<T>>) -> Option<T> {
+    let rx = slot.as_ref()?;
+    match rx.try_recv() {
+        Ok(value) => Some(value),
+        Err(TryRecvError::Disconnected) => {
+            *slot = None;
+            None
+        }
+        Err(TryRecvError::Empty) => None,
+    }
+}
+
 impl AsyncHandlers {
-    pub fn poll_connect(&mut self) -> Option<Result<u32, String>> {
-        if let Some(rx) = &self.connect_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.connect_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.connect_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+    pub fn poll_connect(&mut self, aborted: &str) -> Option<Result<u32, String>> {
+        poll_result(&mut self.connect_rx, aborted)
     }
 
-    pub fn poll_loader(&mut self) -> Option<Result<Vec<CloudFile>, String>> {
-        if let Some(rx) = &self.loader_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.loader_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.loader_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+    pub fn poll_loader(&mut self, aborted: &str) -> Option<Result<Vec<CloudFile>, String>> {
+        poll_result(&mut self.loader_rx, aborted)
     }
 
-    pub fn poll_scan_games(&mut self) -> Option<Result<crate::game_scanner::ScanResult, String>> {
-        if let Some(rx) = &self.scan_games_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.scan_games_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.scan_games_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+    pub fn poll_scan_games(
+        &mut self,
+        aborted: &str,
+    ) -> Option<Result<crate::game_scanner::ScanResult, String>> {
+        poll_result(&mut self.scan_games_rx, aborted)
     }
 
     pub fn poll_restart(&mut self) -> Option<crate::steam_process::RestartStatus> {
-        if let Some(rx) = &self.restart_rx {
-            match rx.try_recv() {
-                Ok(status) => Some(status),
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.restart_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+        poll_value(&mut self.restart_rx)
     }
 
     pub fn poll_upload_progress(&mut self) -> Option<(usize, usize, String)> {
-        if let Some(rx) = &self.upload_progress_rx {
-            match rx.try_recv() {
-                Ok(progress) => Some(progress),
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.upload_progress_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+        poll_value(&mut self.upload_progress_rx)
     }
 
-    pub fn poll_upload_result(&mut self) -> Option<Result<String, String>> {
-        if let Some(rx) = &self.upload_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.upload_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.upload_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+    pub fn poll_upload_result(&mut self, aborted: &str) -> Option<Result<String, String>> {
+        poll_result(&mut self.upload_rx, aborted)
     }
 
-    pub fn poll_update_download(&mut self) -> Option<Result<PathBuf, String>> {
-        if let Some(rx) = &self.update_download_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.update_download_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.update_download_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
-        }
+    pub fn poll_update_download(&mut self, aborted: &str) -> Option<Result<PathBuf, String>> {
+        poll_result(&mut self.update_download_rx, aborted)
     }
 
     pub fn poll_local_scan(&mut self) -> Option<Vec<ScannedLocalFile>> {
-        if let Some(rx) = &self.local_scan_rx {
-            match rx.try_recv() {
-                Ok(result) => {
-                    self.local_scan_rx = None;
-                    Some(result)
-                }
-                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
-                    self.local_scan_rx = None;
-                    None
-                }
-                Err(std::sync::mpsc::TryRecvError::Empty) => None,
-            }
-        } else {
-            None
+        let scanned = poll_value(&mut self.local_scan_rx);
+        if scanned.is_some() {
+            self.local_scan_rx = None;
         }
+        scanned
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AsyncHandlers;
+
+    #[test]
+    fn connect_task_that_dies_without_a_result_reports_an_error() {
+        let (tx, rx) = std::sync::mpsc::channel::<Result<u32, String>>();
+        drop(tx);
+        let mut handlers = AsyncHandlers {
+            connect_rx: Some(rx),
+            ..Default::default()
+        };
+        assert!(matches!(handlers.poll_connect("aborted"), Some(Err(e)) if e == "aborted"));
+        assert!(handlers.connect_rx.is_none());
     }
 }

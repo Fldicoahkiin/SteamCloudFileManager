@@ -553,6 +553,14 @@ pub fn error_worker_lost() -> &'static str {
     "与 Steam 的连接已中断（Steam 可能已退出或无响应），请重新连接"
 }
 
+pub fn error_task_aborted() -> &'static str {
+    "后台任务意外中止，请重试"
+}
+
+pub fn retry() -> &'static str {
+    "重试"
+}
+
 pub fn user_switched() -> &'static str {
     "已切换用户"
 }

@@ -475,18 +475,20 @@ fn draw_quota_info(ui: &mut egui::Ui, total: u64, available: u64, i18n: &I18n) {
     });
 }
 
-// 中心面板渲染
+// 中心面板渲染，返回 true 表示用户点了「重试」
 pub fn render_center_panel(
     ui: &mut egui::Ui,
     connection: &ConnectionState,
     file_list: &mut FileListState,
     misc: &MiscState,
-) {
+) -> bool {
     // 文件列表
     if !connection.is_connected && !connection.is_connecting {
         draw_disconnected_view(ui, &misc.i18n);
     } else if connection.is_connecting || (connection.is_connected && !connection.remote_ready) {
         draw_loading_view(ui, connection.is_connecting, &misc.i18n);
+    } else if let Some(error) = &file_list.load_error {
+        return draw_load_failed_view(ui, error, &misc.i18n);
     } else if let Some(tree) = &mut file_list.file_tree {
         let mut state = crate::ui::TreeViewState {
             search_query: &mut file_list.search_query,
@@ -511,6 +513,19 @@ pub fn render_center_panel(
     } else {
         draw_no_files_view(ui, &misc.i18n);
     }
+    false
+}
+
+// 文件列表加载失败：原因留在原处，带「重试」
+fn draw_load_failed_view(ui: &mut egui::Ui, error: &str, i18n: &I18n) -> bool {
+    let mut retry = false;
+    ui.vertical_centered(|ui| {
+        ui.add_space(ui.available_height() / 2.0 - 50.0);
+        ui.label(error);
+        ui.add_space(10.0);
+        retry = ui.button(i18n.retry()).clicked();
+    });
+    retry
 }
 
 // 绘制未连接状态的提示

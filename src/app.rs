@@ -467,7 +467,9 @@ impl SteamCloudApp {
 
     fn poll_async_results(&mut self) {
         // 连接结果
-        if let Some(result) = self.async_handlers.poll_connect()
+        if let Some(result) = self
+            .async_handlers
+            .poll_connect(self.misc.i18n.error_task_aborted())
             && self.handlers.handle_connect_result(
                 result,
                 &mut self.connection,
@@ -479,7 +481,10 @@ impl SteamCloudApp {
         }
 
         // 文件加载结果
-        if let Some(result) = self.async_handlers.poll_loader() {
+        if let Some(result) = self
+            .async_handlers
+            .poll_loader(self.misc.i18n.error_task_aborted())
+        {
             self.handlers.handle_loader_result(
                 result,
                 &mut self.connection,
@@ -501,7 +506,10 @@ impl SteamCloudApp {
         }
 
         // 游戏扫描结果
-        if let Some(result) = self.async_handlers.poll_scan_games() {
+        if let Some(result) = self
+            .async_handlers
+            .poll_scan_games(self.misc.i18n.error_task_aborted())
+        {
             self.handlers.handle_scan_games_result(
                 result,
                 &mut self.game_library,
@@ -517,7 +525,10 @@ impl SteamCloudApp {
         }
 
         // 上传结果
-        if let Some(result) = self.async_handlers.poll_upload_result() {
+        if let Some(result) = self
+            .async_handlers
+            .poll_upload_result(self.misc.i18n.error_task_aborted())
+        {
             self.handlers
                 .handle_upload_result(result, &mut self.dialogs, &self.misc.i18n);
         }
@@ -530,7 +541,10 @@ impl SteamCloudApp {
         self.update_manager.poll_progress();
 
         // 更新下载结果
-        if let Some(result) = self.async_handlers.poll_update_download() {
+        if let Some(result) = self
+            .async_handlers
+            .poll_update_download(self.misc.i18n.error_task_aborted())
+        {
             self.handlers.handle_update_download_result(
                 result,
                 &mut self.update_manager,
@@ -638,7 +652,7 @@ impl SteamCloudApp {
                 self.file_list.is_refreshing = false;
                 self.connection.remote_ready = true;
                 self.async_handlers.loader_rx = None;
-                self.misc.status_message = self.misc.i18n.error_load_timeout().to_string();
+                self.file_list.load_error = Some(self.misc.i18n.error_load_timeout().to_string());
             }
         }
     }
@@ -748,7 +762,10 @@ impl eframe::App for SteamCloudApp {
                 self.handle_file_drop(&ctx, ui);
             }
 
-            crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list, &self.misc);
+            if crate::ui::render_center_panel(ui, &self.connection, &mut self.file_list, &self.misc)
+            {
+                self.refresh_files();
+            }
         });
 
         // 打开文件夹失败时弹窗
