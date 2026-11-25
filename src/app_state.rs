@@ -133,6 +133,7 @@ pub struct DialogState {
     pub appinfo_dialog: Option<crate::ui::AppInfoDialog>,
     pub symlink_dialog: Option<crate::ui::SymlinkDialog>,
     pub pending_removal: Option<crate::ui::FileRemoval>,
+    pub confirm_restart_steam: bool,
 }
 
 impl Default for DialogState {
@@ -157,6 +158,7 @@ impl Default for DialogState {
             appinfo_dialog: None,
             symlink_dialog: None,
             pending_removal: None,
+            confirm_restart_steam: false,
         }
     }
 }

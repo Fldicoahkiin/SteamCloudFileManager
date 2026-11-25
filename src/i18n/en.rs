@@ -498,6 +498,14 @@ pub fn switch_account_confirm_message(account: &str) -> String {
     )
 }
 
+pub fn restart_steam_confirm_title() -> &'static str {
+    "Restart Steam"
+}
+
+pub fn restart_steam_confirm_message() -> &'static str {
+    "Steam and any running game will close, then Steam starts again in debug mode."
+}
+
 pub fn delete_confirm_title(count: usize) -> String {
     format!(
         "Delete {} {}",

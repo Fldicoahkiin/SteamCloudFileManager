@@ -324,6 +324,31 @@ pub fn draw_file_removal_confirm(
     }
 }
 
+pub fn draw_restart_steam_confirm(ctx: &egui::Context, i18n: &I18n) -> Option<bool> {
+    let mut choice = None;
+    let modal = egui::Modal::new(egui::Id::unique("restart_steam_confirm")).show(ctx, |ui| {
+        ui.set_max_width(420.0);
+        ui.heading(i18n.restart_steam_confirm_title());
+        ui.add_space(8.0);
+        ui.label(i18n.restart_steam_confirm_message());
+        ui.add_space(12.0);
+        ui.horizontal(|ui| {
+            if ui.button(i18n.restart_steam_confirm_title()).clicked() {
+                choice = Some(true);
+            }
+            if ui.button(i18n.cancel()).clicked() {
+                choice = Some(false);
+            }
+        });
+    });
+
+    if modal.should_close() {
+        Some(false)
+    } else {
+        choice
+    }
+}
+
 // 绘制错误窗口
 pub fn draw_error_window(
     ctx: &egui::Context,

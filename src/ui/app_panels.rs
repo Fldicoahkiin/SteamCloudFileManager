@@ -93,11 +93,7 @@ pub fn render_top_panel(
         }
 
         if restart_clicked {
-            dialogs.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
-                misc.i18n.closing_steam().to_string(),
-            ));
             event = TopPanelEvent::Restart;
-            dialogs.show_debug_warning = false;
         }
 
         if dismiss_clicked {

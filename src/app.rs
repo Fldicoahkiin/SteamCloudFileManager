@@ -84,6 +84,27 @@ impl SteamCloudApp {
     }
 
     // 通过重启 Steam 切换到所选账号
+    // Steam 正在运行时，重启会关掉它和正在运行的游戏，先确认
+    fn request_restart_steam(&mut self, ctx: &egui::Context) {
+        if crate::steam_process::is_steam_running() {
+            self.dialogs.confirm_restart_steam = true;
+        } else {
+            self.restart_steam_now(ctx);
+        }
+    }
+
+    fn restart_steam_now(&mut self, ctx: &egui::Context) {
+        if self.connection.is_connected {
+            self.disconnect_from_steam();
+        }
+        self.dialogs.guide_dialog = Some(crate::ui::create_restart_progress_dialog(
+            self.misc.i18n.closing_steam().to_string(),
+        ));
+        self.dialogs.show_debug_warning = false;
+        self.handlers
+            .start_restart_steam(ctx, &mut self.async_handlers);
+    }
+
     fn switch_steam_account(&mut self, ctx: &egui::Context, user_id: String) {
         let steam_path = match VdfParser::new() {
             Ok(parser) => parser.get_steam_path().clone(),
@@ -661,10 +682,7 @@ impl eframe::App for SteamCloudApp {
             crate::ui::TopPanelEvent::Connect => self.connect_to_steam(),
             crate::ui::TopPanelEvent::Disconnect => self.disconnect_from_steam(),
             crate::ui::TopPanelEvent::Refresh => self.open_cloud_url(),
-            crate::ui::TopPanelEvent::Restart => {
-                self.handlers
-                    .start_restart_steam(ui.ctx(), &mut self.async_handlers);
-            }
+            crate::ui::TopPanelEvent::Restart => self.request_restart_steam(ui.ctx()),
             crate::ui::TopPanelEvent::None => {}
         }
 
@@ -777,11 +795,7 @@ impl eframe::App for SteamCloudApp {
                     self.clear_game_config();
                 }
                 crate::ui::AppInfoDialogAction::RestartSteam => {
-                    if self.connection.is_connected {
-                        self.disconnect_from_steam();
-                    }
-                    self.handlers
-                        .start_restart_steam(ui.ctx(), &mut self.async_handlers);
+                    self.request_restart_steam(ui.ctx());
                 }
 
                 crate::ui::AppInfoDialogAction::RefreshConfig => {
@@ -882,6 +896,17 @@ impl eframe::App for SteamCloudApp {
                     self.switch_steam_account(ui.ctx(), user_id);
                 }
                 Some(false) => self.game_library.switch_confirm_user = None,
+                None => {}
+            }
+        }
+
+        if self.dialogs.confirm_restart_steam {
+            match crate::ui::draw_restart_steam_confirm(ui.ctx(), &self.misc.i18n) {
+                Some(true) => {
+                    self.dialogs.confirm_restart_steam = false;
+                    self.restart_steam_now(ui.ctx());
+                }
+                Some(false) => self.dialogs.confirm_restart_steam = false,
                 None => {}
             }
         }

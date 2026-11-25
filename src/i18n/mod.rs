@@ -955,6 +955,20 @@ impl I18n {
         }
     }
 
+    pub fn restart_steam_confirm_title(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::restart_steam_confirm_title(),
+            Language::Chinese => zh::restart_steam_confirm_title(),
+        }
+    }
+
+    pub fn restart_steam_confirm_message(&self) -> &'static str {
+        match self.lang {
+            Language::English => en::restart_steam_confirm_message(),
+            Language::Chinese => zh::restart_steam_confirm_message(),
+        }
+    }
+
     pub fn delete_confirm_title(&self, count: usize) -> String {
         match self.lang {
             Language::English => en::delete_confirm_title(count),

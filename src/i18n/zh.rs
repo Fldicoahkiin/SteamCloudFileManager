@@ -481,6 +481,14 @@ pub fn switch_account_confirm_message(account: &str) -> String {
     )
 }
 
+pub fn restart_steam_confirm_title() -> &'static str {
+    "重启 Steam"
+}
+
+pub fn restart_steam_confirm_message() -> &'static str {
+    "Steam 和正在运行的游戏都会被关闭，然后以调试模式重新启动。"
+}
+
 pub fn delete_confirm_title(count: usize) -> String {
     format!("删除 {} 个文件", count)
 }
