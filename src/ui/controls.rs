@@ -242,13 +242,16 @@ pub enum ConnectionAction {
 }
 
 // 文件选择辅助函数
-pub fn select_all_files(file_count: usize) -> Vec<usize> {
-    (0..file_count).collect()
+pub fn select_all_files(visible_files: &[usize]) -> Vec<usize> {
+    visible_files.to_vec()
 }
 
-pub fn invert_file_selection(current_selected: &[usize], file_count: usize) -> Vec<usize> {
+// 只在可见文件里反选，隐藏的文件不会被选中
+pub fn invert_file_selection(current_selected: &[usize], visible_files: &[usize]) -> Vec<usize> {
     let current_set: std::collections::HashSet<_> = current_selected.iter().copied().collect();
-    (0..file_count)
+    visible_files
+        .iter()
+        .copied()
         .filter(|i| !current_set.contains(i))
         .collect()
 }

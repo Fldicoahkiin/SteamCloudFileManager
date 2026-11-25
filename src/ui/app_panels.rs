@@ -497,6 +497,7 @@ pub fn render_center_panel(
             show_only_local: &mut file_list.show_only_local,
             show_only_cloud: &mut file_list.show_only_cloud,
             last_selected_index: &mut file_list.last_selected_index,
+            visible_files: &mut file_list.visible_files,
         };
         crate::ui::render_file_tree(
             ui,

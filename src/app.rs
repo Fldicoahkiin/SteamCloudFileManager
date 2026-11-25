@@ -685,12 +685,12 @@ impl eframe::App for SteamCloudApp {
         match bottom_event {
             crate::ui::BottomPanelEvent::SelectAll => {
                 self.file_list.selected_files =
-                    crate::ui::select_all_files(self.file_list.files.len());
+                    crate::ui::select_all_files(&self.file_list.visible_files);
             }
             crate::ui::BottomPanelEvent::InvertSelection => {
                 self.file_list.selected_files = crate::ui::invert_file_selection(
                     &self.file_list.selected_files,
-                    self.file_list.files.len(),
+                    &self.file_list.visible_files,
                 );
             }
             crate::ui::BottomPanelEvent::ClearSelection => {

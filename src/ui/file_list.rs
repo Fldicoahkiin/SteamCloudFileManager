@@ -17,6 +17,8 @@ pub struct TreeViewState<'a> {
     pub show_only_local: &'a mut bool,
     pub show_only_cloud: &'a mut bool,
     pub last_selected_index: &'a mut Option<usize>,
+    // 本帧可见的文件索引，全选和反选只作用于这些文件
+    pub visible_files: &'a mut Vec<usize>,
 }
 
 // 递归渲染时的只读上下文
@@ -121,16 +123,24 @@ fn collect_indices(node: &FileTreeNode, indices: &mut Vec<usize>) {
 // 收集当前可见的所有文件索引（用于 Shift 选择）
 fn collect_visible_file_indices(
     nodes: &[FileTreeNode],
+    search_query: &str,
     show_only_local: bool,
     show_only_cloud: bool,
 ) -> Vec<usize> {
     let mut indices = Vec::new();
-    collect_visible_indices_recursive(nodes, show_only_local, show_only_cloud, &mut indices);
+    collect_visible_indices_recursive(
+        nodes,
+        search_query,
+        show_only_local,
+        show_only_cloud,
+        &mut indices,
+    );
     indices
 }
 
 fn collect_visible_indices_recursive(
     nodes: &[FileTreeNode],
+    search_query: &str,
     show_only_local: bool,
     show_only_cloud: bool,
     indices: &mut Vec<usize>,
@@ -146,6 +156,7 @@ fn collect_visible_indices_recursive(
                 if *is_expanded {
                     collect_visible_indices_recursive(
                         children,
+                        search_query,
                         show_only_local,
                         show_only_cloud,
                         indices,
@@ -153,8 +164,10 @@ fn collect_visible_indices_recursive(
                 }
             }
             FileTreeNode::File { index, file, .. } => {
-                // 检查文件是否匹配筛选条件
-                if matches_filter(file, show_only_local, show_only_cloud) {
+                // 与渲染一致：文件名匹配搜索，且符合筛选条件
+                if matches_search(node, search_query)
+                    && matches_filter(file, show_only_local, show_only_cloud)
+                {
                     indices.push(*index);
                 }
             }
@@ -369,8 +382,15 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
             });
         })
         .body(|mut body| {
+            state.visible_files.clear();
             let root = tree.root_mut();
             if let Some(children) = root.children_mut() {
+                *state.visible_files = collect_visible_file_indices(
+                    children,
+                    state.search_query,
+                    *state.show_only_local,
+                    *state.show_only_cloud,
+                );
                 let mut ctx = TreeBodyContext {
                     search_query: state.search_query,
                     show_only_local: *state.show_only_local,
@@ -379,7 +399,13 @@ pub fn render_file_tree(ui: &mut egui::Ui, params: FileTreeRenderParams) {
                     sync_status_map,
                     i18n,
                 };
-                render_tree_body(&mut body, children, selected_files, &mut ctx);
+                render_tree_body(
+                    &mut body,
+                    children,
+                    selected_files,
+                    &mut ctx,
+                    state.visible_files,
+                );
             }
         });
 }
@@ -390,11 +416,8 @@ fn render_tree_body(
     nodes: &mut [FileTreeNode],
     selected_files: &mut Vec<usize>,
     ctx: &mut TreeBodyContext,
+    visible_indices: &[usize],
 ) {
-    // 先收集当前可见的所有文件索引
-    let visible_indices =
-        collect_visible_file_indices(nodes, ctx.show_only_local, ctx.show_only_cloud);
-
     let render_ctx = TreeRenderContext {
         search_query: ctx.search_query,
         show_only_local: ctx.show_only_local,
@@ -410,7 +433,7 @@ fn render_tree_body(
         &[],
         &render_ctx,
         ctx.last_selected_index,
-        &visible_indices,
+        visible_indices,
     );
 }
 
@@ -706,5 +729,45 @@ fn render_tree_body_recursive(
                 });
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::collect_visible_file_indices;
+    use crate::file_tree::FileTreeNode;
+    use crate::steam_api::CloudFile;
+
+    fn file(index: usize, name: &str) -> FileTreeNode {
+        FileTreeNode::File {
+            name: name.to_string(),
+            index,
+            file: CloudFile {
+                name: name.to_string(),
+                size: 1,
+                timestamp: chrono::Local::now(),
+                is_persisted: true,
+                exists: true,
+                root: 0,
+                root_description: String::new(),
+            },
+        }
+    }
+
+    #[test]
+    fn visible_files_follow_the_search_query() {
+        let nodes = vec![
+            file(0, "save1.sav"),
+            file(1, "save2.sav"),
+            file(2, "config.ini"),
+        ];
+        assert_eq!(
+            collect_visible_file_indices(&nodes, "save1", false, false),
+            vec![0]
+        );
+        assert_eq!(
+            collect_visible_file_indices(&nodes, "", false, false),
+            vec![0, 1, 2]
+        );
     }
 }

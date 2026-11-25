@@ -44,6 +44,8 @@ pub struct FileComparisonInfo {
 pub struct FileListState {
     pub files: Vec<CloudFile>,
     pub selected_files: Vec<usize>,
+    // 文件树上一帧可见的文件索引（受搜索和筛选影响）
+    pub visible_files: Vec<usize>,
     pub file_tree: Option<crate::file_tree::FileTree>,
     pub local_save_paths: Vec<(String, PathBuf)>,
     pub search_query: String,
@@ -62,6 +64,7 @@ impl FileListState {
     pub fn clear(&mut self) {
         self.files.clear();
         self.selected_files.clear();
+        self.visible_files.clear();
         self.file_tree = None;
         self.local_save_paths.clear();
         self.sync_status_map.clear();
